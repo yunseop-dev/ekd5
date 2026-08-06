@@ -145,7 +145,8 @@ export interface UnitState {
   maxHp: number
   mp: number
   maxMp: number
-  acted: boolean // 이번 페이즈 행동 완료 여부
+  moved: boolean // 이번 페이즈 이동 완료 여부
+  acted: boolean // 이번 페이즈 행동(공격/책략/대기) 완료 여부
   statuses: StatusEffect[]
   buffs: StatBuff[]
   isLeader?: boolean // 주인공: 격파당하면 패배
