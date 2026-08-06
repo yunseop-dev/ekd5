@@ -189,12 +189,17 @@ describe('affinityMultiplier (상성)', () => {
     expect(affinityMultiplier(archer, cavalry)).toBe(1.5)
   })
 
-  it('기병 → 보병: 배율 없음 (스탯으로 창발)', () => {
-    expect(affinityMultiplier(cavalry, infantry)).toBe(1)
+  it('기병 → 보병: +50% (骑克步)', () => {
+    expect(affinityMultiplier(cavalry, infantry)).toBe(1.5)
   })
 
-  it('보병 → 궁병: 배율 없음', () => {
-    expect(affinityMultiplier(infantry, archer)).toBe(1)
+  it('보병 → 궁병: +50% (步克弓)', () => {
+    expect(affinityMultiplier(infantry, archer)).toBe(1.5)
+  })
+
+  it('역상성/무관 조합은 배율 없음', () => {
+    expect(affinityMultiplier(archer, infantry)).toBe(1)
+    expect(affinityMultiplier(cavalry, archer)).toBe(1)
   })
 })
 

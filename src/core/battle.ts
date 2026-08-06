@@ -10,6 +10,7 @@ import {
   affinityMultiplier,
   applyExp,
   combatStats,
+  COUNTER_DAMAGE_SCALE,
   critRate,
   doubleAttackRate,
   expGain,
@@ -139,7 +140,7 @@ export function forecastAttack(state: BattleState, attacker: UnitState, defender
           atkTerrainEffect: terrainEffectOf(state, defender),
           defTerrainEffect: terrainEffectOf(state, attacker),
           attackerLevel: defender.level,
-          multipliers: [affinityMultiplier(dCls, aCls)],
+          multipliers: [affinityMultiplier(dCls, aCls), COUNTER_DAMAGE_SCALE],
         })
       : 0,
     counterHitRate: willCounter ? hitRate(dStats.agi, aStats.agi) : 0,
@@ -224,8 +225,13 @@ function dealDamage(state: BattleState, target: UnitState, amount: number): void
   }
 }
 
-/** 한 번의 타격 해소 (명중 → 회심 → 데미지). 명중 여부 반환 */
-function resolveStrike(state: BattleState, attacker: UnitState, defender: UnitState): boolean {
+/** 한 번의 타격 해소 (명중 → 회심 → 데미지). 명중 여부 반환. damageScale: 반격 시 0.8 */
+function resolveStrike(
+  state: BattleState,
+  attacker: UnitState,
+  defender: UnitState,
+  damageScale = 1,
+): boolean {
   const aStats = effectiveStats(attacker)
   const dStats = effectiveStats(defender)
 
@@ -244,6 +250,7 @@ function resolveStrike(state: BattleState, attacker: UnitState, defender: UnitSt
 
   const multipliers = [affinityMultiplier(classOf(attacker), classOf(defender))]
   if (critRoll.value) multipliers.push(CRIT_MULTIPLIER)
+  if (damageScale !== 1) multipliers.push(damageScale)
 
   const dmg = physicalDamage({
     atk: aStats.atk,
@@ -429,7 +436,7 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
       const forecast = forecastAttack(state, attacker, defender)
       if (defender.hp > 0 && forecast.willCounter) {
         log(state, 'counter', `${nameOf(defender)}의 반격!`)
-        resolveStrike(state, defender, attacker)
+        resolveStrike(state, defender, attacker, COUNTER_DAMAGE_SCALE)
       }
 
       attacker.acted = true

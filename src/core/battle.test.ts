@@ -158,6 +158,58 @@ describe('attack 액션', () => {
   })
 })
 
+describe('반격 규칙 (docs/research/ux.md §5)', () => {
+  // 전위(중보병) Lv1이 등무(중보병) Lv30을 공격 — 등무는 생존 확정 + 반격 명중 100%(순발 2.4배)
+  const counterStage = () =>
+    mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 0, y: 0 }, isLeader: true },
+        { officerId: 'dianwei', faction: 'player', pos: { x: 3, y: 3 }, level: 1 },
+        { officerId: 'dengMao', faction: 'enemy', pos: { x: 4, y: 3 }, level: 30 },
+      ],
+    })
+
+  it('근접 공격 시 반격이 실제로 실행되어 공격자 HP가 감소한다 (시드 5종)', () => {
+    for (const seed of [1, 7, 42, 99, 2026]) {
+      const state = startBattle(counterStage(), seed)
+      const dianwei = unit(state, 'dianwei')
+      const next = applyAction(state, {
+        type: 'attack', unitId: dianwei.id, targetId: unit(state, 'dengMao').id,
+      })
+      expect(unit(next, 'dengMao').hp).toBeGreaterThan(0) // 방어자 생존
+      expect(unit(next, 'dianwei').hp).toBeLessThan(dianwei.maxHp) // 반격 피해 적용
+      expect(next.log.some((e) => e.type === 'counter'), `seed ${seed}`).toBe(true)
+    }
+  })
+
+  it('반격 예측 데미지 = 역방향 공격 데미지의 80% (버림)', () => {
+    const state = startBattle(counterStage(), 1)
+    const dianwei = unit(state, 'dianwei')
+    const dengMao = unit(state, 'dengMao')
+    const forward = forecastAttack(state, dianwei, dengMao)
+    const reverse = forecastAttack(state, dengMao, dianwei)
+    expect(forward.counterDamage).toBe(Math.max(1, Math.trunc(reverse.damage * 0.8)))
+  })
+
+  it('궁병은 인접(근접) 피격 시 반격 불가 — 최소 사거리 2', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 0, y: 0 }, isLeader: true },
+        { officerId: 'dianwei', faction: 'player', pos: { x: 3, y: 3 }, level: 5 },
+        { officerId: 'yellowArcher', faction: 'enemy', pos: { x: 4, y: 3 }, level: 30 },
+      ],
+    })
+    const state = startBattle(stage, 1)
+    const dianwei = unit(state, 'dianwei')
+    const fc = forecastAttack(state, dianwei, unit(state, 'yellowArcher'))
+    expect(fc.willCounter).toBe(false)
+    const next = applyAction(state, {
+      type: 'attack', unitId: dianwei.id, targetId: unit(state, 'yellowArcher').id,
+    })
+    expect(unit(next, 'dianwei').hp).toBe(dianwei.maxHp) // 반격 안 맞음
+  })
+})
+
 describe('strategy 액션', () => {
   it('초열: MP 소모 + 데미지', () => {
     const stage = mkStage({

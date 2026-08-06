@@ -146,15 +146,24 @@ export function strategyDamage(
 // ---------- 상성 ----------
 
 /**
- * 상성 배율 (조조전 실구현 방식 — 나머지 삼각형은 스탯으로 창발):
- *  - 보병 → 기병(mounted): 딜 50% 감소 (×0.5)
- *  - 원거리(ranged) → 기병(mounted): +50% 추가 피해 (×1.5)
+ * 상성 배율 — 삼각형: 기병 > 보병 > 궁병 > 기병 (단방향 +50%)
+ *  - 원거리(ranged) → 기병(mounted): ×1.5 (弓克骑) [CN·KR 일치]
+ *  - 기병 → 보병: ×1.5 (骑克步) [CN 百度经验]
+ *  - 보병 → 궁병: ×1.5 (步克弓) [CN 百度经验]
+ *  - 보병 → 기병(mounted): ×0.5 (딜 반감) [KR 나무위키]
+ * ※ 출처 충돌: KR 나무위키는 궁→기 +50%와 보→기 반감만 명시(나머지는 스탯 창발),
+ *   CN 百度经验은 삼각 +50%를 명시 — 삼각형이 완성되는 CN 서술을 채택 (docs/research/ux.md 부록).
  */
 export function affinityMultiplier(attacker: UnitClassDef, defender: UnitClassDef): number {
   if (attacker.category === 'infantry' && defender.mounted) return 0.5
   if (attacker.ranged && defender.mounted) return 1.5
+  if (attacker.category === 'cavalry' && defender.category === 'infantry') return 1.5
+  if (attacker.category === 'infantry' && defender.category === 'archer') return 1.5
   return 1
 }
+
+/** 반격 데미지 배율 — 반격은 본 공격 데미지의 80% (docs/research/ux.md §5) */
+export const COUNTER_DAMAGE_SCALE = 0.8
 
 export const critMultiplier = CRIT_MULTIPLIER
 

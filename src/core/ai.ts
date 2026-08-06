@@ -17,6 +17,7 @@ import {
 } from './battle'
 import {
   affinityMultiplier,
+  COUNTER_DAMAGE_SCALE,
   critRate as critRateOf,
   doubleAttackRate,
   hitRate,
@@ -73,7 +74,7 @@ function scorePhysical(state: BattleState, unit: UnitState, cell: Vec2, target: 
       atkTerrainEffect: terrainEffectOf(state, target),
       defTerrainEffect: terrainEffectAt(state, unit, cell),
       attackerLevel: target.level,
-      multipliers: [affinityMultiplier(tCls, uCls)],
+      multipliers: [affinityMultiplier(tCls, uCls), COUNTER_DAMAGE_SCALE],
     })
     score -= counterDmg * (hitRate(tStats.agi, uStats.agi) / 100)
   }
