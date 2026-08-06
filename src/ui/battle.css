@@ -29,8 +29,19 @@
 .turn-banner .phase-player { color: #6ab0f3; font-weight: 700; }
 .turn-banner .phase-enemy { color: #e06c5a; font-weight: 700; }
 
-.end-turn-btn {
+.speed-btn {
   margin-left: auto;
+  padding: 8px 12px;
+  background: #3d3527;
+  color: #e8dcc8;
+  border: 1px solid #6a5c40;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.speed-btn:hover { background: #55482f; }
+
+.end-turn-btn {
   padding: 8px 16px;
   background: #3a5a8c;
   color: #fff;
@@ -49,12 +60,39 @@
 }
 
 .board {
+  position: relative;
   display: grid;
   gap: 1px;
   background: #000;
   border: 2px solid #000;
   width: fit-content;
   user-select: none;
+}
+
+/* 데미지/회복 플로팅 텍스트 */
+.floater {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 5;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  opacity: 0;
+  animation: float-up 1.2s ease-out forwards;
+}
+.fl-damage { color: #ffffff; }
+.fl-crit { color: #ffb04c; font-size: 16px; }
+.fl-counter { color: #ff8a7a; }
+.fl-heal { color: #7ce08a; }
+.fl-miss { color: #b8b8b8; }
+
+@keyframes float-up {
+  0% { opacity: 0; translate: 0 6px; }
+  15% { opacity: 1; translate: 0 0; }
+  75% { opacity: 1; translate: 0 -14px; }
+  100% { opacity: 0; translate: 0 -22px; }
 }
 
 .tile {
@@ -118,6 +156,15 @@
 .unit-token.acted { filter: grayscale(0.8) brightness(0.7); }
 .unit-token.leader { box-shadow: 0 0 6px 2px #ffd76a; }
 .unit-token.boss { box-shadow: 0 0 6px 2px #ff5a3c; }
+.unit-token.ai-active {
+  animation: ai-pulse 0.7s ease-in-out infinite;
+  z-index: 3;
+}
+
+@keyframes ai-pulse {
+  0%, 100% { outline: 3px solid #fff; outline-offset: 0; }
+  50% { outline: 3px solid #ffd76a; outline-offset: 3px; }
+}
 
 .unit-token .hp-bar {
   position: absolute;

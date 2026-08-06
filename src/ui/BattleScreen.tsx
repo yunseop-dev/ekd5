@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { runAiPhase } from '../core/ai'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { runAiPhase, stepAiUnit } from '../core/ai'
 import {
   applyAction,
   classOf,
@@ -28,6 +28,29 @@ interface Selection {
   undo: BattleState // 취소 시 복원 지점 (이동 전 상태)
 }
 
+export interface Floater {
+  id: number
+  x: number
+  y: number
+  text: string
+  kind: 'damage' | 'crit' | 'counter' | 'heal' | 'miss'
+  delay: number // 초 단위 stagger
+}
+
+/** 연출 속도: 1=보통, 2=빠름, 0=생략 */
+type PlaySpeed = 1 | 2 | 0
+const AI_STEP_MS = 700
+
+const FLOATER_TEXT: Record<string, (n: number) => { text: string; kind: Floater['kind'] }> = {
+  hit: (n) => ({ text: `${n}`, kind: 'damage' }),
+  crit: (n) => ({ text: `회심! ${n}`, kind: 'crit' }),
+  counterHit: (n) => ({ text: `반격! ${n}`, kind: 'counter' }),
+  counterCrit: (n) => ({ text: `반격 회심! ${n}`, kind: 'crit' }),
+  strategy: (n) => ({ text: `${n}`, kind: 'damage' }),
+  heal: (n) => ({ text: `+${n}`, kind: 'heal' }),
+  miss: () => ({ text: 'MISS', kind: 'miss' }),
+}
+
 interface Props {
   stage: StageDef
   seed: number
@@ -39,9 +62,75 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
   const [state, setState] = useState<BattleState>(() => startBattle(stage, seed))
   const [sel, setSel] = useState<Selection | null>(null)
   const [hover, setHover] = useState<Vec2 | null>(null)
+  const [speed, setSpeed] = useState<PlaySpeed>(1)
+  const [aiActiveId, setAiActiveId] = useState<string | null>(null)
+  const [floaters, setFloaters] = useState<Floater[]>([])
+  const floaterSeq = useRef(0)
+  const prevLogLen = useRef(state.log.length)
 
   const selectedUnit = sel ? state.units.find((u) => u.id === sel.unitId) : undefined
   const hoverUnit = hover ? unitAt(state, hover) : undefined
+  const aiActiveUnit = aiActiveId ? state.units.find((u) => u.id === aiActiveId) : undefined
+
+  // ---------- AI 페이즈 순차 재생 ----------
+
+  useEffect(() => {
+    if (state.result !== 'ongoing' || state.phase === 'player') {
+      if (aiActiveId !== null) setAiActiveId(null)
+      return
+    }
+    if (speed === 0) {
+      // 연출 생략: 즉시 전부 처리
+      setState((prev) => {
+        let cur = prev
+        while (cur.result === 'ongoing' && cur.phase !== 'player') cur = runAiPhase(cur, cur.phase)
+        return cur
+      })
+      return
+    }
+    const timer = setTimeout(() => {
+      setState((prev) => {
+        if (prev.result !== 'ongoing' || prev.phase === 'player') return prev
+        const step = stepAiUnit(prev, prev.phase)
+        setAiActiveId(step.actedUnitId)
+        return step.state
+      })
+    }, AI_STEP_MS / speed)
+    return () => clearTimeout(timer)
+  }, [state, speed, aiActiveId])
+
+  // ---------- 데미지/회복 플로팅 텍스트 (로그 diff 기반) ----------
+
+  useEffect(() => {
+    if (state.log.length <= prevLogLen.current) {
+      prevLogLen.current = state.log.length
+      return
+    }
+    const events = state.log.slice(prevLogLen.current)
+    prevLogLen.current = state.log.length
+
+    const created: Floater[] = []
+    for (const e of events) {
+      if (!e.targetId || e.amount === undefined) continue
+      const target = state.units.find((u) => u.id === e.targetId)
+      const mk = FLOATER_TEXT[e.type]
+      if (!target || !mk) continue
+      created.push({
+        id: ++floaterSeq.current,
+        x: target.pos.x,
+        y: target.pos.y,
+        delay: created.length * 0.25,
+        ...mk(e.amount),
+      })
+    }
+    if (created.length === 0) return
+    setFloaters((prev) => [...prev, ...created])
+    const ids = new Set(created.map((f) => f.id))
+    setTimeout(
+      () => setFloaters((prev) => prev.filter((f) => !ids.has(f.id))),
+      1300 + created.length * 250,
+    )
+  }, [state])
 
   // ---------- 오버레이 계산 ----------
 
@@ -179,12 +268,8 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
   function handleEndTurn() {
     if (!isPlayerTurn) return
     setSel(null)
-    let next = applyAction(state, { type: 'endPhase' })
-    // 우군/적군 페이즈를 AI로 자동 진행
-    while (next.result === 'ongoing' && next.phase !== 'player') {
-      next = runAiPhase(next, next.phase)
-    }
-    setState(next)
+    // 페이즈만 넘기면 AI 재생 useEffect가 이어받는다
+    setState(applyAction(state, { type: 'endPhase' }))
   }
 
   // ---------- 렌더 ----------
@@ -214,6 +299,13 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
           </span>
           <span>{state.weather === 'clear' ? '맑음' : '비'}</span>
         </div>
+        <button
+          className="speed-btn"
+          onClick={() => setSpeed((s) => (s === 1 ? 2 : s === 2 ? 0 : 1))}
+          title="적 턴 연출 속도"
+        >
+          연출: {speed === 1 ? '보통' : speed === 2 ? '빠름' : '생략'}
+        </button>
         <button className="end-turn-btn" onClick={handleEndTurn} disabled={!isPlayerTurn}>
           턴 종료
         </button>
@@ -225,6 +317,8 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
         attackCells={attackCells}
         strategyCells={strategyCells}
         selectedUnitId={sel?.unitId ?? null}
+        activeUnitId={aiActiveId}
+        floaters={floaters}
         onCellClick={handleCellClick}
         onCellHover={setHover}
       />
@@ -270,7 +364,9 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
           <ForecastPanel state={state} attacker={selectedUnit} defender={forecastTarget} />
         )}
 
-        {(hoverUnit ?? selectedUnit) && <UnitInfoPanel state={state} unit={(hoverUnit ?? selectedUnit)!} />}
+        {(hoverUnit ?? selectedUnit ?? aiActiveUnit) && (
+          <UnitInfoPanel state={state} unit={(hoverUnit ?? selectedUnit ?? aiActiveUnit)!} />
+        )}
 
         <BattleLog log={state.log} />
       </aside>

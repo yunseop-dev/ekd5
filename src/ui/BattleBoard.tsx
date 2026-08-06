@@ -2,6 +2,9 @@ import { classOf, unitAt } from '../core/battle'
 import { keyOf } from '../core/movement'
 import type { BattleState, UnitState, Vec2 } from '../core/types'
 import { TERRAIN } from '../data/terrain'
+import type { Floater } from './BattleScreen'
+
+const TILE = 45 // 44px 타일 + 1px gap
 
 const CLASS_ICON: Record<string, string> = {
   lord: '主',
@@ -18,11 +21,15 @@ interface Props {
   attackCells: Set<string>
   strategyCells: Set<string>
   selectedUnitId: string | null
+  /** AI 페이즈에서 현재 행동 중인 유닛 (하이라이트) */
+  activeUnitId: string | null
+  floaters: Floater[]
   onCellClick: (pos: Vec2) => void
   onCellHover: (pos: Vec2 | null) => void
+  onCellRightClick?: (pos: Vec2) => void
 }
 
-function UnitToken({ unit }: { unit: UnitState }) {
+function UnitToken({ unit, active }: { unit: UnitState; active: boolean }) {
   const ratio = unit.hp / unit.maxHp
   const hpClass = ratio <= 0.25 ? 'critical' : ratio <= 0.5 ? 'low' : ''
   const classes = [
@@ -31,6 +38,7 @@ function UnitToken({ unit }: { unit: UnitState }) {
     unit.acted && unit.faction === 'player' ? 'acted' : '',
     unit.isLeader ? 'leader' : '',
     unit.isBoss ? 'boss' : '',
+    active ? 'ai-active' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -50,8 +58,11 @@ export function BattleBoard({
   attackCells,
   strategyCells,
   selectedUnitId,
+  activeUnitId,
+  floaters,
   onCellClick,
   onCellHover,
+  onCellRightClick,
 }: Props) {
   const { width, height, tiles } = state.map
 
@@ -70,6 +81,10 @@ export function BattleBoard({
                 key={key}
                 className={`tile t-${terrain.id}`}
                 onClick={() => onCellClick(pos)}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  onCellRightClick?.(pos)
+                }}
                 onMouseEnter={() => onCellHover(pos)}
                 title={`${terrain.name} (${x},${y})`}
               >
@@ -77,12 +92,25 @@ export function BattleBoard({
                 {moveCells.has(key) && <div className="overlay move" />}
                 {attackCells.has(key) && <div className="overlay attack" />}
                 {strategyCells.has(key) && <div className="overlay strategy" />}
-                {unit && <UnitToken unit={unit} />}
+                {unit && <UnitToken unit={unit} active={unit.id === activeUnitId} />}
                 {isSelected && <div className="overlay cursor" />}
               </div>
             )
           }),
         )}
+        {floaters.map((f) => (
+          <div
+            key={f.id}
+            className={`floater fl-${f.kind}`}
+            style={{
+              left: f.x * TILE + TILE / 2,
+              top: f.y * TILE,
+              animationDelay: `${f.delay}s`,
+            }}
+          >
+            {f.text}
+          </div>
+        ))}
       </div>
     </div>
   )
