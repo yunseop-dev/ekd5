@@ -1,0 +1,261 @@
+.battle-screen {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 12px;
+  padding: 12px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.battle-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.battle-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.turn-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.turn-banner .phase-player { color: #6ab0f3; font-weight: 700; }
+.turn-banner .phase-enemy { color: #e06c5a; font-weight: 700; }
+
+.end-turn-btn {
+  margin-left: auto;
+  padding: 8px 16px;
+  background: #3a5a8c;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.end-turn-btn:hover { background: #4a6fa8; }
+.end-turn-btn:disabled { background: #444; cursor: default; }
+
+/* ---------- 보드 ---------- */
+
+.board-wrap {
+  overflow-x: auto;
+}
+
+.board {
+  display: grid;
+  gap: 1px;
+  background: #000;
+  border: 2px solid #000;
+  width: fit-content;
+  user-select: none;
+}
+
+.tile {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+}
+
+/* 지형 색 */
+.tile.t-plain { background: #a8bf6e; }
+.tile.t-grass { background: #8fb95e; }
+.tile.t-forest { background: #4e7a3d; }
+.tile.t-mountain { background: #8a7355; }
+.tile.t-wasteland { background: #c2a86b; }
+.tile.t-river { background: #4c7fb5; }
+.tile.t-bridge { background: #a3865a; }
+.tile.t-fort { background: #7d6a8f; }
+.tile.t-village { background: #d9b06c; }
+.tile.t-castle { background: #9b9b9b; }
+.tile.t-wall { background: #55504a; }
+.tile.t-gate { background: #6d5c3f; }
+
+.tile .terrain-mark {
+  position: absolute;
+  right: 2px;
+  bottom: 0;
+  font-size: 9px;
+  opacity: 0.65;
+  color: #1c1c1c;
+  pointer-events: none;
+}
+
+/* 오버레이 */
+.tile .overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.tile .overlay.move { background: rgba(70, 130, 240, 0.45); }
+.tile .overlay.attack { background: rgba(230, 60, 40, 0.45); }
+.tile .overlay.strategy { background: rgba(180, 80, 220, 0.45); }
+.tile .overlay.cursor { outline: 2px solid #fff; outline-offset: -2px; }
+
+/* 유닛 토큰 */
+.unit-token {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.unit-token.f-player { background: #2d5da8; border: 2px solid #9cc2ff; }
+.unit-token.f-enemy { background: #a83a2d; border: 2px solid #ffb09c; }
+.unit-token.f-ally { background: #2d8a4a; border: 2px solid #a2eab8; }
+.unit-token.acted { filter: grayscale(0.8) brightness(0.7); }
+.unit-token.leader { box-shadow: 0 0 6px 2px #ffd76a; }
+.unit-token.boss { box-shadow: 0 0 6px 2px #ff5a3c; }
+
+.unit-token .hp-bar {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: -1px;
+  height: 4px;
+  background: #222;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.unit-token .hp-bar > div {
+  height: 100%;
+  background: #52d869;
+}
+.unit-token .hp-bar > div.low { background: #e6b23c; }
+.unit-token .hp-bar > div.critical { background: #e0492f; }
+
+/* ---------- 사이드 패널 ---------- */
+
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.panel-box {
+  background: #262119;
+  border: 1px solid #4a4132;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.panel-box h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #d8b96a;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px 10px;
+}
+
+.forecast-row {
+  display: flex;
+  justify-content: space-between;
+}
+.forecast-vs {
+  text-align: center;
+  color: #d8b96a;
+  margin: 4px 0;
+}
+
+/* 액션 메뉴 */
+.action-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.action-menu button {
+  padding: 7px 10px;
+  background: #3d3527;
+  color: #e8dcc8;
+  border: 1px solid #6a5c40;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+}
+.action-menu button:hover:not(:disabled) { background: #55482f; }
+.action-menu button:disabled { opacity: 0.4; cursor: default; }
+
+/* 로그 */
+.battle-log {
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #bfb39c;
+}
+.battle-log .log-crit { color: #ffb04c; }
+.battle-log .log-defeat { color: #ff7a5c; }
+.battle-log .log-levelUp { color: #7ce08a; }
+.battle-log .log-victory { color: #ffd76a; font-weight: 700; }
+.battle-log .log-reinforcement { color: #e08ae0; }
+
+/* 결과 오버레이 */
+.result-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+.result-overlay .result-box {
+  background: #262119;
+  border: 2px solid #d8b96a;
+  border-radius: 12px;
+  padding: 32px 48px;
+  text-align: center;
+}
+.result-overlay h2 { margin: 0 0 16px; font-size: 28px; }
+.result-overlay button {
+  margin: 0 6px;
+  padding: 10px 20px;
+  background: #3a5a8c;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* 스테이지 선택 */
+.stage-select {
+  max-width: 640px;
+  margin: 48px auto;
+  padding: 0 16px;
+}
+.stage-select h1 { color: #d8b96a; }
+.stage-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #262119;
+  border: 1px solid #4a4132;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  color: #e8dcc8;
+  cursor: pointer;
+  font-size: 15px;
+}
+.stage-card:hover { border-color: #d8b96a; }
+.stage-card .stage-desc { font-size: 13px; color: #bfb39c; margin-top: 4px; }
