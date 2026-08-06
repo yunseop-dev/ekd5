@@ -63,6 +63,7 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
   const [sel, setSel] = useState<Selection | null>(null)
   const [hover, setHover] = useState<Vec2 | null>(null)
   const [speed, setSpeed] = useState<PlaySpeed>(1)
+  const [confirmEnd, setConfirmEnd] = useState(false)
   const [aiActiveId, setAiActiveId] = useState<string | null>(null)
   const [floaters, setFloaters] = useState<Floater[]>([])
   const floaterSeq = useRef(0)
@@ -197,6 +198,45 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
   function finishAction(next: BattleState) {
     setState(next)
     setSel(null)
+    // 원작(GBA 영걸전) 동작: 전원 행동 완료 시 턴 종료 확인창 자동 표시
+    if (
+      next.result === 'ongoing' &&
+      next.phase === 'player' &&
+      livingUnits(next, 'player').every((u) => u.acted)
+    ) {
+      setConfirmEnd(true)
+    }
+  }
+
+  function doEndTurn() {
+    setConfirmEnd(false)
+    if (!isPlayerTurn) return
+    setSel(null)
+    // 페이즈만 넘기면 AI 재생 useEffect가 이어받는다
+    setState(applyAction(state, { type: 'endPhase' }))
+  }
+
+  /** 우클릭 = 원작 취소 버튼: 단계별 뒤로가기, 선택 없음 상태에서는 턴 종료 확인 */
+  function handleRightClick() {
+    if (!isPlayerTurn) return
+    if (!sel) {
+      setConfirmEnd(true)
+      return
+    }
+    switch (sel.mode) {
+      case 'attackTarget':
+      case 'strategyTarget':
+        setSel({ ...sel, mode: 'menu', strategyId: undefined })
+        return
+      case 'menu':
+        // 이동 취소: 이동 전 상태로 복원하고 이동 모드 유지
+        setState(sel.undo)
+        setSel({ unitId: sel.unitId, mode: 'move', undo: sel.undo })
+        return
+      case 'move':
+        setSel(null)
+        return
+    }
   }
 
   function handleCellClick(pos: Vec2) {
@@ -267,9 +307,7 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
 
   function handleEndTurn() {
     if (!isPlayerTurn) return
-    setSel(null)
-    // 페이즈만 넘기면 AI 재생 useEffect가 이어받는다
-    setState(applyAction(state, { type: 'endPhase' }))
+    setConfirmEnd(true)
   }
 
   // ---------- 렌더 ----------
@@ -321,6 +359,7 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
         floaters={floaters}
         onCellClick={handleCellClick}
         onCellHover={setHover}
+        onCellRightClick={handleRightClick}
       />
 
       <aside className="side-panel">
@@ -370,6 +409,16 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
 
         <BattleLog log={state.log} />
       </aside>
+
+      {confirmEnd && isPlayerTurn && (
+        <div className="result-overlay" onContextMenu={(e) => { e.preventDefault(); setConfirmEnd(false) }}>
+          <div className="result-box">
+            <h2>턴을 종료하시겠습니까?</h2>
+            <button onClick={doEndTurn}>예</button>
+            <button onClick={() => setConfirmEnd(false)}>아니오</button>
+          </div>
+        </div>
+      )}
 
       {state.result !== 'ongoing' && (
         <div className="result-overlay">
