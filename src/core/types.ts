@@ -201,6 +201,10 @@ export type BattleResult = 'ongoing' | 'victory' | 'defeat'
 export interface LogEvent {
   type: string
   message: string
+  /** 데미지/회복/미스의 대상 유닛 — UI 플로팅 텍스트 앵커 */
+  targetId?: string
+  /** 음수 = 데미지, 양수 = 회복, 0 = 미스 */
+  amount?: number
 }
 
 export interface BattleState {

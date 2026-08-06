@@ -192,8 +192,13 @@ export function createBattle(stage: StageDef, seed: number): BattleState {
 
 // ---------- 내부 유틸 ----------
 
-function log(state: BattleState, type: string, message: string): void {
-  state.log.push({ type, message })
+function log(
+  state: BattleState,
+  type: string,
+  message: string,
+  detail?: { targetId?: string; amount?: number },
+): void {
+  state.log.push({ type, message, ...detail })
 }
 
 const nameOf = (unit: UnitState): string => officerOf(unit).name
@@ -238,7 +243,7 @@ function resolveStrike(
   const hitRoll = roll(state.rngState, hitRate(aStats.agi, dStats.agi))
   state.rngState = hitRoll.nextState
   if (!hitRoll.value) {
-    log(state, 'miss', `${nameOf(attacker)}의 공격이 빗나갔다!`)
+    log(state, 'miss', `${nameOf(attacker)}의 공격이 빗나갔다!`, { targetId: defender.id, amount: 0 })
     return false
   }
 
@@ -262,10 +267,13 @@ function resolveStrike(
     randomBonus: bonus.value,
   })
 
+  const isCounter = damageScale !== 1
+  const eventType = isCounter ? (critRoll.value ? 'counterCrit' : 'counterHit') : critRoll.value ? 'crit' : 'hit'
   log(
     state,
-    critRoll.value ? 'crit' : 'hit',
+    eventType,
     `${nameOf(attacker)} → ${nameOf(defender)}: ${dmg} 데미지${critRoll.value ? ' (회심의 일격!)' : ''}`,
+    { targetId: defender.id, amount: -dmg },
   )
   dealDamage(state, defender, dmg)
   grantExp(state, attacker, defender.level, defender.hp === 0)
@@ -494,7 +502,10 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
             const bonus = nextInt(state.rngState, 0, 7)
             state.rngState = bonus.nextState
             const dmg = strategyDamage(cStats.mind, tStats.mind, caster.level, strategy.power!, bonus.value)
-            log(state, 'strategy', `${nameOf(caster)}의 ${strategy.name} → ${nameOf(target)}: ${dmg} 데미지`)
+            log(state, 'strategy', `${nameOf(caster)}의 ${strategy.name} → ${nameOf(target)}: ${dmg} 데미지`, {
+              targetId: target.id,
+              amount: -dmg,
+            })
             dealDamage(state, target, dmg)
             grantExp(state, caster, target.level, target.hp === 0)
           } else {
@@ -506,7 +517,10 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
           if (isHostile(caster, target)) continue
           const healed = Math.min(strategy.healAmount!, target.maxHp - target.hp)
           target.hp += healed
-          log(state, 'heal', `${nameOf(caster)}의 ${strategy.name} → ${nameOf(target)}: ${healed} 회복`)
+          log(state, 'heal', `${nameOf(caster)}의 ${strategy.name} → ${nameOf(target)}: ${healed} 회복`, {
+            targetId: target.id,
+            amount: healed,
+          })
           grantExp(state, caster, target.level, false)
         } else {
           if (isHostile(caster, target)) continue

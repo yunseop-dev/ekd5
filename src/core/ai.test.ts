@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decideUnit, runAiPhase } from './ai'
+import { decideUnit, runAiPhase, stepAiUnit } from './ai'
 import { applyAction, livingUnits, startBattle } from './battle'
 import { manhattan } from './movement'
 import type { BattleState, StageDef, TerrainId, UnitState } from './types'
@@ -96,6 +96,47 @@ describe('decideUnit', () => {
     state = applyAction(state, { type: 'endPhase' })
     const plan = decideUnit(state, unit(state, 'yellowShaman'))
     expect(plan.act.type).toBe('strategy')
+  })
+})
+
+describe('stepAiUnit', () => {
+  it('한 번에 유닛 1기만 행동하고, 전원 소진 시 endPhase와 done을 반환한다', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 3, y: 2 } },
+        { officerId: 'yellowCavalry', faction: 'enemy', pos: { x: 8, y: 8 } },
+      ],
+    })
+    let state = startBattle(stage, 1)
+    state = applyAction(state, { type: 'endPhase' })
+
+    const step1 = stepAiUnit(state, 'enemy')
+    expect(step1.done).toBe(false)
+    expect(step1.actedUnitId).not.toBeNull()
+    expect(livingUnits(step1.state, 'enemy').filter((u) => u.acted).length).toBe(1)
+
+    const step2 = stepAiUnit(step1.state, 'enemy')
+    expect(step2.done).toBe(false)
+    expect(step2.actedUnitId).not.toBe(step1.actedUnitId)
+
+    const step3 = stepAiUnit(step2.state, 'enemy')
+    expect(step3.done).toBe(true)
+    expect(step3.actedUnitId).toBeNull()
+    expect(step3.state.phase).toBe('player')
+    expect(step3.state.turn).toBe(2)
+  })
+
+  it('아군 페이즈이거나 종료된 전투에서는 아무것도 하지 않는다', () => {
+    const state = startBattle(mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 3, y: 2 } },
+      ],
+    }), 1)
+    const step = stepAiUnit(state, 'enemy') // 현재 player 페이즈
+    expect(step.done).toBe(true)
+    expect(step.state).toBe(state)
   })
 })
 

@@ -174,32 +174,47 @@ export function decideUnit(state: BattleState, unit: UnitState): UnitPlan {
   return { moveTo: null, act: { type: 'wait', unitId: unit.id }, score: 0 }
 }
 
-/** 해당 진영 전 유닛의 AI 턴 실행 후 페이즈 종료까지 진행 */
+export interface AiStep {
+  state: BattleState
+  /** 이번 스텝에 행동한 유닛 (UI 하이라이트용). 없으면 페이즈 종료 스텝 */
+  actedUnitId: string | null
+  done: boolean
+}
+
+/**
+ * AI 유닛 1기만 실행하는 스텝 함수 — UI가 유닛 단위로 순차 재생할 수 있게 한다.
+ * 미행동 유닛이 없으면 endPhase를 적용하고 done을 반환.
+ */
+export function stepAiUnit(state: BattleState, faction: Faction): AiStep {
+  if (state.phase !== faction || state.result !== 'ongoing') {
+    return { state, actedUnitId: null, done: true }
+  }
+
+  const unit = livingUnits(state, faction).find((u) => !u.acted)
+  if (!unit) {
+    return { state: applyAction(state, { type: 'endPhase' }), actedUnitId: null, done: true }
+  }
+
+  let current = state
+  const plan = decideUnit(current, unit)
+  if (plan.moveTo && !unitAt(current, plan.moveTo)) {
+    current = applyAction(current, { type: 'move', unitId: unit.id, to: plan.moveTo })
+  }
+  current = applyAction(current, plan.act)
+  // 계획이 거부됐다면(상태 변화로 무효화) 안전하게 대기 처리해 무한 루프 방지
+  const after = current.units.find((u) => u.id === unit.id)
+  if (current.result === 'ongoing' && after && after.hp > 0 && !after.acted) {
+    current = applyAction(current, { type: 'wait', unitId: unit.id })
+  }
+  return { state: current, actedUnitId: unit.id, done: current.result !== 'ongoing' }
+}
+
+/** 해당 진영 전 유닛의 AI 턴 실행 후 페이즈 종료까지 진행 (stepAiUnit 루프) */
 export function runAiPhase(state: BattleState, faction: Faction): BattleState {
   let current = state
-  if (current.phase !== faction || current.result !== 'ongoing') return current
-
-  // 유닛 스냅샷 순회 (도중 증원된 유닛은 다음 턴부터 행동)
-  const ids = livingUnits(current, faction).map((u) => u.id)
-  for (const id of ids) {
-    if (current.result !== 'ongoing') break
-    const unit = current.units.find((u) => u.id === id)
-    if (!unit || unit.hp <= 0 || unit.acted) continue
-
-    const plan = decideUnit(current, unit)
-    if (plan.moveTo && !unitAt(current, plan.moveTo)) {
-      current = applyAction(current, { type: 'move', unitId: id, to: plan.moveTo })
-    }
-    current = applyAction(current, plan.act)
-    // 계획이 거부됐다면(상태 변화로 무효화) 안전하게 대기
-    const after = current.units.find((u) => u.id === id)
-    if (after && after.hp > 0 && !after.acted) {
-      current = applyAction(current, { type: 'wait', unitId: id })
-    }
+  for (;;) {
+    const step = stepAiUnit(current, faction)
+    current = step.state
+    if (step.done) return current
   }
-
-  if (current.result === 'ongoing') {
-    current = applyAction(current, { type: 'endPhase' })
-  }
-  return current
 }
