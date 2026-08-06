@@ -50,25 +50,27 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     cost: { foot: 1, horse: 1, wheel: 1, mage: 1 },
     effect: { foot: 100, horse: 100, wheel: 100, mage: 100 },
   },
+  // 원작 확정치: 성·관문·요새 = 120%(★), 마을·병영 = 110%(◎) + 매턴 최대 HP 20% 회복
+  // (docs/research/ux.md §4)
   fort: {
     id: 'fort',
     name: '성채',
     cost: { foot: 1, horse: 1, wheel: 1, mage: 1 },
-    effect: { foot: 120, horse: 110, wheel: 110, mage: 115 },
+    effect: { foot: 120, horse: 120, wheel: 120, mage: 120 },
     healPerTurn: 20,
   },
   village: {
     id: 'village',
     name: '마을',
     cost: { foot: 1, horse: 1, wheel: 1, mage: 1 },
-    effect: { foot: 105, horse: 100, wheel: 100, mage: 105 },
-    healPerTurn: 10,
+    effect: { foot: 110, horse: 110, wheel: 110, mage: 110 },
+    healPerTurn: 20,
   },
   castle: {
     id: 'castle',
     name: '성내',
     cost: { foot: 1, horse: 1, wheel: 1, mage: 1 },
-    effect: { foot: 110, horse: 100, wheel: 100, mage: 105 },
+    effect: { foot: 120, horse: 120, wheel: 120, mage: 120 },
   },
   wall: {
     id: 'wall',
@@ -80,6 +82,6 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     id: 'gate',
     name: '성문',
     cost: { foot: 1, horse: 1, wheel: 1, mage: 1 },
-    effect: { foot: 120, horse: 110, wheel: 110, mage: 115 },
+    effect: { foot: 120, horse: 120, wheel: 120, mage: 120 },
   },
 }

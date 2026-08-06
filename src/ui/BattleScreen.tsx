@@ -13,9 +13,11 @@ import {
 } from '../core/battle'
 import { attackableCells, attackRangeUnion, keyOf, manhattan } from '../core/movement'
 import type { BattleState, StageDef, UnitState, Vec2 } from '../core/types'
+import { TERRAIN } from '../data/terrain'
 import { BattleBoard } from './BattleBoard'
 import { BattleLog } from './BattleLog'
 import { ForecastPanel } from './ForecastPanel'
+import { TerrainInfoPanel } from './TerrainInfoPanel'
 import { UnitInfoPanel } from './UnitInfoPanel'
 import './battle.css'
 
@@ -406,6 +408,8 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
         {(hoverUnit ?? selectedUnit ?? aiActiveUnit) && (
           <UnitInfoPanel state={state} unit={(hoverUnit ?? selectedUnit ?? aiActiveUnit)!} />
         )}
+
+        {hover && <TerrainInfoPanel terrain={TERRAIN[state.map.tiles[hover.y][hover.x]]} />}
 
         <BattleLog log={state.log} />
       </aside>

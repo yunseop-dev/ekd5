@@ -221,6 +221,25 @@
   margin: 4px 0;
 }
 
+/* 지형 정보 */
+.terrain-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: center;
+}
+.terrain-table th,
+.terrain-table td {
+  padding: 2px 4px;
+}
+.terrain-table th { color: #bfb39c; font-weight: 400; }
+.terrain-table td:first-child { color: #bfb39c; text-align: left; }
+.cost-1 { color: #6ab0f3; font-weight: 700; }
+.cost-2 { color: #7ce08a; font-weight: 700; }
+.cost-3 { color: #e6a23c; font-weight: 700; }
+.cost-x { color: #777; }
+.terrain-heal { margin-top: 4px; color: #7ce08a; font-size: 12px; }
+
 /* 액션 메뉴 */
 .action-menu {
   display: flex;
