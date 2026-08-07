@@ -4,6 +4,7 @@
 import { EQUIPMENT } from '../data/equipment'
 import { OFFICERS } from '../data/officers'
 import { STAGES } from '../data/stages'
+// (착용 제한 판정은 OFFICERS.classId만으로 충분 — CLASSES 참조 불필요)
 import type { BattleState, EquipmentMap, EquipSlot, StageDef } from './types'
 
 /** 로스터 1명 = 전투 사이로 이월되는 성장치 전부 (HP/MP는 레벨에서 재계산) */
@@ -57,7 +58,8 @@ export function newCampaign(): CampaignState {
       officerId,
       level: OFFICERS[officerId].level,
       exp: 0,
-      equipment: {},
+      // 원작 디테일: 장수는 합류 시 병과 기본 무기를 장착하고 온다 (조조 = 의천검)
+      equipment: { ...(OFFICERS[officerId].initialEquipment ?? {}) },
     })),
     clearedStages: [],
     gold: INITIAL_GOLD,
@@ -166,13 +168,25 @@ function removeOne(inventory: string[], itemId: string): string[] | null {
 }
 
 /**
+ * 병과별 착용 가능 판정 (원작: 무기 카테고리는 병과 1:1 — equipment.md §5).
+ * classes 미지정 장비는 전 병과 착용 가능.
+ */
+export function canEquip(officerId: string, itemId: string): boolean {
+  const item = EQUIPMENT[itemId]
+  const officer = OFFICERS[officerId]
+  if (!item || !officer) return false
+  return !item.classes || item.classes.includes(officer.classId)
+}
+
+/**
  * 창고의 장비를 장수에게 장착. 같은 슬롯에 이미 장비가 있으면 그것은 창고로 돌아간다.
- * 창고에 없는 장비 / 없는 장수 / 미등록 id면 원본을 그대로 반환한다.
+ * 창고에 없는 장비 / 없는 장수 / 미등록 id / 병과 착용 불가면 원본을 그대로 반환한다.
  */
 export function equipItem(campaign: CampaignState, officerId: string, itemId: string): CampaignState {
   const item = EQUIPMENT[itemId]
   if (!item) return campaign
   if (!campaign.roster.some((r) => r.officerId === officerId)) return campaign
+  if (!canEquip(officerId, itemId)) return campaign
   const rest = removeOne(campaign.inventory, itemId)
   if (!rest) return campaign
 

@@ -54,6 +54,8 @@ export interface OfficerDef {
   stats: OfficerStats
   classId: string
   level: number
+  /** 합류 시 장착하고 있는 장비 (원작: 조조 = 의천검, campaign-ux.md §7.2) */
+  initialEquipment?: EquipmentMap
 }
 
 // 성장 등급: 레벨당 성장치. S=+5, A=+4, B=+3, C=+2
@@ -110,6 +112,8 @@ export interface EquipmentDef {
   expMultiplier?: number // 획득 경험치 배율 (맹덕신서 1.5)
   mpRegenPerTurn?: number // 매턴 페이즈 시작 시 MP 회복 (태평요술서 = 10, 원작 확정)
   allTerrainCost1?: boolean // 진입 가능 전 지형 소비 이동력 1 (적로, 원작 확정)
+  /** 착용 가능 병과 id 목록. undefined = 전 병과 (원작 병과 1:1 무기 규칙, equipment.md §5) */
+  classes?: string[]
   price: number | null // null = 비매품(보물)
   tier: 1 | 2 | 3 // 상점 해금 단계 (아군 평균 레벨 연동, campaign-ux.md 1부 §3)
   isTreasure?: boolean // 보물 — 판매 불가 (원작: 영걸전은 가능, 조조전은 불가)

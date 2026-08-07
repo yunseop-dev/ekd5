@@ -12,6 +12,7 @@ import {
   applyVictory,
   avgRosterLevel,
   buyItem,
+  canEquip,
   completeStory,
   equipItem,
   INITIAL_GOLD,
@@ -53,12 +54,17 @@ const entry = (officerId: string, level: number, equipment: EquipmentMap = {}): 
 const unitOf = (state: BattleState, officerId: string): UnitState =>
   state.units.find((u) => u.officerId === officerId)!
 
-/** 창고/군자금만 갈아끼운 캠페인 (노드는 서장 story 그대로) */
-const withStock = (inventory: string[], gold = INITIAL_GOLD): CampaignState => ({
-  ...newCampaign(),
-  gold,
-  inventory,
-})
+/** 창고/군자금만 갈아끼운 캠페인 (노드는 서장 story 그대로).
+ *  장착 로직 테스트의 전제를 단순하게 유지하려고 초기 장비(의천검 등)는 벗긴다. */
+const withStock = (inventory: string[], gold = INITIAL_GOLD): CampaignState => {
+  const base = newCampaign()
+  return {
+    ...base,
+    roster: base.roster.map((r) => ({ ...r, equipment: {} })),
+    gold,
+    inventory,
+  }
+}
 
 // ---------- 데이터 정합성 ----------
 
@@ -75,7 +81,7 @@ describe('EQUIPMENT 데이터', () => {
     for (const item of Object.values(EQUIPMENT)) {
       expect(item.price === null, item.id).toBe(item.isTreasure === true)
     }
-    expect(Object.values(EQUIPMENT).filter((i) => i.isTreasure).length).toBe(4)
+    expect(Object.values(EQUIPMENT).filter((i) => i.isTreasure).length).toBe(5)
   })
 
   it('상점 장비 가격이 단계별 설계 구간 안에 있다', () => {
@@ -273,6 +279,69 @@ describe('equipItem / unequipItem', () => {
     expect(effectiveStats(unitOf(state, 'caocao')).atk).toBe(
       effectiveStats(unitOf(bare, 'caocao')).atk + EQUIPMENT.ironSword.bonus.atk!,
     )
+  })
+})
+
+// ---------- 병과별 착용 제한 (원작 확정 — docs/research/equipment.md §5) ----------
+
+describe('병과별 착용 제한', () => {
+  it('무기 카테고리 = 병과 1:1 매트릭스', () => {
+    // 검=군주·중보병 / 창=경기병 / 활=궁병 / 부채=책사 / 보검=풍수사
+    expect(canEquip('caocao', 'woodSword')).toBe(true) // 군주 ← 검
+    expect(canEquip('dianwei', 'woodSword')).toBe(true) // 중보병 ← 검
+    expect(canEquip('guojia', 'woodSword')).toBe(false) // 책사 ← 검 ✗
+    expect(canEquip('xiahoudun', 'woodSpear')).toBe(true) // 경기병 ← 창
+    expect(canEquip('caocao', 'woodSpear')).toBe(false) // 군주 ← 창 ✗
+    expect(canEquip('xiahouyuan', 'woodBow')).toBe(true) // 궁병 ← 활
+    expect(canEquip('guojia', 'bambooFan')).toBe(true) // 책사 ← 부채
+    expect(canEquip('xunyu', 'bambooFan')).toBe(false) // 풍수사 ← 부채 ✗ (보검 전용)
+    expect(canEquip('xunyu', 'stoneGemSword')).toBe(true) // 풍수사 ← 보검
+    // 방어구: 갑옷=무관계 / 옷=문관계
+    expect(canEquip('xiahoudun', 'leatherArmor')).toBe(true)
+    expect(canEquip('guojia', 'leatherArmor')).toBe(false)
+    expect(canEquip('guojia', 'clothRobe')).toBe(true)
+    expect(canEquip('dianwei', 'clothRobe')).toBe(false)
+    // 보조구는 전 병과
+    expect(canEquip('guojia', 'leatherShield')).toBe(true)
+    expect(canEquip('caocao', 'dilu')).toBe(true)
+  })
+
+  it('equipItem은 착용 불가 병과에 장착을 거부한다 (원본 반환)', () => {
+    const campaign = withStock(['woodSword'])
+    expect(equipItem(campaign, 'guojia', 'woodSword')).toBe(campaign)
+    // 착용 가능 장수에게는 정상 장착
+    expect(equipItem(campaign, 'dianwei', 'woodSword')).not.toBe(campaign)
+  })
+
+  it('세이브 정화: 규칙 강화 이전 세이브의 위반 장비는 창고로 이동한다', () => {
+    const raw = JSON.parse(JSON.stringify(newCampaign())) as Record<string, unknown>
+    const roster = raw.roster as { officerId: string; equipment: Record<string, string> }[]
+    roster.find((r) => r.officerId === 'guojia')!.equipment = { weapon: 'woodSword' } // 위반
+    roster.find((r) => r.officerId === 'dianwei')!.equipment = { weapon: 'woodSword' } // 정상
+    const restored = validateCampaign(raw)!
+    expect(restored.roster.find((r) => r.officerId === 'guojia')!.equipment.weapon).toBeUndefined()
+    expect(restored.roster.find((r) => r.officerId === 'dianwei')!.equipment.weapon).toBe('woodSword')
+    expect(restored.inventory).toContain('woodSword')
+  })
+})
+
+describe('초기 장비 (원작: 조조 = 의천검)', () => {
+  it('newCampaign 로스터가 초기 장비로 시작하고 전투 능력치에 반영된다', () => {
+    const campaign = newCampaign()
+    const state = startBattle(mkStage(), 1, campaign.roster)
+    const bare = startBattle(mkStage(), 1, [entry('caocao', OFFICERS.caocao.level)])
+    expect(unitOf(state, 'caocao').equipment.weapon).toBe('yitianSword')
+    expect(effectiveStats(unitOf(state, 'caocao')).atk).toBe(
+      effectiveStats(unitOf(bare, 'caocao')).atk + EQUIPMENT.yitianSword.bonus.atk!,
+    )
+  })
+
+  it('전 장수의 초기 장비는 자기 병과가 착용 가능한 것이어야 한다 (데이터 정합)', () => {
+    for (const [id, officer] of Object.entries(OFFICERS)) {
+      for (const itemId of Object.values(officer.initialEquipment ?? {})) {
+        expect(canEquip(id, itemId), `${id}: ${itemId}`).toBe(true)
+      }
+    }
   })
 })
 

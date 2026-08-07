@@ -57,11 +57,14 @@ describe('newCampaign', () => {
     expect(campaign.nodeId).toBe(CAMPAIGN_NODES[0].id)
   })
 
-  it('v2: 장비 없음 / 초기 군자금 / 빈 창고로 시작한다', () => {
+  it('v2: 초기 군자금 / 빈 창고 / 장수별 초기 장비(원작: 조조 = 의천검)로 시작한다', () => {
     const campaign = newCampaign()
     expect(campaign.gold).toBe(INITIAL_GOLD)
     expect(campaign.inventory).toEqual([])
-    for (const entry of campaign.roster) expect(entry.equipment).toEqual({})
+    for (const entry of campaign.roster) {
+      expect(entry.equipment, entry.officerId).toEqual(OFFICERS[entry.officerId].initialEquipment ?? {})
+    }
+    expect(campaign.roster.find((r) => r.officerId === 'caocao')!.equipment.weapon).toBe('yitianSword')
   })
 })
 

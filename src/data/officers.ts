@@ -10,6 +10,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '조조',
     stats: { str: 78, ldr: 96, int: 92, agi: 82, luck: 90 },
     classId: 'lord',
+    initialEquipment: { weapon: 'yitianSword' },
     level: 3,
   },
   xiahoudun: {
@@ -17,6 +18,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '하후돈',
     stats: { str: 90, ldr: 78, int: 60, agi: 78, luck: 70 },
     classId: 'lightCavalry',
+    initialEquipment: { weapon: 'woodSpear' },
     level: 2,
   },
   dianwei: {
@@ -24,6 +26,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '전위',
     stats: { str: 94, ldr: 66, int: 32, agi: 70, luck: 82 },
     classId: 'heavyInfantry',
+    initialEquipment: { weapon: 'woodSword' },
     level: 2,
   },
   xiahouyuan: {
@@ -31,6 +34,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '하후연',
     stats: { str: 86, ldr: 74, int: 58, agi: 88, luck: 66 },
     classId: 'archer',
+    initialEquipment: { weapon: 'woodBow' },
     level: 2,
   },
   guojia: {
@@ -38,6 +42,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '곽가',
     stats: { str: 30, ldr: 60, int: 96, agi: 74, luck: 60 },
     classId: 'strategist',
+    initialEquipment: { weapon: 'bambooFan' },
     level: 2,
   },
   xunyu: {
@@ -45,6 +50,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '순욱',
     stats: { str: 28, ldr: 68, int: 94, agi: 62, luck: 74 },
     classId: 'geomancer',
+    initialEquipment: { weapon: 'stoneGemSword' },
     level: 2,
   },
 

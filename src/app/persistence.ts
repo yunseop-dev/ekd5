@@ -4,8 +4,9 @@
 
 import { openDB, type IDBPDatabase } from 'idb'
 import type { CampaignState, RosterEntry } from '../core/campaign'
-import { currentNode, INITIAL_GOLD } from '../core/campaign'
+import { canEquip, currentNode, INITIAL_GOLD } from '../core/campaign'
 import type { EquipmentMap, EquipSlot } from '../core/types'
+import { EQUIPMENT } from '../data/equipment'
 import { STAGES } from '../data/stages'
 
 export interface SaveMeta {
@@ -90,11 +91,21 @@ export function validateCampaign(data: unknown): CampaignState | null {
     if (typeof entry.officerId !== 'string') return null
     if (typeof entry.level !== 'number' || !Number.isFinite(entry.level)) return null
     if (typeof entry.exp !== 'number' || !Number.isFinite(entry.exp)) return null
+    // 착용 규칙 강화 이전 세이브 정화: 병과 착용 불가 장비(예: 곽가의 목검)는 창고로 되돌린다.
+    // 미등록 id는 기존 방침대로 슬롯에 남긴다(읽기 쪽이 조용히 무시).
+    const equipment = legacy ? {} : normalizeEquipment(entry.equipment)
+    for (const slot of EQUIP_SLOTS) {
+      const itemId = equipment[slot]
+      if (itemId && EQUIPMENT[itemId] && !canEquip(entry.officerId, itemId)) {
+        delete equipment[slot]
+        inventory.push(itemId)
+      }
+    }
     roster.push({
       officerId: entry.officerId,
       level: entry.level,
       exp: entry.exp,
-      equipment: legacy ? {} : normalizeEquipment(entry.equipment),
+      equipment,
     })
   }
 
