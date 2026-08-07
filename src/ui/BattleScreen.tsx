@@ -11,8 +11,11 @@ import {
   startBattle,
   unitAt,
 } from '../core/battle'
+import type { RosterEntry } from '../core/campaign'
+import { growthSummary } from '../core/campaign'
 import { attackableCells, attackRangeUnion, keyOf, manhattan } from '../core/movement'
 import type { BattleState, Faction, StageDef, UnitState, Vec2 } from '../core/types'
+import { OFFICERS } from '../data/officers'
 import { TERRAIN } from '../data/terrain'
 import { Banner, type BannerProps } from './Banner'
 import { BattleBoard } from './BattleBoard'
@@ -71,10 +74,13 @@ interface Props {
   seed: number
   onExit: () => void
   onRestart: () => void
+  /** 캠페인 모드: 로스터 이월 + 종료 시 결과 회수 */
+  roster?: RosterEntry[]
+  onFinish?: (result: 'victory' | 'defeat', state: BattleState) => void
 }
 
-export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
-  const [state, setState] = useState<BattleState>(() => startBattle(stage, seed))
+export function BattleScreen({ stage, seed, onExit, onRestart, roster, onFinish }: Props) {
+  const [state, setState] = useState<BattleState>(() => startBattle(stage, seed, roster))
   const [sel, setSel] = useState<Selection | null>(null)
   const [hover, setHover] = useState<Vec2 | null>(null)
   const [speed, setSpeed] = useState<PlaySpeed>(1)
@@ -488,11 +494,49 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
         <div className="result-overlay">
           <div className="result-box">
             <h2>{state.result === 'victory' ? '승리!' : '패배...'}</h2>
-            <button onClick={onRestart}>다시 도전</button>
-            <button onClick={onExit}>스테이지 선택</button>
+            {roster && state.result === 'victory' && <GrowthRecap roster={roster} state={state} />}
+            {onFinish ? (
+              state.result === 'victory' ? (
+                <button onClick={() => onFinish('victory', state)}>진영으로</button>
+              ) : (
+                <>
+                  <button onClick={onRestart}>다시 도전</button>
+                  <button onClick={() => onFinish('defeat', state)}>진영으로</button>
+                </>
+              )
+            ) : (
+              <>
+                <button onClick={onRestart}>다시 도전</button>
+                <button onClick={onExit}>스테이지 선택</button>
+              </>
+            )}
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** 승리 시 부대별 성장 요약 (레벨업 유닛 상단 정렬) */
+function GrowthRecap({ roster, state }: { roster: RosterEntry[]; state: BattleState }) {
+  const after: RosterEntry[] = state.units
+    .filter((u) => u.faction === 'player')
+    .map((u) => ({ officerId: u.officerId, level: u.level, exp: u.exp }))
+  const rows = growthSummary(roster, after)
+  return (
+    <div className="growth-recap">
+      {rows.map((r) => (
+        <div key={r.officerId} className={`growth-row${r.levelAfter > r.levelBefore ? ' leveled' : ''}`}>
+          <span className="growth-name">{OFFICERS[r.officerId]?.name ?? r.officerId}</span>
+          <span>
+            Lv {r.levelBefore}
+            {r.levelAfter > r.levelBefore && <strong> → {r.levelAfter}</strong>}
+          </span>
+          <span className="growth-exp">
+            EXP {r.expBefore} → {r.expAfter}
+          </span>
+        </div>
+      ))}
     </div>
   )
 }
