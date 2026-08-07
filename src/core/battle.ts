@@ -5,6 +5,7 @@ import { CLASSES } from '../data/classes'
 import { OFFICERS } from '../data/officers'
 import { STRATEGIES } from '../data/strategies'
 import { TERRAIN } from '../data/terrain'
+import type { RosterEntry } from './campaign'
 import type { CombatStats } from './formulas'
 import {
   affinityMultiplier,
@@ -149,11 +150,13 @@ export function forecastAttack(state: BattleState, attacker: UnitState, defender
 
 // ---------- 전투 생성 ----------
 
-export function createBattle(stage: StageDef, seed: number): BattleState {
+export function createBattle(stage: StageDef, seed: number, roster?: RosterEntry[]): BattleState {
   const units: UnitState[] = stage.units.map((def, i) => {
     const officer = OFFICERS[def.officerId]
     const cls = CLASSES[officer.classId]
-    const level = def.level ?? officer.level
+    // 캠페인 로스터가 있으면 스테이지/장수 기본 레벨을 덮어쓴다 (전투 간 성장 이월)
+    const entry = def.faction === 'player' ? roster?.find((r) => r.officerId === def.officerId) : undefined
+    const level = entry?.level ?? def.level ?? officer.level
     return {
       id: `u${i}_${def.officerId}`,
       officerId: def.officerId,
@@ -161,7 +164,7 @@ export function createBattle(stage: StageDef, seed: number): BattleState {
       faction: def.faction,
       pos: { ...def.pos },
       level,
-      exp: 0,
+      exp: entry?.exp ?? 0,
       hp: maxHp(cls, level),
       maxHp: maxHp(cls, level),
       mp: maxMp(cls, level),
@@ -392,8 +395,8 @@ export function attachStage(state: BattleState, stage: StageDef): BattleState {
   return state
 }
 
-export function startBattle(stage: StageDef, seed: number): BattleState {
-  return attachStage(createBattle(stage, seed), stage)
+export function startBattle(stage: StageDef, seed: number, roster?: RosterEntry[]): BattleState {
+  return attachStage(createBattle(stage, seed, roster), stage)
 }
 
 export function applyAction(prev: BattleState, action: BattleAction): BattleState {

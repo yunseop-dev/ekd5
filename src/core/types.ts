@@ -194,6 +194,11 @@ export interface StageDef {
   reinforcements: ReinforcementDef[]
   weather: Weather
   bonusExp?: number // 2차 승리조건 달성 시 생존 전원 보너스 (시리즈 전통 +50)
+  // 출진 준비 화면용 (v0.4 예약 — 현재 미사용). 원작은 스테이지마다 출진 부대수 min~max와
+  // 강제출진 슬롯(①조조②하후돈)이 데이터로 박혀 있다 (docs/research/campaign-ux.md 1부 §2).
+  deployMin?: number
+  deployMax?: number
+  forcedOfficers?: string[]
 }
 
 export type BattleResult = 'ongoing' | 'victory' | 'defeat'
