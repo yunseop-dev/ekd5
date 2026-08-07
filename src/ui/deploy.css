@@ -1,0 +1,356 @@
+/* 출진 준비 화면 + 대화 화면 (campaign.css 톤 유지: 패널 #262119 / 금색 #d8b96a) */
+
+/* 패널(.panel-box)·로스터 행(.roster-row)·버튼(.sortie-btn/.title-btn)은
+   battle.css / campaign.css 의 스타일을 그대로 재사용하고, 여기서 차이만 얹는다. */
+
+/* ---------- 출진 준비 ---------- */
+
+.deploy-screen {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.deploy-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.deploy-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #d8b96a;
+}
+
+.deploy-stage-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #e8dcc8;
+}
+
+.deploy-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: #857a66;
+}
+
+.deploy-grid {
+  display: grid;
+  grid-template-columns: 300px 1fr 280px;
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .deploy-grid { grid-template-columns: 1fr; }
+}
+
+/* 정렬 토글 */
+.sort-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 8px;
+}
+
+.sort-tab {
+  flex: 1;
+  padding: 4px 0;
+  font-size: 12px;
+  background: #1f1a13;
+  color: #bfb39c;
+  border: 1px solid #4a4132;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.sort-tab:hover { border-color: #d8b96a; }
+.sort-tab.active {
+  background: #3d3527;
+  color: #e8dcc8;
+  border-color: #d8b96a;
+}
+
+/* 로스터 행 — campaign.css .roster-row 위에 뱃지 열만 얹는다 */
+.deploy-row {
+  grid-template-columns: 32px minmax(44px, 1fr) 56px 46px 40px;
+}
+.deploy-row .roster-name,
+.deploy-row .roster-class,
+.deploy-row .roster-level {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.deploy-row.locked { cursor: not-allowed; }
+.deploy-row.locked .roster-name { color: #d8b96a; }
+
+.deploy-badge {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #9cc2ff;
+  min-height: 20px;
+}
+
+.lock-mark {
+  font-size: 11px;
+  filter: grayscale(0.2);
+}
+
+/* 맵 미리보기 */
+.preview-scroll {
+  overflow: auto;
+  width: max-content;
+  max-width: 100%;
+  max-height: 62vh;
+  padding: 2px;
+  background: #14100b;
+  border: 1px solid #3a3226;
+  border-radius: 6px;
+}
+
+.preview-map {
+  display: grid;
+  gap: 1px;
+  width: max-content;
+}
+
+.dp-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 지형 팔레트 (battle.css .tile.t-* 와 동일 값) */
+.dp-tile.dt-plain { background: #a8bf6e; }
+.dp-tile.dt-grass { background: #8fb95e; }
+.dp-tile.dt-forest { background: #4e7a3d; }
+.dp-tile.dt-mountain { background: #8a7355; }
+.dp-tile.dt-wasteland { background: #c2a86b; }
+.dp-tile.dt-river { background: #4c7fb5; }
+.dp-tile.dt-bridge { background: #a3865a; }
+.dp-tile.dt-fort { background: #7d6a8f; }
+.dp-tile.dt-village { background: #d9b06c; }
+.dp-tile.dt-castle { background: #9b9b9b; }
+.dp-tile.dt-wall { background: #55504a; }
+.dp-tile.dt-gate { background: #6d5c3f; }
+
+/* 출진 슬롯 마커 */
+.dp-slot {
+  position: absolute;
+  inset: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: #e8dcc8;
+  background: rgba(30, 26, 19, 0.75);
+  border: 1px solid #8d8271;
+}
+.dp-slot.filled {
+  color: #fff;
+  background: #2d5da8;
+  border: 1px solid #9cc2ff;
+  font-size: 10px;
+}
+
+.dp-enemy {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d83a2d;
+  border: 1px solid #ffb09c;
+}
+
+.preview-legend {
+  display: flex;
+  gap: 14px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #bfb39c;
+}
+.preview-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  border-radius: 50%;
+  vertical-align: -1px;
+}
+.preview-legend .lg-slot {
+  background: rgba(30, 26, 19, 0.75);
+  border: 1px solid #8d8271;
+}
+.preview-legend .lg-slot.filled {
+  background: #2d5da8;
+  border-color: #9cc2ff;
+}
+.preview-legend .lg-enemy {
+  background: #d83a2d;
+  border: 1px solid #ffb09c;
+}
+
+/* 출진 카드 */
+.deploy-count {
+  font-size: 18px;
+  font-weight: 700;
+  color: #d8b96a;
+  margin: 4px 0 10px;
+}
+.deploy-count.bad { color: #ff8a7a; }
+
+.deploy-order {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  font-size: 13px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.deploy-order li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 2px;
+  border-bottom: 1px solid #3a3226;
+}
+.deploy-order-no {
+  color: #9cc2ff;
+  font-weight: 700;
+}
+
+.deploy-reason {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #ff8a7a;
+}
+
+.deploy-confirm .sortie-btn:disabled {
+  background: #4a3d38;
+  border-color: #6a5c40;
+  color: #9c9081;
+  cursor: not-allowed;
+}
+
+.deploy-back {
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* ---------- 대화 화면 ---------- */
+
+.dialogue-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: radial-gradient(circle at 50% 35%, #241f18 0%, #0d0b08 100%);
+  cursor: pointer;
+  user-select: none;
+  z-index: 50;
+}
+
+.dialogue-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.dialogue-title {
+  font-size: 13px;
+  color: #d8b96a;
+  letter-spacing: 0.04em;
+}
+
+.dialogue-progress {
+  font-size: 12px;
+  color: #857a66;
+}
+
+.dialogue-skip {
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.dialogue-box {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-height: 168px;
+  margin: 0 16px 20px;
+  padding: 14px 18px;
+  background: #262119;
+  border: 1px solid #6a5c40;
+  border-radius: 10px;
+  box-shadow: 0 -2px 18px rgba(0, 0, 0, 0.6);
+}
+
+.dialogue-portrait-wrap {
+  flex: 0 0 auto;
+  width: 74px;
+  text-align: center;
+}
+
+.dialogue-portrait {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  background: #2d5da8;
+  border: 2px solid #9cc2ff;
+}
+
+.dialogue-speaker {
+  font-size: 13px;
+  font-weight: 700;
+  color: #d8b96a;
+}
+
+.dialogue-text {
+  flex: 1;
+  margin: 4px 0 0;
+  font-size: 17px;
+  line-height: 1.7;
+  color: #e8dcc8;
+  white-space: pre-wrap;
+}
+
+.dialogue-box.narration .dialogue-text {
+  font-style: italic;
+  text-align: center;
+  color: #cdbfa6;
+  align-self: center;
+}
+
+.dialogue-next {
+  position: absolute;
+  right: 14px;
+  bottom: 8px;
+  font-size: 14px;
+  color: #d8b96a;
+  animation: dlg-blink 1s steps(1, end) infinite;
+}
+
+@keyframes dlg-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
