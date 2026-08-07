@@ -156,6 +156,15 @@ export interface UnitState {
 
 export type Weather = 'clear' | 'rain'
 
+// ---------- 대사 / 스토리 ----------
+
+// 조조전 스토리 노드 = 이동 없는 회의장 + 장수 얼굴 그래픽 + 대사 (campaign-ux.md 1부 §5).
+// 화자는 장수 id로만 들고, 이름/초상 해석은 표시 계층에 맡긴다.
+export interface DialogueLine {
+  speaker: string | null // OFFICERS 키. null = 내레이션
+  text: string
+}
+
 export interface MapDef {
   width: number
   height: number
@@ -194,11 +203,14 @@ export interface StageDef {
   reinforcements: ReinforcementDef[]
   weather: Weather
   bonusExp?: number // 2차 승리조건 달성 시 생존 전원 보너스 (시리즈 전통 +50)
-  // 출진 준비 화면용 (v0.4 예약 — 현재 미사용). 원작은 스테이지마다 출진 부대수 min~max와
-  // 강제출진 슬롯(①조조②하후돈)이 데이터로 박혀 있다 (docs/research/campaign-ux.md 1부 §2).
+  // ---- 출진 준비 화면 (docs/research/campaign-ux.md 1부 §2) ----
+  // 원작은 스테이지마다 출진 부대수 min~max와 강제출진 슬롯(①조조②하후돈 — 번호=출진 순서)이
+  // 데이터로 박혀 있고, "선택 순서 = 맵 배치 위치"라 슬롯 인덱스→좌표 테이블이 하드코딩돼 있다.
+  // 전부 옵션 — 없으면 units의 player 정의를 그대로 쓰는 자유 전투 경로가 유지된다.
+  playerSlots?: Vec2[] // 출진 슬롯 좌표. 인덱스 = 배치 순서
   deployMin?: number
   deployMax?: number
-  forcedOfficers?: string[]
+  forcedOfficers?: string[] // 앞 슬롯 고정(순서 포함). 조조는 전 전투 강제(퇴각=게임오버)
 }
 
 export type BattleResult = 'ongoing' | 'victory' | 'defeat'

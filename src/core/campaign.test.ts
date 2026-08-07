@@ -5,11 +5,13 @@ import { validateCampaign } from '../app/persistence'
 import { CLASSES } from '../data/classes'
 import { OFFICERS } from '../data/officers'
 import { STAGES } from '../data/stages'
-import { startBattle } from './battle'
+import { STORY_SCRIPTS } from '../data/story'
+import { livingUnits, startBattle } from './battle'
 import type { RosterEntry } from './campaign'
 import {
   applyVictory,
   CAMPAIGN_NODES,
+  completeStory,
   currentNode,
   growthSummary,
   isCampaignFinished,
@@ -60,21 +62,92 @@ describe('캠페인 노드', () => {
     const visited: string[] = []
     let node = currentNode(newCampaign())
     while (node) {
-      visited.push(node.stageId)
+      visited.push(node.id)
       node = node.next ? (CAMPAIGN_NODES.find((n) => n.id === node!.next) ?? null) : null
     }
-    expect(visited).toEqual(['stage01', 'stage02'])
+    // story ↔ battle 교대 체인 (battle id n01/n02는 v0.3 세이브 호환용으로 유지)
+    expect(visited).toEqual(['s00', 'n01', 's01', 'n02', 's02', 'n03'])
+    expect(visited.length).toBe(CAMPAIGN_NODES.length)
+  })
+
+  it('battle 노드는 stage01→03, story 노드는 스크립트를 가리킨다', () => {
+    const battles = CAMPAIGN_NODES.filter((n) => n.type === 'battle')
+    expect(battles.map((n) => n.stageId)).toEqual(['stage01', 'stage02', 'stage03'])
+    const stories = CAMPAIGN_NODES.filter((n) => n.type === 'story')
+    expect(stories.map((n) => n.scriptId)).toEqual(['intro', 'afterStage01', 'afterStage02'])
+    for (const node of stories) expect(node.title.length).toBeGreaterThan(0)
   })
 
   it('stageForNode가 실제 스테이지 데이터를 돌려준다', () => {
     for (const node of CAMPAIGN_NODES) {
+      if (node.type !== 'battle') continue
       expect(stageForNode(node)).toBe(STAGES.find((s) => s.id === node.stageId))
     }
   })
 
-  it('알 수 없는 노드/스테이지는 각각 null·예외', () => {
+  it('알 수 없는 노드/스테이지는 각각 null·예외, story 노드는 stageForNode 불가', () => {
     expect(currentNode({ ...newCampaign(), nodeId: 'nope' })).toBeNull()
     expect(() => stageForNode({ id: 'x', type: 'battle', stageId: 'nope', next: null })).toThrow()
+    expect(() => stageForNode({ id: 's00', type: 'story', title: 't', scriptId: 'intro', next: null })).toThrow()
+  })
+})
+
+describe('completeStory', () => {
+  it('story 노드에서 next로 전진한다', () => {
+    const campaign = newCampaign()
+    expect(currentNode(campaign)!.type).toBe('story')
+    const next = completeStory(campaign)
+    expect(next.nodeId).toBe('n01')
+    expect(currentNode(next)!.type).toBe('battle')
+  })
+
+  it('battle 노드에서 호출하면 원본을 그대로 반환한다 (no-op)', () => {
+    const atBattle = completeStory(newCampaign())
+    expect(completeStory(atBattle)).toBe(atBattle)
+  })
+
+  it('알 수 없는 노드에서도 원본을 그대로 반환한다', () => {
+    const broken = { ...newCampaign(), nodeId: 'nope' }
+    expect(completeStory(broken)).toBe(broken)
+  })
+
+  it('원본을 변형하지 않고 로스터/클리어 목록을 복사해 넘긴다', () => {
+    const campaign = { ...newCampaign(), clearedStages: ['stage00'] }
+    const snapshot = JSON.stringify(campaign)
+    const next = completeStory(campaign)
+    expect(JSON.stringify(campaign)).toBe(snapshot)
+    expect(next.roster).toEqual(campaign.roster)
+    expect(next.roster).not.toBe(campaign.roster)
+    expect(next.roster[0]).not.toBe(campaign.roster[0])
+    expect(next.clearedStages).toEqual(['stage00'])
+    expect(next.clearedStages).not.toBe(campaign.clearedStages)
+  })
+
+  it('story 노드를 소화하기 전에는 완주 판정이 켜지지 않는다', () => {
+    expect(isCampaignFinished(newCampaign())).toBe(false)
+  })
+})
+
+describe('스토리 스크립트', () => {
+  it('story 노드의 scriptId마다 6~10줄 대사가 있다', () => {
+    for (const node of CAMPAIGN_NODES) {
+      if (node.type !== 'story') continue
+      const lines = STORY_SCRIPTS[node.scriptId]
+      expect(lines, `${node.id}: ${node.scriptId}`).toBeDefined()
+      expect(lines.length, node.scriptId).toBeGreaterThanOrEqual(6)
+      expect(lines.length, node.scriptId).toBeLessThanOrEqual(10)
+    }
+  })
+
+  it('화자는 유효한 장수 id 또는 내레이션(null)이고 본문이 비지 않는다', () => {
+    for (const [scriptId, lines] of Object.entries(STORY_SCRIPTS)) {
+      for (const line of lines) {
+        if (line.speaker !== null) {
+          expect(OFFICERS[line.speaker], `${scriptId}: ${line.speaker}`).toBeDefined()
+        }
+        expect(line.text.length, scriptId).toBeGreaterThan(0)
+      }
+    }
   })
 })
 
@@ -108,9 +181,71 @@ describe('startBattle(roster)', () => {
   })
 })
 
+describe('startBattle(deployment)', () => {
+  // 출진 슬롯 3칸 — 인덱스 = 선택 순서 = 배치 위치 (campaign-ux.md 1부 §2)
+  const slotStage = (): StageDef =>
+    mkStage({
+      playerSlots: [
+        { x: 1, y: 5 },
+        { x: 2, y: 5 },
+        { x: 3, y: 5 },
+      ],
+      deployMin: 2,
+      deployMax: 3,
+      forcedOfficers: ['caocao'],
+    })
+
+  it('출진 명단 순서가 슬롯 좌표 순서와 일치한다', () => {
+    const state = startBattle(slotStage(), 1, undefined, ['caocao', 'guojia', 'dianwei'])
+    expect(livingUnits(state, 'player').map((u) => u.officerId)).toEqual(['caocao', 'guojia', 'dianwei'])
+    expect(unit(state, 'caocao').pos).toEqual({ x: 1, y: 5 })
+    expect(unit(state, 'guojia').pos).toEqual({ x: 2, y: 5 })
+    expect(unit(state, 'dianwei').pos).toEqual({ x: 3, y: 5 })
+  })
+
+  it('stage.units의 player 정의를 무시하고 로스터 레벨을 적용하며 조조가 주인공이 된다', () => {
+    const roster: RosterEntry[] = [
+      { officerId: 'caocao', level: 9, exp: 12 },
+      { officerId: 'dianwei', level: 4, exp: 3 },
+    ]
+    const state = startBattle(slotStage(), 1, roster, ['caocao', 'dianwei'])
+    // 스테이지에 level 7로 박혀 있던 하후돈은 출진하지 않았으므로 존재하지 않는다
+    expect(state.units.some((u) => u.officerId === 'xiahoudun')).toBe(false)
+    const caocao = unit(state, 'caocao')
+    expect(caocao.level).toBe(9)
+    expect(caocao.exp).toBe(12)
+    expect(caocao.maxHp).toBe(maxHp(CLASSES[caocao.classId], 9))
+    expect(caocao.isLeader).toBe(true)
+    const dian = unit(state, 'dianwei')
+    expect(dian.level).toBe(4)
+    expect(dian.isLeader).toBeFalsy()
+    // 적군은 언제나 stage.units에서 생성된다
+    expect(unit(state, 'yellowInfantry').pos).toEqual({ x: 4, y: 1 })
+  })
+
+  it('로스터에 없는 장수는 장수 기본 레벨로 출진한다', () => {
+    const state = startBattle(slotStage(), 1, [], ['caocao', 'xunyu'])
+    expect(unit(state, 'xunyu').level).toBe(OFFICERS.xunyu.level)
+    expect(unit(state, 'xunyu').exp).toBe(0)
+  })
+
+  it('슬롯보다 많이 고르면 초과분은 무시된다', () => {
+    const state = startBattle(slotStage(), 1, undefined, ['caocao', 'guojia', 'dianwei', 'xunyu'])
+    expect(livingUnits(state, 'player').length).toBe(3)
+    expect(state.units.some((u) => u.officerId === 'xunyu')).toBe(false)
+  })
+
+  it('슬롯 테이블이 없는 스테이지는 명단을 무시하고 기존 배치를 유지한다 (하위호환)', () => {
+    const state = startBattle(mkStage(), 1, undefined, ['guojia'])
+    expect(unit(state, 'caocao').pos).toEqual({ x: 1, y: 1 })
+    expect(state.units.some((u) => u.officerId === 'guojia')).toBe(false)
+  })
+})
+
 describe('applyVictory', () => {
   const setup = () => {
-    const campaign = newCampaign()
+    // 서장 story 노드(s00)를 소화해 첫 전투 노드(n01)에 선 상태
+    const campaign = completeStory(newCampaign())
     const state = startBattle(mkStage(), 1, campaign.roster)
     return { campaign, state }
   }
@@ -125,7 +260,7 @@ describe('applyVictory', () => {
     const entry = next.roster.find((r) => r.officerId === 'caocao')!
     expect(entry.level).toBe(OFFICERS.caocao.level + 2)
     expect(entry.exp).toBe(37)
-    expect(next.nodeId).toBe('n02')
+    expect(next.nodeId).toBe('s01') // 전투 뒤 후속 story 노드
     expect(next.clearedStages).toEqual(['stage01'])
   })
 
@@ -165,17 +300,19 @@ describe('applyVictory', () => {
   })
 
   it('마지막 노드를 클리어하면 nodeId는 그대로 두고 완주 판정이 켜진다', () => {
-    const campaign = newCampaign()
+    const stageIds = ['stage01', 'stage02', 'stage03']
+    let campaign = completeStory(newCampaign()) // s00 → n01
     expect(isCampaignFinished(campaign)).toBe(false)
 
-    const first = applyVictory(campaign, startBattle(mkStage(), 1, campaign.roster))
-    expect(isCampaignFinished(first)).toBe(false)
+    for (const stageId of stageIds) {
+      campaign = applyVictory(campaign, startBattle(mkStage({ id: stageId }), 1, campaign.roster))
+      expect(isCampaignFinished(campaign), stageId).toBe(stageId === 'stage03')
+      campaign = completeStory(campaign) // 후속 story 노드 소화 (마지막 전투 뒤에는 no-op)
+    }
 
-    const lastStage = mkStage({ id: 'stage02' })
-    const second = applyVictory(first, startBattle(lastStage, 1, first.roster))
-    expect(second.nodeId).toBe('n02')
-    expect(second.clearedStages).toEqual(['stage01', 'stage02'])
-    expect(isCampaignFinished(second)).toBe(true)
+    expect(campaign.nodeId).toBe('n03')
+    expect(campaign.clearedStages).toEqual(stageIds)
+    expect(isCampaignFinished(campaign)).toBe(true)
   })
 })
 

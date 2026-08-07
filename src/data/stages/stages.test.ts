@@ -7,9 +7,11 @@ import type { BattleState } from '../../core/types'
 import { CLASSES } from '../classes'
 import { OFFICERS } from '../officers'
 import { STRATEGIES } from '../strategies'
+import { TERRAIN } from '../terrain'
 import { STAGES } from './index'
 import { STAGE_01 } from './stage01'
 import { STAGE_02 } from './stage02'
+import { STAGE_03 } from './stage03'
 
 /** 아군도 AI로 조작해 전투를 완주시키는 헬퍼 */
 function simulate(state: BattleState, maxRounds: number, onTurnStart?: (s: BattleState) => void): BattleState {
@@ -75,6 +77,35 @@ describe('스테이지 데이터 무결성', () => {
       expect(leaders.length, stage.id).toBe(1)
     }
   })
+
+  it('출진 슬롯이 있는 스테이지: min/max·강제출진이 슬롯 테이블과 맞물린다', () => {
+    for (const stage of STAGES) {
+      if (!stage.playerSlots) continue
+      const slots = stage.playerSlots
+      const min = stage.deployMin!
+      const max = stage.deployMax!
+      expect(min, `${stage.id} deployMin`).toBeGreaterThan(0)
+      expect(min, `${stage.id} deployMin≤Max`).toBeLessThanOrEqual(max)
+      expect(max, `${stage.id} deployMax≤슬롯수`).toBeLessThanOrEqual(slots.length)
+
+      // 조조는 전 전투 강제출진 (퇴각 = 게임오버)
+      expect(stage.forcedOfficers, stage.id).toContain('caocao')
+      expect(stage.forcedOfficers![0], `${stage.id}: ①번 슬롯`).toBe('caocao')
+      expect(stage.forcedOfficers!.length, `${stage.id} 강제출진≤min`).toBeLessThanOrEqual(min)
+      for (const id of stage.forcedOfficers!) expect(OFFICERS[id], `${stage.id}: ${id}`).toBeDefined()
+
+      // 슬롯 좌표: 맵 안 + 보행 진입 가능 + 중복 없음
+      const seen = new Set<string>()
+      for (const slot of slots) {
+        const where = `${stage.id} (${slot.x},${slot.y})`
+        expect(slot.x, where).toBeLessThan(stage.map.width)
+        expect(slot.y, where).toBeLessThan(stage.map.height)
+        expect(TERRAIN[stage.map.tiles[slot.y][slot.x]].cost.foot, where).not.toBeNull()
+        expect(seen.has(`${slot.x},${slot.y}`), where).toBe(false)
+        seen.add(`${slot.x},${slot.y}`)
+      }
+    }
+  })
 })
 
 describe('스테이지 1 — 연습전', () => {
@@ -114,5 +145,30 @@ describe('스테이지 2 — 관문 방어전', () => {
       }
     }
     expect(state.result).not.toBe('ongoing')
+  })
+})
+
+describe('스테이지 3 — 황건 본진 소탕', () => {
+  it('AI vs AI 자동 시뮬레이션이 크래시 없이 승패를 낸다', () => {
+    // 장수 기본 레벨(2~3)로는 협곡에서 밀린다 — 최종 스테이지라 로스터 이월을 전제한다
+    expect(['victory', 'defeat']).toContain(simulate(startBattle(STAGE_03, 42), 400).result)
+
+    // 두 전투를 거친 로스터(≈Lv6)면 협곡→성문→성채까지 실제로 진행돼 장각을 잡는다
+    const roster = STAGE_03.units
+      .filter((u) => u.faction === 'player')
+      .map((u) => ({ officerId: u.officerId, level: 6, exp: 0 }))
+    const grown = simulate(startBattle(STAGE_03, 42, roster), 400)
+    expect(grown.result).toBe('victory')
+    expect(grown.units.find((u) => u.isBoss)!.hp).toBe(0)
+  })
+
+  it('출진 명단으로 시작하면 슬롯에 배치되고 적 배치는 그대로다', () => {
+    const state = startBattle(STAGE_03, 1, undefined, ['caocao', 'dianwei', 'xunyu', 'guojia'])
+    const players = livingUnits(state, 'player')
+    expect(players.map((u) => u.officerId)).toEqual(['caocao', 'dianwei', 'xunyu', 'guojia'])
+    expect(players.map((u) => u.pos)).toEqual(STAGE_03.playerSlots!.slice(0, 4))
+    const boss = state.units.find((u) => u.isBoss)!
+    expect(boss.officerId).toBe('zhangJiao')
+    expect(boss.pos).toEqual({ x: 7, y: 1 })
   })
 })

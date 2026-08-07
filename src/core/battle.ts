@@ -30,6 +30,7 @@ import type {
   BattleState,
   OfficerDef,
   StageDef,
+  StageUnitDef,
   StrategyDef,
   UnitClassDef,
   UnitState,
@@ -150,8 +151,35 @@ export function forecastAttack(state: BattleState, attacker: UnitState, defender
 
 // ---------- 전투 생성 ----------
 
-export function createBattle(stage: StageDef, seed: number, roster?: RosterEntry[]): BattleState {
-  const units: UnitState[] = stage.units.map((def, i) => {
+/**
+ * 출진 명단 → 아군 유닛 정의. 원작은 "선택 순서 = 맵 배치 위치"라서
+ * deployment[i]가 stage.playerSlots[i]에 서고, 슬롯보다 많이 고른 초과분은 버린다
+ * (docs/research/campaign-ux.md 1부 §2). 슬롯 테이블이 없는 스테이지는 이 경로를 쓰지 않는다.
+ */
+function deployedPlayerUnits(stage: StageDef, deployment: string[]): StageUnitDef[] {
+  const slots = stage.playerSlots ?? []
+  return deployment.slice(0, slots.length).map((officerId, i) => ({
+    officerId,
+    faction: 'player' as const,
+    pos: slots[i],
+    isLeader: officerId === 'caocao', // 주인공은 조조 고정 (퇴각 = 게임오버)
+  }))
+}
+
+export function createBattle(
+  stage: StageDef,
+  seed: number,
+  roster?: RosterEntry[],
+  deployment?: string[],
+): BattleState {
+  // 출진 명단이 오면 stage.units의 player 정의는 무시하고 슬롯 배치로 대체한다.
+  // 적/우군은 언제나 stage.units에서 생성.
+  const defs: StageUnitDef[] =
+    deployment && stage.playerSlots
+      ? [...deployedPlayerUnits(stage, deployment), ...stage.units.filter((u) => u.faction !== 'player')]
+      : stage.units
+
+  const units: UnitState[] = defs.map((def, i) => {
     const officer = OFFICERS[def.officerId]
     const cls = CLASSES[officer.classId]
     // 캠페인 로스터가 있으면 스테이지/장수 기본 레벨을 덮어쓴다 (전투 간 성장 이월)
@@ -395,8 +423,13 @@ export function attachStage(state: BattleState, stage: StageDef): BattleState {
   return state
 }
 
-export function startBattle(stage: StageDef, seed: number, roster?: RosterEntry[]): BattleState {
-  return attachStage(createBattle(stage, seed, roster), stage)
+export function startBattle(
+  stage: StageDef,
+  seed: number,
+  roster?: RosterEntry[],
+  deployment?: string[],
+): BattleState {
+  return attachStage(createBattle(stage, seed, roster, deployment), stage)
 }
 
 export function applyAction(prev: BattleState, action: BattleAction): BattleState {

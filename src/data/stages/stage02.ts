@@ -23,8 +23,20 @@ export const STAGE_02: StageDef = {
     'PPPPPPPPPPPPP',
     'PPPPPPPPPPPPP',
   ]),
+  // 출진 슬롯 — 인덱스 = 선택 순서 = 배치 위치. ①조조 ②전위(성문 탱킹)가 강제출진
+  playerSlots: [
+    { x: 6, y: 10 }, // ① 조조
+    { x: 6, y: 8 }, // ② 성문 — 전위 강제
+    { x: 5, y: 9 }, // 성채 위
+    { x: 7, y: 9 }, // 성채 위
+    { x: 6, y: 9 },
+    { x: 4, y: 10 }, // 기동 예비대
+  ],
+  deployMin: 4,
+  deployMax: 6,
+  forcedOfficers: ['caocao', 'dianwei'],
   units: [
-    // 아군 — 성문 안쪽 방어선
+    // 아군 — 성문 안쪽 방어선 (출진 명단 없이 시작하는 자유 전투용 기본 배치)
     { officerId: 'caocao', faction: 'player', pos: { x: 6, y: 10 }, isLeader: true },
     { officerId: 'dianwei', faction: 'player', pos: { x: 6, y: 8 } }, // 성문 탱킹
     { officerId: 'xiahouyuan', faction: 'player', pos: { x: 5, y: 9 } }, // 성채 위 궁병

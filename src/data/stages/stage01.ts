@@ -22,8 +22,19 @@ export const STAGE_01: StageDef = {
     'PFFFPPPPPPPPPPP',
     'PFFPPPPPPPPPPPP',
   ]),
+  // 출진 슬롯 — 인덱스 = 선택 순서 = 배치 위치 (campaign-ux.md 1부 §2)
+  playerSlots: [
+    { x: 7, y: 10 }, // ① 강제출진: 조조
+    { x: 5, y: 9 },
+    { x: 6, y: 9 },
+    { x: 7, y: 9 },
+    { x: 8, y: 9 },
+  ],
+  deployMin: 3,
+  deployMax: 5,
+  forcedOfficers: ['caocao'],
   units: [
-    // 아군 — 강 남쪽에서 시작
+    // 아군 — 강 남쪽에서 시작 (출진 명단 없이 시작하는 자유 전투용 기본 배치)
     { officerId: 'caocao', faction: 'player', pos: { x: 7, y: 10 }, isLeader: true },
     { officerId: 'xiahoudun', faction: 'player', pos: { x: 5, y: 9 } },
     { officerId: 'dianwei', faction: 'player', pos: { x: 6, y: 9 } },

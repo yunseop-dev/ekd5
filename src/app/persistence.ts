@@ -71,6 +71,7 @@ export function validateCampaign(data: unknown): CampaignState | null {
 function stageNameOf(campaign: CampaignState): string {
   const node = currentNode(campaign)
   if (!node) return ''
+  if (node.type === 'story') return node.title
   return STAGES.find((s) => s.id === node.stageId)?.name ?? node.stageId
 }
 

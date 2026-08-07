@@ -91,4 +91,20 @@ export const OFFICERS: Record<string, OfficerDef> = {
     classId: 'heavyInfantry',
     level: 3,
   },
+  // 황건 본진 부장 — 정원지급 정예 보병
+  zhangLiang: {
+    id: 'zhangLiang',
+    name: '장량',
+    stats: { str: 84, ldr: 72, int: 54, agi: 60, luck: 56 },
+    classId: 'heavyInfantry',
+    level: 5,
+  },
+  // 대현량사 — 최종 보스. 요술(책략) 특화라 지력만 아군 책사급
+  zhangJiao: {
+    id: 'zhangJiao',
+    name: '장각',
+    stats: { str: 34, ldr: 72, int: 98, agi: 64, luck: 78 },
+    classId: 'strategist',
+    level: 6,
+  },
 }

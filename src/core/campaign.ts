@@ -12,12 +12,9 @@ export interface RosterEntry {
   exp: number
 }
 
-export type CampaignNode = {
-  id: string
-  type: 'battle'
-  stageId: string
-  next: string | null
-}
+export type CampaignNode =
+  | { id: string; type: 'battle'; stageId: string; next: string | null }
+  | { id: string; type: 'story'; title: string; scriptId: string; next: string | null }
 
 export interface CampaignState {
   version: 1
@@ -27,11 +24,16 @@ export interface CampaignState {
 }
 
 // 원작은 story|battle 노드의 조건부 DAG — 전투 없는 노드, 전투 뒤 후속 노드,
-// 선택지/클리어 방식에 따른 스테이지 스킵이 존재한다 (campaign-ux.md 1부 §3).
-// v0.3은 battle 노드 선형 체인만 구현하고, story 노드와 분기는 노드 타입 확장으로 얹는다.
+// 선택지/클리어 방식에 따른 스테이지 스킵이 존재한다 (campaign-ux.md 1부 §3.3).
+// v0.4는 story↔battle 교대 선형 체인까지. 분기/스킵은 next를 조건부로 바꿔 얹는다.
+// battle 노드 id(n01/n02)는 v0.3 세이브 호환을 위해 유지한다.
 export const CAMPAIGN_NODES: CampaignNode[] = [
-  { id: 'n01', type: 'battle', stageId: 'stage01', next: 'n02' },
-  { id: 'n02', type: 'battle', stageId: 'stage02', next: null },
+  { id: 's00', type: 'story', title: '의용군 결성', scriptId: 'intro', next: 'n01' },
+  { id: 'n01', type: 'battle', stageId: 'stage01', next: 's01' },
+  { id: 's01', type: 'story', title: '관문을 지켜라', scriptId: 'afterStage01', next: 'n02' },
+  { id: 'n02', type: 'battle', stageId: 'stage02', next: 's02' },
+  { id: 's02', type: 'story', title: '황건 본진', scriptId: 'afterStage02', next: 'n03' },
+  { id: 'n03', type: 'battle', stageId: 'stage03', next: null },
 ]
 
 /** 초기 로스터 — 서장 클리어 후 6명 일괄 합류 커브를 압축한 구성 (campaign-ux.md 1부 §7) */
@@ -54,16 +56,35 @@ export function currentNode(campaign: CampaignState): CampaignNode | null {
   return CAMPAIGN_NODES.find((n) => n.id === campaign.nodeId) ?? null
 }
 
+/** battle 노드 전용 — story 노드는 전투가 없으므로 예외 */
 export function stageForNode(node: CampaignNode): StageDef {
+  if (node.type !== 'battle') throw new Error(`전투 노드가 아니다: ${node.id}`)
   const stage = STAGES.find((s) => s.id === node.stageId)
   if (!stage) throw new Error(`알 수 없는 스테이지: ${node.stageId}`)
   return stage
 }
 
+/**
+ * story 노드 소화 → 다음 노드로 전진 (원본 불변).
+ * battle 노드나 막다른 노드에서 호출되면 아무 일도 하지 않고 원본을 그대로 돌려준다.
+ */
+export function completeStory(campaign: CampaignState): CampaignState {
+  const node = currentNode(campaign)
+  if (!node || node.type !== 'story' || node.next === null) return campaign
+  return {
+    version: 1,
+    nodeId: node.next,
+    roster: campaign.roster.map((entry) => ({ ...entry })),
+    clearedStages: [...campaign.clearedStages],
+  }
+}
+
 /** 마지막 노드의 전투까지 클리어한 상태 */
 export function isCampaignFinished(campaign: CampaignState): boolean {
   const node = currentNode(campaign)
-  return node !== null && node.next === null && campaign.clearedStages.includes(node.stageId)
+  return (
+    node !== null && node.type === 'battle' && node.next === null && campaign.clearedStages.includes(node.stageId)
+  )
 }
 
 /**
