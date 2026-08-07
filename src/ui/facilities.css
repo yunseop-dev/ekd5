@@ -228,6 +228,10 @@
   font-size: 11px;
   color: #857a66;
 }
+.fac-unwearable { opacity: 0.45; cursor: default; }
+.fac-forbidden { color: #c46a5a; font-size: 11px; white-space: nowrap; }
+.fac-classes { color: #857a66; font-size: 11px; }
+
 .fac-item-effect {
   font-size: 11px;
   color: #bfb39c;

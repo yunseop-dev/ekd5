@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { CampaignState, RosterEntry } from '../core/campaign'
-import { avgRosterLevel, buyItem, equipItem, sellItem, shopTierFor, unequipItem } from '../core/campaign'
+import { avgRosterLevel, buyItem, canEquip, equipItem, sellItem, shopTierFor, unequipItem } from '../core/campaign'
 import { combatStats, maxHp, maxMp } from '../core/formulas'
 import type { EquipSlot, EquipmentDef } from '../core/types'
 import { CLASSES } from '../data/classes'
@@ -66,6 +66,13 @@ function effectText(def: EquipmentDef): string {
   const exp = expMultiplierOf(def)
   if (exp !== 1) parts.push(`경험치 ×${exp}`)
   return parts.length > 0 ? parts.join(' · ') : '효과 없음'
+}
+
+/** 착용 가능 병과 요약 — "기병 전용" / "군주·중보병" / "전 병과" */
+function classesLabel(def: EquipmentDef): string {
+  if (!def.classes) return '전 병과'
+  const names = def.classes.map((id) => CLASSES[id]?.name ?? id)
+  return names.length === 1 ? `${names[0]} 전용` : names.join('·')
 }
 
 // ---------- 로스터 장비 합산 ----------
@@ -158,8 +165,9 @@ function StorageTab({ campaign, onChange }: TabProps) {
       .map((itemId, index) => ({ index, itemId, def: defOf(itemId) }))
       .filter((r): r is { index: number; itemId: string; def: EquipmentDef } => r.def !== null)
     if (!selected) return rows
-    // 빈 슬롯용 장비 → 능력치가 오르는 교체품 → 나머지 (병과 제한은 MVP 없음)
+    // 착용 가능(빈 슬롯 → 상승 교체품 → 나머지) → 병과 불가 순
     const rank = (def: EquipmentDef): number => {
+      if (!canEquip(selected.officerId, def.id)) return 3
       if (!defOf(selected.equipment?.[def.slot])) return 0
       return deltaScore(previewDelta(selected, def)) > 0 ? 1 : 2
     }
@@ -295,13 +303,19 @@ function StorageTab({ campaign, onChange }: TabProps) {
         ) : (
           <div className="fac-inventory">
             {inventory.map((row) => {
+              const wearable = canEquip(selected.officerId, row.itemId)
               const delta = previewDelta(selected, row.def)
               return (
                 <button
                   key={`${row.itemId}-${row.index}`}
-                  className="fac-item-row"
+                  className={`fac-item-row${wearable ? '' : ' fac-unwearable'}`}
+                  disabled={!wearable}
                   onClick={() => doEquip(row.itemId)}
-                  title={`${row.def.description} — 클릭하면 ${officer.name}에게 장착`}
+                  title={
+                    wearable
+                      ? `${row.def.description} — 클릭하면 ${officer.name}에게 장착`
+                      : `${cls.name}은(는) 착용할 수 없다 (${classesLabel(row.def)})`
+                  }
                 >
                   <span className="fac-item-head">
                     <span className="fac-item-name">{row.def.name}</span>
@@ -309,7 +323,7 @@ function StorageTab({ campaign, onChange }: TabProps) {
                   </span>
                   <span className="fac-item-effect">{effectText(row.def)}</span>
                   <span className="fac-item-delta">
-                    <DeltaChips delta={delta} />
+                    {wearable ? <DeltaChips delta={delta} /> : <span className="fac-forbidden">병과 불가</span>}
                   </span>
                 </button>
               )
@@ -398,7 +412,10 @@ function ShopTab({ campaign, onChange }: TabProps) {
                     <div key={def.id} className={`fac-shop-row${locked ? ' locked' : ''}`} title={def.description}>
                       <span className="fac-item-name">{def.name}</span>
                       <span className="fac-item-slot">{SLOT_LABEL[def.slot]}</span>
-                      <span className="fac-item-effect">{effectText(def)}</span>
+                      <span className="fac-item-effect">
+                        {effectText(def)}
+                        <span className="fac-classes"> · {classesLabel(def)}</span>
+                      </span>
                       <span className={`fac-price${!locked && poor ? ' poor' : ''}`}>
                         {price.toLocaleString('ko-KR')}
                       </span>
