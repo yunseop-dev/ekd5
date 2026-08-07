@@ -74,13 +74,14 @@ interface Props {
   seed: number
   onExit: () => void
   onRestart: () => void
-  /** 캠페인 모드: 로스터 이월 + 종료 시 결과 회수 */
+  /** 캠페인 모드: 로스터 이월 + 출진 명단 + 종료 시 결과 회수 */
   roster?: RosterEntry[]
+  deployment?: string[]
   onFinish?: (result: 'victory' | 'defeat', state: BattleState) => void
 }
 
-export function BattleScreen({ stage, seed, onExit, onRestart, roster, onFinish }: Props) {
-  const [state, setState] = useState<BattleState>(() => startBattle(stage, seed, roster))
+export function BattleScreen({ stage, seed, onExit, onRestart, roster, deployment, onFinish }: Props) {
+  const [state, setState] = useState<BattleState>(() => startBattle(stage, seed, roster, deployment))
   const [sel, setSel] = useState<Selection | null>(null)
   const [hover, setHover] = useState<Vec2 | null>(null)
   const [speed, setSpeed] = useState<PlaySpeed>(1)

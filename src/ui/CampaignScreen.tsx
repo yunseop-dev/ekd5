@@ -46,7 +46,7 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle }: Props) 
   const [selectedId, setSelectedId] = useState<string>(campaign.roster[0]?.officerId)
   const finished = isCampaignFinished(campaign)
   const node = currentNode(campaign)
-  const stage = !finished && node ? stageForNode(node) : null
+  const stage = !finished && node?.type === 'battle' ? stageForNode(node) : null
   const nodeIndex = CAMPAIGN_NODES.findIndex((n) => n.id === campaign.nodeId)
 
   const selected = campaign.roster.find((r) => r.officerId === selectedId)
@@ -70,12 +70,21 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle }: Props) 
 
       <div className="campaign-grid">
         <section className="panel-box next-battle">
-          {finished || !stage ? (
+          {finished ? (
             <>
               <h3>시나리오 클리어!</h3>
               <p>모든 전투에서 승리했습니다. 다음 장은 준비 중입니다.</p>
             </>
-          ) : (
+          ) : node?.type === 'story' ? (
+            <>
+              <h3>다음 이야기</h3>
+              <div className="battle-name">{node.title}</div>
+              <p className="dim">이야기를 진행하면 다음 전투가 열립니다.</p>
+              <button className="sortie-btn" onClick={onSortie} autoFocus>
+                이야기 진행
+              </button>
+            </>
+          ) : !stage ? null : (
             <>
               <h3>다음 전투</h3>
               <div className="battle-name">{stage.name}</div>

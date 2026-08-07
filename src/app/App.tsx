@@ -1,11 +1,21 @@
 import { useState } from 'react'
 import type { CampaignState } from '../core/campaign'
-import { applyVictory, currentNode, isCampaignFinished, newCampaign, stageForNode } from '../core/campaign'
+import {
+  applyVictory,
+  completeStory,
+  currentNode,
+  isCampaignFinished,
+  newCampaign,
+  stageForNode,
+} from '../core/campaign'
 import type { BattleState, StageDef } from '../core/types'
 import { STAGES } from '../data/stages'
+import { STORY_SCRIPTS } from '../data/story'
 import { BattleScreen } from '../ui/BattleScreen'
 import { CampaignScreen } from '../ui/CampaignScreen'
 import '../ui/campaign.css'
+import { DeployScreen } from '../ui/DeployScreen'
+import { DialogueScreen } from '../ui/DialogueScreen'
 import { loadCampaign, loadSaveMeta, saveCampaign } from './persistence'
 
 const newSeed = () => Math.floor(Math.random() * 2 ** 31)
@@ -15,7 +25,16 @@ type Screen =
   | { s: 'freeSelect' }
   | { s: 'freeBattle'; stage: StageDef; seed: number }
   | { s: 'camp'; campaign: CampaignState; savedAt: number | null }
-  | { s: 'campaignBattle'; campaign: CampaignState; stage: StageDef; seed: number; savedAt: number | null }
+  | { s: 'story'; campaign: CampaignState; savedAt: number | null }
+  | { s: 'deploy'; campaign: CampaignState; stage: StageDef; savedAt: number | null }
+  | {
+      s: 'campaignBattle'
+      campaign: CampaignState
+      stage: StageDef
+      seed: number
+      deployment: string[]
+      savedAt: number | null
+    }
 
 const STAGE_DESC: Record<string, string> = {
   stage01: '강과 다리 길목을 건너 황건적을 전멸시켜라. (이동/지형/상성/책략 기본기)',
@@ -128,14 +147,52 @@ export function App() {
         onSortie={() => {
           const node = currentNode(screen.campaign)
           if (!node || isCampaignFinished(screen.campaign)) return
+          if (node.type === 'story') {
+            setScreen({ s: 'story', campaign: screen.campaign, savedAt: screen.savedAt })
+          } else {
+            setScreen({ s: 'deploy', campaign: screen.campaign, stage: stageForNode(node), savedAt: screen.savedAt })
+          }
+        }}
+      />
+    )
+  }
+
+  if (screen.s === 'story') {
+    const node = currentNode(screen.campaign)
+    if (!node || node.type !== 'story') {
+      setScreen({ s: 'camp', campaign: screen.campaign, savedAt: screen.savedAt })
+      return null
+    }
+    return (
+      <DialogueScreen
+        title={node.title}
+        script={STORY_SCRIPTS[node.scriptId] ?? []}
+        onDone={() => {
+          const next = completeStory(screen.campaign)
+          void saveCampaign(next).then(() => {
+            setScreen({ s: 'camp', campaign: next, savedAt: Date.now() })
+          })
+        }}
+      />
+    )
+  }
+
+  if (screen.s === 'deploy') {
+    return (
+      <DeployScreen
+        stage={screen.stage}
+        roster={screen.campaign.roster}
+        onBack={() => setScreen({ s: 'camp', campaign: screen.campaign, savedAt: screen.savedAt })}
+        onConfirm={(deployment) =>
           setScreen({
             s: 'campaignBattle',
             campaign: screen.campaign,
-            stage: stageForNode(node),
+            stage: screen.stage,
             seed: newSeed(),
+            deployment,
             savedAt: screen.savedAt,
           })
-        }}
+        }
       />
     )
   }
@@ -159,6 +216,7 @@ export function App() {
       stage={screen.stage}
       seed={screen.seed}
       roster={screen.campaign.roster}
+      deployment={screen.deployment}
       onFinish={handleFinish}
       onExit={() => setScreen({ s: 'camp', campaign: screen.campaign, savedAt: screen.savedAt })}
       onRestart={() => setScreen({ ...screen, seed: newSeed() })}
