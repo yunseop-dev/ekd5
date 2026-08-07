@@ -12,8 +12,9 @@ import {
   unitAt,
 } from '../core/battle'
 import { attackableCells, attackRangeUnion, keyOf, manhattan } from '../core/movement'
-import type { BattleState, StageDef, UnitState, Vec2 } from '../core/types'
+import type { BattleState, Faction, StageDef, UnitState, Vec2 } from '../core/types'
 import { TERRAIN } from '../data/terrain'
+import { Banner, type BannerProps } from './Banner'
 import { BattleBoard } from './BattleBoard'
 import { BattleLog } from './BattleLog'
 import { ForecastPanel } from './ForecastPanel'
@@ -43,6 +44,18 @@ export interface Floater {
 type PlaySpeed = 1 | 2 | 0
 const AI_STEP_MS = 700
 
+const PHASE_LABEL: Record<Faction, string> = {
+  player: '아군 페이즈',
+  enemy: '적군 페이즈',
+  ally: '우군 페이즈',
+}
+
+interface BannerSpec {
+  text: string
+  color: BannerProps['color']
+  direction: 'left' | 'right'
+}
+
 const FLOATER_TEXT: Record<string, (n: number) => { text: string; kind: Floater['kind'] }> = {
   hit: (n) => ({ text: `${n}`, kind: 'damage' }),
   crit: (n) => ({ text: `회심! ${n}`, kind: 'crit' }),
@@ -68,12 +81,49 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
   const [confirmEnd, setConfirmEnd] = useState(false)
   const [aiActiveId, setAiActiveId] = useState<string | null>(null)
   const [floaters, setFloaters] = useState<Floater[]>([])
+  const [banner, setBanner] = useState<BannerSpec | null>(null)
+  const [resultShown, setResultShown] = useState(false)
   const floaterSeq = useRef(0)
   const prevLogLen = useRef(state.log.length)
+  const prevPhaseKey = useRef<string | null>(null)
 
   const selectedUnit = sel ? state.units.find((u) => u.id === sel.unitId) : undefined
   const hoverUnit = hover ? unitAt(state, hover) : undefined
   const aiActiveUnit = aiActiveId ? state.units.find((u) => u.id === aiActiveId) : undefined
+
+  // ---------- 페이즈 전환 / 승패 배너 ----------
+
+  // 속도 0(연출 생략)에서는 배너를 아예 띄우지 않는다 (즉시 처리 경로 유지)
+  useEffect(() => {
+    if (state.result !== 'ongoing') return
+    const key = `${state.phase}:${state.turn}`
+    if (prevPhaseKey.current === key) return
+    prevPhaseKey.current = key
+    if (speed === 0) return
+    setBanner({
+      text: `제 ${state.turn} 턴 · ${PHASE_LABEL[state.phase]}`,
+      color: state.phase,
+      direction: state.phase === 'enemy' ? 'right' : 'left',
+    })
+  }, [state.phase, state.turn, state.result, speed])
+
+  useEffect(() => {
+    if (state.result === 'ongoing') return
+    if (speed === 0) {
+      setResultShown(true)
+      return
+    }
+    setBanner(
+      state.result === 'victory'
+        ? { text: '승리!', color: 'gold', direction: 'left' }
+        : { text: '패배...', color: 'enemy', direction: 'right' },
+    )
+  }, [state.result, speed])
+
+  function handleBannerDone() {
+    setBanner(null)
+    if (state.result !== 'ongoing') setResultShown(true)
+  }
 
   // ---------- AI 페이즈 순차 재생 ----------
 
@@ -82,6 +132,7 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
       if (aiActiveId !== null) setAiActiveId(null)
       return
     }
+    if (banner) return // 배너 연출 중에는 적 유닛을 움직이지 않는다
     if (speed === 0) {
       // 연출 생략: 즉시 전부 처리
       setState((prev) => {
@@ -100,7 +151,7 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
       })
     }, AI_STEP_MS / speed)
     return () => clearTimeout(timer)
-  }, [state, speed, aiActiveId])
+  }, [state, speed, aiActiveId, banner])
 
   // ---------- 데미지/회복 플로팅 텍스트 (로그 diff 기반) ----------
 
@@ -334,9 +385,7 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
         <h2>{stage.name}</h2>
         <div className="turn-banner">
           <span>턴 {state.turn}</span>
-          <span className={`phase-${state.phase}`}>
-            {state.phase === 'player' ? '아군 페이즈' : state.phase === 'enemy' ? '적군 페이즈' : '우군 페이즈'}
-          </span>
+          <span className={`phase-${state.phase}`}>{PHASE_LABEL[state.phase]}</span>
           <span>{state.weather === 'clear' ? '맑음' : '비'}</span>
         </div>
         <button
@@ -424,7 +473,18 @@ export function BattleScreen({ stage, seed, onExit, onRestart }: Props) {
         </div>
       )}
 
-      {state.result !== 'ongoing' && (
+      {banner && (
+        <Banner
+          key={`${banner.color}:${banner.text}`}
+          text={banner.text}
+          color={banner.color}
+          direction={banner.direction}
+          durationScale={speed === 2 ? 0.25 : 1}
+          onDone={handleBannerDone}
+        />
+      )}
+
+      {state.result !== 'ongoing' && resultShown && (
         <div className="result-overlay">
           <div className="result-box">
             <h2>{state.result === 'victory' ? '승리!' : '패배...'}</h2>

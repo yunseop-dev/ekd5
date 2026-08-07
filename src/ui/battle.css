@@ -303,6 +303,121 @@
   cursor: pointer;
 }
 
+/* ---------- 전면 배너 (페이즈 전환 / 승패) ---------- */
+
+.banner-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+  z-index: 9; /* 결과 오버레이(10) 아래 */
+}
+
+.banner-band {
+  width: 100%;
+  padding: 14px 0;
+  text-align: center;
+  border-top: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  animation-duration: var(--banner-enter), var(--banner-exit);
+  animation-delay: 0ms, var(--banner-out-delay);
+  animation-timing-function: cubic-bezier(0.16, 0.9, 0.3, 1), cubic-bezier(0.5, 0, 0.9, 0.35);
+  animation-fill-mode: both, forwards;
+}
+
+.banner-band.banner-from-left {
+  animation-name: banner-in-left, banner-out-left;
+}
+.banner-band.banner-from-right {
+  animation-name: banner-in-right, banner-out-right;
+}
+
+.banner-text {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.75);
+  white-space: nowrap;
+}
+
+/* 진영색 그라디언트 (α0.9) */
+.banner-player {
+  background: linear-gradient(
+    90deg,
+    rgba(26, 45, 88, 0.9),
+    rgba(59, 111, 212, 0.9),
+    rgba(26, 45, 88, 0.9)
+  );
+}
+.banner-enemy {
+  background: linear-gradient(
+    90deg,
+    rgba(86, 28, 20, 0.9),
+    rgba(192, 57, 43, 0.9),
+    rgba(86, 28, 20, 0.9)
+  );
+}
+.banner-ally {
+  background: linear-gradient(
+    90deg,
+    rgba(22, 66, 42, 0.9),
+    rgba(46, 158, 91, 0.9),
+    rgba(22, 66, 42, 0.9)
+  );
+}
+.banner-gold {
+  background: linear-gradient(
+    90deg,
+    rgba(92, 72, 30, 0.9),
+    rgba(216, 185, 106, 0.9),
+    rgba(92, 72, 30, 0.9)
+  );
+}
+.banner-gold .banner-text {
+  color: #2a2011;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+@keyframes banner-in-left {
+  from { opacity: 0; transform: translateX(-105%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes banner-out-left {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(105%); }
+}
+@keyframes banner-in-right {
+  from { opacity: 0; transform: translateX(105%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes banner-out-right {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-105%); }
+}
+
+/* 모션 최소화: 슬라이드 없이 짧은 페이드 (컴포넌트 타이밍은 동일) */
+@media (prefers-reduced-motion: reduce) {
+  .banner-band.banner-from-left,
+  .banner-band.banner-from-right {
+    animation-name: banner-fade-in, banner-fade-out;
+    animation-duration: 90ms, 90ms;
+  }
+}
+
+@keyframes banner-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes banner-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 /* 스테이지 선택 */
 .stage-select {
   max-width: 640px;
