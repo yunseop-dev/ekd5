@@ -233,8 +233,8 @@ export function createBattle(
       acted: false,
       statuses: [],
       buffs: [],
-      // 장비는 캠페인 로스터에서만 온다 (비캠페인 전투/적군은 맨몸)
-      equipment: { ...(entry?.equipment ?? {}) },
+      // 아군은 캠페인 로스터 우선, 적/우군·자유 전투는 스테이지 정의(적장 장비 — 원작: 격파 드랍과 연결)
+      equipment: { ...(entry?.equipment ?? def.equipment ?? officer.initialEquipment ?? {}) },
       isLeader: def.isLeader,
       isBoss: def.isBoss,
       behavior: def.behavior,
@@ -435,7 +435,7 @@ function triggerReinforcements(
         acted: false,
         statuses: [],
         buffs: [],
-        equipment: {}, // 증원은 적/우군 전용 — 장비 없음
+        equipment: { ...(def.equipment ?? officer.initialEquipment ?? {}) },
         isLeader: def.isLeader,
         isBoss: def.isBoss,
         behavior: def.behavior,

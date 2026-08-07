@@ -1,4 +1,4 @@
-import { classOf, effectiveStats, moveOf, officerOf, terrainEffectOf } from '../core/battle'
+import { classOf, effectiveStats, equippedItems, moveOf, officerOf, terrainEffectOf } from '../core/battle'
 import type { BattleState, UnitState } from '../core/types'
 import { TERRAIN } from '../data/terrain'
 
@@ -7,6 +7,8 @@ export function UnitInfoPanel({ state, unit }: { state: BattleState; unit: UnitS
   const cls = classOf(unit)
   const stats = effectiveStats(unit)
   const tile = TERRAIN[state.map.tiles[unit.pos.y][unit.pos.x]]
+  // 아군/적군/우군 공통 — 원작도 적장 장비를 정보 패널에서 확인 가능
+  const items = equippedItems(unit)
 
   return (
     <div className="panel-box">
@@ -30,6 +32,9 @@ export function UnitInfoPanel({ state, unit }: { state: BattleState; unit: UnitS
           지형 {tile.name} {terrainEffectOf(state, unit)}%
         </span>
         <span>이동 {moveOf(unit)}</span>
+      </div>
+      <div className="equip-line" title={items.map((i) => `${i.name}: ${i.description}`).join('\n')}>
+        장비 {items.length > 0 ? items.map((i) => i.name).join(' · ') : '없음'}
       </div>
     </div>
   )

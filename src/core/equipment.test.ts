@@ -145,9 +145,18 @@ describe('장비 → effectiveStats', () => {
     expect(unitOf(state, 'yellowInfantry').equipment).toEqual({})
   })
 
-  it('로스터 없는 전투는 전원 맨몸이다', () => {
+  it('적장도 장비를 지닌다 — 장각의 태평요술서는 격파 드랍(bossKill loot)과 일치', () => {
+    const stage03 = STAGES.find((s) => s.id === 'stage03')!
+    const state = startBattle(stage03, 1)
+    const boss = state.units.find((u) => u.isBoss)!
+    expect(boss.equipment.accessory).toBe('taipingYaoshu')
+    expect(stage03.loot).toEqual([{ trigger: 'bossKill', itemId: 'taipingYaoshu' }])
+  })
+
+  it('로스터 없는 전투(자유 전투)는 장수 initialEquipment을 쓴다', () => {
     const state = startBattle(mkStage(), 1)
-    for (const u of state.units) expect(u.equipment).toEqual({})
+    expect(unitOf(state, 'caocao').equipment).toEqual(OFFICERS.caocao.initialEquipment)
+    expect(unitOf(state, 'yellowInfantry').equipment).toEqual({}) // initialEquipment 없는 장수는 맨몸
   })
 
   it('로스터의 장비 맵은 복사되어 전투 상태에 들어간다 (참조 공유 없음)', () => {
@@ -509,7 +518,9 @@ describe('applyVictory — 보상금과 전리품', () => {
     const campaign = equipItem({ ...atFirstBattle(), inventory: ['woodSword'] }, 'caocao', 'woodSword')
     const snapshot = JSON.stringify(campaign)
     const next = applyVictory(campaign, startBattle(mkStage(), 1, campaign.roster))
-    expect(next.roster.find((r) => r.officerId === 'caocao')!.equipment).toEqual({ weapon: 'woodSword' })
+    const equipped = next.roster.find((r) => r.officerId === 'caocao')!.equipment
+    expect(equipped.weapon).toBe('woodSword') // 교체한 무기 유지
+    expect(equipped.armor).toBe('leatherArmor') // 초기 방어구도 유지
     expect(JSON.stringify(campaign)).toBe(snapshot)
   })
 

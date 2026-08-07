@@ -10,7 +10,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '조조',
     stats: { str: 78, ldr: 96, int: 92, agi: 82, luck: 90 },
     classId: 'lord',
-    initialEquipment: { weapon: 'yitianSword' },
+    initialEquipment: { weapon: 'yitianSword', armor: 'leatherArmor' },
     level: 3,
   },
   xiahoudun: {
@@ -18,7 +18,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '하후돈',
     stats: { str: 90, ldr: 78, int: 60, agi: 78, luck: 70 },
     classId: 'lightCavalry',
-    initialEquipment: { weapon: 'woodSpear' },
+    initialEquipment: { weapon: 'woodSpear', armor: 'leatherArmor' },
     level: 2,
   },
   dianwei: {
@@ -26,7 +26,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '전위',
     stats: { str: 94, ldr: 66, int: 32, agi: 70, luck: 82 },
     classId: 'heavyInfantry',
-    initialEquipment: { weapon: 'woodSword' },
+    initialEquipment: { weapon: 'woodSword', armor: 'leatherArmor' },
     level: 2,
   },
   xiahouyuan: {
@@ -34,7 +34,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '하후연',
     stats: { str: 86, ldr: 74, int: 58, agi: 88, luck: 66 },
     classId: 'archer',
-    initialEquipment: { weapon: 'woodBow' },
+    initialEquipment: { weapon: 'woodBow', armor: 'leatherArmor' },
     level: 2,
   },
   guojia: {
@@ -42,7 +42,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '곽가',
     stats: { str: 30, ldr: 60, int: 96, agi: 74, luck: 60 },
     classId: 'strategist',
-    initialEquipment: { weapon: 'bambooFan' },
+    initialEquipment: { weapon: 'bambooFan', armor: 'clothRobe' },
     level: 2,
   },
   xunyu: {
@@ -50,7 +50,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '순욱',
     stats: { str: 28, ldr: 68, int: 94, agi: 62, luck: 74 },
     classId: 'geomancer',
-    initialEquipment: { weapon: 'stoneGemSword' },
+    initialEquipment: { weapon: 'stoneGemSword', armor: 'clothRobe' },
     level: 2,
   },
 
@@ -88,6 +88,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '정원지',
     stats: { str: 82, ldr: 62, int: 38, agi: 64, luck: 50 },
     classId: 'lightCavalry',
+    initialEquipment: { weapon: 'woodSpear' },
     level: 4,
   },
   dengMao: {
@@ -95,6 +96,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '등무',
     stats: { str: 78, ldr: 58, int: 30, agi: 58, luck: 48 },
     classId: 'heavyInfantry',
+    initialEquipment: { weapon: 'woodSword' },
     level: 3,
   },
   // 황건 본진 부장 — 정원지급 정예 보병
@@ -103,6 +105,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '장량',
     stats: { str: 84, ldr: 72, int: 54, agi: 60, luck: 56 },
     classId: 'heavyInfantry',
+    initialEquipment: { weapon: 'woodSword', armor: 'leatherArmor' },
     level: 5,
   },
   // 대현량사 — 최종 보스. 요술(책략) 특화라 지력만 아군 책사급
@@ -111,6 +114,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '장각',
     stats: { str: 34, ldr: 72, int: 98, agi: 64, luck: 78 },
     classId: 'strategist',
+    initialEquipment: { accessory: 'taipingYaoshu' },
     level: 6,
   },
 }

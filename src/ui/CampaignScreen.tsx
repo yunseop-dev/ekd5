@@ -164,17 +164,29 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle, onUpdate 
               <div className="stat-grid">
                 {(() => {
                   const s = combatStats(selOfficer.stats, selClass.growth, selected.level)
+                  const items = Object.values(selected.equipment)
+                    .map((id) => EQUIPMENT[id])
+                    .filter((d) => d !== undefined)
+                  const bonus = (k: 'atk' | 'def' | 'mind' | 'agi' | 'morale') =>
+                    items.reduce((sum, d) => sum + (d.bonus[k] ?? 0), 0)
+                  const moveBonus = items.reduce((sum, d) => sum + (d.moveBonus ?? 0), 0)
+                  const stat = (label: string, base: number, extra: number) => (
+                    <span>
+                      {label} {base + extra}
+                      {extra !== 0 && <em className="equip-bonus"> (+{extra})</em>}
+                    </span>
+                  )
                   return (
                     <>
                       <span>HP {maxHp(selClass, selected.level)}</span>
                       <span>MP {maxMp(selClass, selected.level)}</span>
-                      <span>공격 {s.atk}</span>
-                      <span>방어 {s.def}</span>
-                      <span>정신 {s.mind}</span>
-                      <span>순발 {s.agi}</span>
-                      <span>사기 {s.morale}</span>
+                      {stat('공격', s.atk, bonus('atk'))}
+                      {stat('방어', s.def, bonus('def'))}
+                      {stat('정신', s.mind, bonus('mind'))}
+                      {stat('순발', s.agi, bonus('agi'))}
+                      {stat('사기', s.morale, bonus('morale'))}
                       <span>EXP {selected.exp}/100</span>
-                      <span>이동 {selClass.move}</span>
+                      {stat('이동', selClass.move, moveBonus)}
                       <span>
                         사거리 {selClass.minRange === selClass.maxRange ? selClass.minRange : `${selClass.minRange}~${selClass.maxRange}`}
                       </span>
@@ -182,6 +194,18 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle, onUpdate 
                   )
                 })()}
               </div>
+              <h4>장비</h4>
+              <ul className="strategy-list">
+                {(['weapon', 'armor', 'accessory'] as const).map((slot) => {
+                  const def = selected.equipment[slot] ? EQUIPMENT[selected.equipment[slot]!] : undefined
+                  const slotName = { weapon: '무기', armor: '방어구', accessory: '보조' }[slot]
+                  return (
+                    <li key={slot} className={def ? '' : 'dim'} title={def?.description}>
+                      {slotName}: {def ? def.name : '없음'}
+                    </li>
+                  )
+                })}
+              </ul>
               <h4>보유 책략</h4>
               <ul className="strategy-list">
                 {selClass.strategies

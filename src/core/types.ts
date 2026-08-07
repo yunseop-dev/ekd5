@@ -220,6 +220,8 @@ export interface StageUnitDef {
   faction: Faction
   pos: Vec2
   level?: number // 생략 시 장수 기본 레벨
+  /** 적/우군 장비 (아군은 캠페인 로스터가 우선). 생략 시 장수 initialEquipment */
+  equipment?: EquipmentMap
   isLeader?: boolean
   isBoss?: boolean
   behavior?: 'guard' | 'pursue'
