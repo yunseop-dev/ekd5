@@ -4,7 +4,8 @@
 
 import { openDB, type IDBPDatabase } from 'idb'
 import type { CampaignState, RosterEntry } from '../core/campaign'
-import { currentNode } from '../core/campaign'
+import { currentNode, INITIAL_GOLD } from '../core/campaign'
+import type { EquipmentMap, EquipSlot } from '../core/types'
 import { STAGES } from '../data/stages'
 
 export interface SaveMeta {
@@ -41,14 +42,46 @@ function requestPersistence(): void {
   if (promise) void promise.catch(() => {}) // 결과(승격 여부)는 UI 흐름에 영향 없음
 }
 
-/** 저장된 JSON은 신뢰할 수 없다 (수동 편집/구버전) — 구조 + version 검사 후에만 통과 */
+const EQUIP_SLOTS: EquipSlot[] = ['weapon', 'armor', 'accessory']
+
+/**
+ * 장비 맵 정규화 — 알려진 슬롯 + 문자열 값만 남긴다.
+ * 미등록 장비 id를 여기서 걸러내지 않는 이유: 데이터 개편으로 사라진 id는 battle/campaign 쪽이
+ * 조용히 무시하도록 만들어 뒀고, 세이브를 통째로 거부하는 편이 훨씬 나쁜 결과이기 때문.
+ */
+function normalizeEquipment(value: unknown): EquipmentMap {
+  if (typeof value !== 'object' || value === null) return {}
+  const raw = value as Record<string, unknown>
+  const map: EquipmentMap = {}
+  for (const slot of EQUIP_SLOTS) {
+    if (typeof raw[slot] === 'string') map[slot] = raw[slot] as string
+  }
+  return map
+}
+
+/**
+ * 저장된 JSON은 신뢰할 수 없다 (수동 편집/구버전) — 구조 검사 후에만 통과.
+ * v1(장비/군자금 이전) 세이브는 거부하지 않고 v2로 **승계 마이그레이션**한다:
+ * 군자금 = 초기치, 창고 = 빈 목록, 각 부대의 장비 = 빈 슬롯. 성장치(레벨/경험치)는 그대로 살린다.
+ */
 export function validateCampaign(data: unknown): CampaignState | null {
   if (typeof data !== 'object' || data === null) return null
   const raw = data as Record<string, unknown>
-  if (raw.version !== 1) return null
+  if (raw.version !== 1 && raw.version !== 2) return null
+  const legacy = raw.version === 1
   if (typeof raw.nodeId !== 'string') return null
   if (!Array.isArray(raw.roster) || !Array.isArray(raw.clearedStages)) return null
   if (!raw.clearedStages.every((s) => typeof s === 'string')) return null
+
+  // v2 전용 필드 — v1 세이브에는 아예 없으므로 기본값을 채워 승계한다
+  let gold = INITIAL_GOLD
+  let inventory: string[] = []
+  if (!legacy) {
+    if (typeof raw.gold !== 'number' || !Number.isFinite(raw.gold)) return null
+    if (!Array.isArray(raw.inventory) || !raw.inventory.every((s) => typeof s === 'string')) return null
+    gold = raw.gold
+    inventory = [...(raw.inventory as string[])]
+  }
 
   const roster: RosterEntry[] = []
   for (const item of raw.roster) {
@@ -57,14 +90,21 @@ export function validateCampaign(data: unknown): CampaignState | null {
     if (typeof entry.officerId !== 'string') return null
     if (typeof entry.level !== 'number' || !Number.isFinite(entry.level)) return null
     if (typeof entry.exp !== 'number' || !Number.isFinite(entry.exp)) return null
-    roster.push({ officerId: entry.officerId, level: entry.level, exp: entry.exp })
+    roster.push({
+      officerId: entry.officerId,
+      level: entry.level,
+      exp: entry.exp,
+      equipment: legacy ? {} : normalizeEquipment(entry.equipment),
+    })
   }
 
   return {
-    version: 1,
+    version: 2,
     nodeId: raw.nodeId,
     roster,
     clearedStages: raw.clearedStages as string[],
+    gold,
+    inventory,
   }
 }
 

@@ -1,0 +1,232 @@
+// 장비/보물 정의 — 조조전 아이템 시스템 (docs/research/caocao.md §6)
+// 슬롯 3개(무기/방어구/보조구) + 상점 3단계 해금(나무→구리→철) + 비매품 보물.
+//
+// ⚠ 수치는 전부 설계값(추후 리서치 보정 예정) — 원작 무구 수치표를 아직 확보하지 못했다.
+//    설계 원칙: tier1은 Lv3~5 부대 기본 공격력(≈60)의 15% 정도, tier가 오를수록 약 2배씩.
+//    보물은 tier3 상점품보다 확실히 세거나(청강검) 수치 대신 고유 효과(맹덕신서)를 준다.
+// ⚠ 무구성장(장비 경험치 → Lv3/Lv9)은 v0.5 미구현. 고정 보정치만 쓴다.
+
+import type { EquipmentDef } from '../core/types'
+
+export const EQUIPMENT: Record<string, EquipmentDef> = {
+  // ---------- 무기: 검 (군주·보병 계열 범용) ----------
+  woodSword: {
+    id: 'woodSword',
+    name: '목검',
+    slot: 'weapon',
+    bonus: { atk: 8 },
+    price: 300,
+    tier: 1,
+    description: '수련용 나무 검. 없는 것보다는 낫다.',
+  },
+  bronzeSword: {
+    id: 'bronzeSword',
+    name: '동검',
+    slot: 'weapon',
+    bonus: { atk: 16 },
+    price: 800,
+    tier: 2,
+    description: '청동을 벼려 만든 검. 관군의 표준 장비다.',
+  },
+  ironSword: {
+    id: 'ironSword',
+    name: '철검',
+    slot: 'weapon',
+    bonus: { atk: 26 },
+    price: 2000,
+    tier: 3,
+    description: '단단한 철검. 명장의 손에서 위력을 발한다.',
+  },
+
+  // ---------- 무기: 창 (검보다 공격력 우위, 값이 비싸다) ----------
+  woodSpear: {
+    id: 'woodSpear',
+    name: '목창',
+    slot: 'weapon',
+    bonus: { atk: 10 },
+    price: 350,
+    tier: 1,
+    description: '끝을 깎아 세운 나무 창. 길이가 곧 무기다.',
+  },
+  bronzeSpear: {
+    id: 'bronzeSpear',
+    name: '동창',
+    slot: 'weapon',
+    bonus: { atk: 18 },
+    price: 900,
+    tier: 2,
+    description: '청동 창날을 물린 장병기.',
+  },
+  ironSpear: {
+    id: 'ironSpear',
+    name: '철창',
+    slot: 'weapon',
+    bonus: { atk: 28 },
+    price: 2200,
+    tier: 3,
+    description: '철제 창날이 갑옷을 꿰뚫는다.',
+  },
+
+  // ---------- 무기: 활 (궁병 전용 성향 — 검과 창 사이) ----------
+  woodBow: {
+    id: 'woodBow',
+    name: '목궁',
+    slot: 'weapon',
+    bonus: { atk: 9 },
+    price: 320,
+    tier: 1,
+    description: '나무를 휘어 만든 단궁.',
+  },
+  bronzeBow: {
+    id: 'bronzeBow',
+    name: '동궁',
+    slot: 'weapon',
+    bonus: { atk: 17 },
+    price: 850,
+    tier: 2,
+    description: '동으로 보강한 활. 시위가 묵직하다.',
+  },
+  ironBow: {
+    id: 'ironBow',
+    name: '철궁',
+    slot: 'weapon',
+    bonus: { atk: 27 },
+    price: 2100,
+    tier: 3,
+    description: '철궁. 화살이 방패를 뚫고 지나간다.',
+  },
+
+  // ---------- 무기: 부채 (책사·풍수사 — 공격력이 아니라 정신력) ----------
+  bambooFan: {
+    id: 'bambooFan',
+    name: '죽선',
+    slot: 'weapon',
+    bonus: { mind: 10 },
+    price: 400,
+    tier: 1,
+    description: '대나무 살로 엮은 부채. 책략의 기운을 모은다.',
+  },
+  whiteFeatherFan: {
+    id: 'whiteFeatherFan',
+    name: '백우선',
+    slot: 'weapon',
+    bonus: { mind: 20 },
+    price: 1000,
+    tier: 2,
+    description: '흰 깃털 부채. 군사의 위엄이 서려 있다.',
+  },
+
+  // ---------- 방어구: 갑옷 (무관계) ----------
+  leatherArmor: {
+    id: 'leatherArmor',
+    name: '가죽 갑옷',
+    slot: 'armor',
+    bonus: { def: 8 },
+    price: 340,
+    tier: 1,
+    description: '무두질한 가죽 갑옷. 가볍고 값이 싸다.',
+  },
+  bronzeArmor: {
+    id: 'bronzeArmor',
+    name: '동 갑옷',
+    slot: 'armor',
+    bonus: { def: 16 },
+    price: 880,
+    tier: 2,
+    description: '청동 비늘을 덧댄 갑옷.',
+  },
+  ironArmor: {
+    id: 'ironArmor',
+    name: '철 갑옷',
+    slot: 'armor',
+    bonus: { def: 26 },
+    price: 2100,
+    tier: 3,
+    description: '두꺼운 철 갑옷. 화살도 튕겨낸다.',
+  },
+
+  // ---------- 방어구: 옷 (회피형·문관계 — 방어는 낮고 정신력을 얹는다) ----------
+  clothRobe: {
+    id: 'clothRobe',
+    name: '무명옷',
+    slot: 'armor',
+    bonus: { def: 4, mind: 6 },
+    price: 300,
+    tier: 1,
+    description: '거친 무명으로 지은 옷. 몸이 가볍다.',
+  },
+  silkRobe: {
+    id: 'silkRobe',
+    name: '비단옷',
+    slot: 'armor',
+    bonus: { def: 8, mind: 12 },
+    price: 820,
+    tier: 2,
+    description: '고운 비단옷. 마음을 다스리기에 좋다.',
+  },
+
+  // ---------- 보조구 ----------
+  leatherShield: {
+    id: 'leatherShield',
+    name: '가죽 방패',
+    slot: 'accessory',
+    bonus: { def: 6 },
+    price: 500,
+    tier: 1,
+    description: '가죽을 덧댄 작은 방패.',
+  },
+  swiftHorse: {
+    id: 'swiftHorse',
+    name: '준마',
+    slot: 'accessory',
+    bonus: {},
+    moveBonus: 1,
+    price: 1200,
+    tier: 2,
+    description: '잘 달리는 말. 한 걸음 더 나아간다.',
+  },
+
+  // ---------- 보물 (비매품 · 판매 불가) ----------
+  qinggangSword: {
+    id: 'qinggangSword',
+    name: '청강검',
+    slot: 'weapon',
+    bonus: { atk: 40 },
+    price: null,
+    tier: 3,
+    isTreasure: true,
+    description: '조조가 아끼던 명검. 무엇이든 베어낸다.',
+  },
+  dilu: {
+    id: 'dilu',
+    name: '적로',
+    slot: 'accessory',
+    bonus: { agi: 10 },
+    moveBonus: 2,
+    price: null,
+    tier: 3,
+    isTreasure: true,
+    description: '이마에 흰 점이 있는 준마. 바람처럼 달린다.',
+  },
+  mengdeXinshu: {
+    id: 'mengdeXinshu',
+    name: '맹덕신서',
+    slot: 'accessory',
+    bonus: {},
+    expMultiplier: 1.5,
+    price: null,
+    tier: 3,
+    isTreasure: true,
+    description: '조조가 병법을 정리한 저술. 얻는 경험이 1.5배가 된다.',
+  },
+  taipingYaoshu: {
+    id: 'taipingYaoshu',
+    name: '태평요술서',
+    slot: 'accessory',
+    bonus: { mind: 24, morale: 16 },
+    price: null,
+    tier: 3,
+    isTreasure: true,
+    description: '장각이 남긴 요술서. 정신과 사기를 크게 끌어올린다.',
+  },
+}

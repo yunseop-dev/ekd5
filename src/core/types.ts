@@ -94,6 +94,29 @@ export interface UnitClassDef {
   promotesTo?: string // 인수 사용 시 (Lv15↑ 2차, Lv30↑ 3차)
 }
 
+// ---------- 장비 / 보물 ----------
+
+// 조조전 장비 슬롯 3개: 무기 / 방어구(갑옷·옷) / 보조구(방패·기마·서적) (docs/research/caocao.md §6).
+// v0.5는 무구성장(장비 레벨업 Lv1~3/보물 Lv9)을 구현하지 않는다 — 고정 보정치만.
+export type EquipSlot = 'weapon' | 'armor' | 'accessory'
+
+export interface EquipmentDef {
+  id: string
+  name: string
+  slot: EquipSlot
+  /** 부대 능력치 가산 (effectiveStats에 합산) */
+  bonus: Partial<Record<'atk' | 'def' | 'mind' | 'agi' | 'morale', number>>
+  moveBonus?: number // 이동력 가산 (준마/적로)
+  expMultiplier?: number // 획득 경험치 배율 (맹덕신서 1.5)
+  price: number | null // null = 비매품(보물)
+  tier: 1 | 2 | 3 // 상점 해금 단계 (아군 평균 레벨 연동, campaign-ux.md 1부 §3)
+  isTreasure?: boolean // 보물 — 판매 불가 (원작: 영걸전은 가능, 조조전은 불가)
+  description: string
+}
+
+/** 슬롯 → 장비 id. 비어 있는 슬롯은 키 자체가 없다 */
+export type EquipmentMap = Partial<Record<EquipSlot, string>>
+
 // ---------- 책략 ----------
 
 export type StrategyElement = 'fire' | 'water' | 'wind' | 'earth' | 'holy' | 'none'
@@ -149,6 +172,8 @@ export interface UnitState {
   acted: boolean // 이번 페이즈 행동(공격/책략/대기) 완료 여부
   statuses: StatusEffect[]
   buffs: StatBuff[]
+  /** 장착 장비 — 캠페인 로스터에서 복사됨. 비캠페인 전투는 빈 객체 */
+  equipment: EquipmentMap
   isLeader?: boolean // 주인공: 격파당하면 패배
   isBoss?: boolean // 격파 시 승리 조건 대상
   behavior?: 'guard' | 'pursue' // AI: guard = 사거리 진입 전 대기
@@ -203,6 +228,9 @@ export interface StageDef {
   reinforcements: ReinforcementDef[]
   weather: Weather
   bonusExp?: number // 2차 승리조건 달성 시 생존 전원 보너스 (시리즈 전통 +50)
+  // 전리품 — 원작 3분류 중 "특정 적 격파 시"(bossKill)와 "승리 후 지급"(victory)만 구현.
+  // 시설 점령 즉시 지급은 v0.5 범위 밖 (docs/research/campaign-ux.md 1부 §3).
+  loot?: { trigger: 'victory' | 'bossKill'; itemId: string }[]
   // ---- 출진 준비 화면 (docs/research/campaign-ux.md 1부 §2) ----
   // 원작은 스테이지마다 출진 부대수 min~max와 강제출진 슬롯(①조조②하후돈 — 번호=출진 순서)이
   // 데이터로 박혀 있고, "선택 순서 = 맵 배치 위치"라 슬롯 인덱스→좌표 테이블이 하드코딩돼 있다.

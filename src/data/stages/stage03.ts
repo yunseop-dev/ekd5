@@ -62,6 +62,8 @@ export const STAGE_03: StageDef = {
   // 순서 주의: 전멸은 보스 격파를 포함하므로 defeatBoss가 앞에 오면 2차 보너스가 영원히 안 뜬다.
   victory: [{ type: 'annihilation' }, { type: 'defeatBoss' }],
   bonusExp: 50,
+  // 전리품 — 장각을 직접 잡아야 나오는 보물 ("특정 적 격파" 분류)
+  loot: [{ trigger: 'bossKill', itemId: 'taipingYaoshu' }],
   reinforcements: [
     // 측면 산길로 돌아 나오는 기병 (좌우 끝 1칸 우회로)
     {

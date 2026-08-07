@@ -2,6 +2,7 @@
 // 공격 해소 순서: 명중 → 회심 → 데미지 → 2회 공격 → 반격 (조조전 사양)
 
 import { CLASSES } from '../data/classes'
+import { EQUIPMENT } from '../data/equipment'
 import { OFFICERS } from '../data/officers'
 import { STRATEGIES } from '../data/strategies'
 import { TERRAIN } from '../data/terrain'
@@ -28,6 +29,7 @@ import { nextInt, roll } from './rng'
 import type {
   BattleAction,
   BattleState,
+  EquipmentDef,
   OfficerDef,
   StageDef,
   StageUnitDef,
@@ -56,13 +58,38 @@ const hostileTo = (a: UnitState['faction']): UnitState['faction'][] =>
 
 export const isHostile = (a: UnitState, b: UnitState): boolean => hostileTo(a.faction).includes(b.faction)
 
-/** 버프 반영된 실효 전투 능력치 */
+/**
+ * 장착 중인 장비 정의 목록.
+ * 알 수 없는 id는 조용히 무시한다 — 구버전 세이브 승계/데이터 개편 내성 (equipment 자체가 없어도 안전).
+ */
+export function equippedItems(unit: UnitState): EquipmentDef[] {
+  const slots: (string | undefined)[] = Object.values(unit.equipment ?? {})
+  return slots.map((id) => (id ? EQUIPMENT[id] : undefined)).filter((e): e is EquipmentDef => e !== undefined)
+}
+
+/** 장비 + 버프 반영된 실효 전투 능력치 (장비 가산 → 버프 순서) */
 export function effectiveStats(unit: UnitState): CombatStats {
   const base = combatStats(officerOf(unit).stats, classOf(unit).growth, unit.level)
+  for (const item of equippedItems(unit)) {
+    for (const [stat, amount] of Object.entries(item.bonus)) {
+      base[stat as keyof CombatStats] += amount
+    }
+  }
   for (const buff of unit.buffs) {
     base[buff.stat] = Math.max(1, base[buff.stat] + buff.amount)
   }
   return base
+}
+
+/** 실효 이동력 = 병과 이동력 + 장비 moveBonus (준마/적로). 최소 1 */
+export function moveOf(unit: UnitState): number {
+  const bonus = equippedItems(unit).reduce((sum, item) => sum + (item.moveBonus ?? 0), 0)
+  return Math.max(1, classOf(unit).move + bonus)
+}
+
+/** 획득 경험치 배율 (맹덕신서 1.5) — 여러 개면 곱연산 */
+export function expMultiplierOf(unit: UnitState): number {
+  return equippedItems(unit).reduce((mult, item) => mult * (item.expMultiplier ?? 1), 1)
 }
 
 /** 유닛이 서 있는 지형의 물리 지형효과 % */
@@ -90,7 +117,7 @@ export function moveContextFor(state: BattleState, unit: UnitState): MoveContext
       if (!other || other.id === unit.id) return 'free'
       return isHostile(unit, other) ? 'block' : 'pass'
     },
-    movePoints: classOf(unit).move,
+    movePoints: moveOf(unit),
   }
 }
 
@@ -201,6 +228,8 @@ export function createBattle(
       acted: false,
       statuses: [],
       buffs: [],
+      // 장비는 캠페인 로스터에서만 온다 (비캠페인 전투/적군은 맨몸)
+      equipment: { ...(entry?.equipment ?? {}) },
       isLeader: def.isLeader,
       isBoss: def.isBoss,
       behavior: def.behavior,
@@ -237,7 +266,8 @@ const nameOf = (unit: UnitState): string => officerOf(unit).name
 /** 경험치 부여 + 레벨업 처리 (state를 직접 수정) */
 function grantExp(state: BattleState, unit: UnitState, targetLevel: number, defeated: boolean): void {
   if (unit.faction !== 'player') return // 적/우군은 성장하지 않음
-  const gained = expGain(unit.level, targetLevel, defeated)
+  // 맹덕신서류 경험치 증폭은 획득 시점에 곱한다 (레벨업 판정 전, 최소 1)
+  const gained = Math.max(1, Math.trunc(expGain(unit.level, targetLevel, defeated) * expMultiplierOf(unit)))
   const progress = applyExp(unit.level, unit.exp, gained)
   unit.exp = progress.exp
   if (progress.levelsGained > 0) {
@@ -400,6 +430,7 @@ function triggerReinforcements(
         acted: false,
         statuses: [],
         buffs: [],
+        equipment: {}, // 증원은 적/우군 전용 — 장비 없음
         isLeader: def.isLeader,
         isBoss: def.isBoss,
         behavior: def.behavior,

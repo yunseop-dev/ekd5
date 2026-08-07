@@ -56,6 +56,8 @@ export const STAGE_02: StageDef = {
     { type: 'defeatBoss' },
   ],
   bonusExp: 50,
+  // 전리품 — 관문을 지켜냈으면 무조건 지급 ("승리 후" 분류)
+  loot: [{ trigger: 'victory', itemId: 'leatherShield' }],
   reinforcements: [
     {
       trigger: { type: 'turnStart', turn: 3 },
