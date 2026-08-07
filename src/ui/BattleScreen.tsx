@@ -520,7 +520,7 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
 
 /** 승리 시 부대별 성장 요약 (레벨업 유닛 상단 정렬) */
 function GrowthRecap({ roster, state }: { roster: RosterEntry[]; state: BattleState }) {
-  const after: RosterEntry[] = state.units
+  const after = state.units
     .filter((u) => u.faction === 'player')
     .map((u) => ({ officerId: u.officerId, level: u.level, exp: u.exp }))
   const rows = growthSummary(roster, after)

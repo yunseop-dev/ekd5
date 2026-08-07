@@ -1,4 +1,4 @@
-import { classOf, effectiveStats, officerOf, terrainEffectOf } from '../core/battle'
+import { classOf, effectiveStats, moveOf, officerOf, terrainEffectOf } from '../core/battle'
 import type { BattleState, UnitState } from '../core/types'
 import { TERRAIN } from '../data/terrain'
 
@@ -29,7 +29,7 @@ export function UnitInfoPanel({ state, unit }: { state: BattleState; unit: UnitS
         <span>
           지형 {tile.name} {terrainEffectOf(state, unit)}%
         </span>
-        <span>이동 {cls.move}</span>
+        <span>이동 {moveOf(unit)}</span>
       </div>
     </div>
   )
