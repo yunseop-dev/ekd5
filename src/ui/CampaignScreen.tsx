@@ -7,9 +7,11 @@ import { CAMPAIGN_NODES, currentNode, isCampaignFinished, stageForNode } from '.
 import { combatStats, maxHp, maxMp } from '../core/formulas'
 import type { StageDef, VictoryCondition } from '../core/types'
 import { CLASSES } from '../data/classes'
+import { EQUIPMENT } from '../data/equipment'
 import { OFFICERS } from '../data/officers'
 import { STRATEGIES } from '../data/strategies'
 import { CLASS_ICON } from './BattleBoard'
+import { CampFacilities } from './CampFacilities'
 import './campaign.css'
 
 function victoryText(cond: VictoryCondition): string {
@@ -40,10 +42,13 @@ interface Props {
   savedAt: number | null
   onSortie: () => void
   onTitle: () => void
+  /** 막사(상점/창고) 거래·장착 결과 반영 + 저장 (부모 책임) */
+  onUpdate: (next: CampaignState) => void
 }
 
-export function CampaignScreen({ campaign, savedAt, onSortie, onTitle }: Props) {
+export function CampaignScreen({ campaign, savedAt, onSortie, onTitle, onUpdate }: Props) {
   const [selectedId, setSelectedId] = useState<string>(campaign.roster[0]?.officerId)
+  const [facilitiesOpen, setFacilitiesOpen] = useState(false)
   const finished = isCampaignFinished(campaign)
   const node = currentNode(campaign)
   const stage = !finished && node?.type === 'battle' ? stageForNode(node) : null
@@ -63,10 +68,18 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle }: Props) 
         <span className="save-indicator">
           {savedAt ? `자동 저장됨 · ${new Date(savedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}` : ''}
         </span>
+        <span className="gold-display">금 {campaign.gold.toLocaleString('ko-KR')}</span>
+        <button className="title-btn" onClick={() => setFacilitiesOpen(true)}>
+          막사 (상점·창고)
+        </button>
         <button className="title-btn" onClick={onTitle}>
           타이틀로
         </button>
       </header>
+
+      {facilitiesOpen && (
+        <CampFacilities campaign={campaign} onChange={onUpdate} onClose={() => setFacilitiesOpen(false)} />
+      )}
 
       <div className="campaign-grid">
         <section className="panel-box next-battle">
@@ -118,6 +131,10 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle }: Props) 
           {campaign.roster.map((r) => {
             const officer = OFFICERS[r.officerId]
             const cls = CLASSES[officer.classId]
+            // 원작 유닛 정보 패널 7필드(초상/이름/병과/Lv/HP/사기/Exp) 축약 재현
+            const morale =
+              combatStats(officer.stats, cls.growth, r.level).morale +
+              Object.values(r.equipment).reduce((s, id) => s + (EQUIPMENT[id]?.bonus.morale ?? 0), 0)
             return (
               <button
                 key={r.officerId}
@@ -128,6 +145,8 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle }: Props) 
                 <span className="roster-name">{officer.name}</span>
                 <span className="roster-class">{cls.name}</span>
                 <span className="roster-level">Lv {r.level}</span>
+                <span className="roster-stat">HP {maxHp(cls, r.level)}</span>
+                <span className="roster-stat">사기 {morale}</span>
                 <span className="exp-bar">
                   <span style={{ width: `${r.exp}%` }} />
                 </span>

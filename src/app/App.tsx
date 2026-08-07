@@ -143,6 +143,15 @@ export function App() {
       <CampaignScreen
         campaign={screen.campaign}
         savedAt={screen.savedAt}
+        onUpdate={(next) => {
+          // 거래/장착은 즉시 화면 반영, 저장 완료 시 인디케이터 갱신
+          setScreen({ s: 'camp', campaign: next, savedAt: screen.savedAt })
+          void saveCampaign(next).then(() => {
+            setScreen((cur) =>
+              cur.s === 'camp' && cur.campaign === next ? { ...cur, savedAt: Date.now() } : cur,
+            )
+          })
+        }}
         onTitle={() => setScreen({ s: 'title' })}
         onSortie={() => {
           const node = currentNode(screen.campaign)

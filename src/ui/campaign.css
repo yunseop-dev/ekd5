@@ -93,9 +93,9 @@
 
 .roster-row {
   display: grid;
-  grid-template-columns: 32px 1fr 64px 52px 70px;
+  grid-template-columns: 32px 1fr 56px 46px 62px 58px 60px;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 8px;
   background: #1f1a13;
   border: 1px solid #4a4132;
@@ -125,6 +125,9 @@
 .roster-name { font-weight: 700; }
 .roster-class { color: #bfb39c; font-size: 12px; }
 .roster-level { text-align: right; }
+.roster-stat { color: #bfb39c; font-size: 12px; text-align: right; white-space: nowrap; }
+
+.gold-display { color: #d8b96a; font-weight: 700; font-size: 14px; }
 
 .exp-bar {
   height: 6px;
