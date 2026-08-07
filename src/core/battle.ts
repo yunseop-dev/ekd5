@@ -108,10 +108,15 @@ export function knownStrategies(unit: UnitState): StrategyDef[] {
 /** 이동범위 계산용 컨텍스트 (적 = 차단, 아군·우군 = 통과만) */
 export function moveContextFor(state: BattleState, unit: UnitState): MoveContext {
   const profile = classOf(unit).moveProfile
+  // 적로(원작 확정): 진입 가능한 모든 지형의 소비 이동력을 1로
+  const flatCost = equippedItems(unit).some((item) => item.allTerrainCost1)
   return {
     width: state.map.width,
     height: state.map.height,
-    costAt: (pos) => TERRAIN[state.map.tiles[pos.y][pos.x]].cost[profile],
+    costAt: (pos) => {
+      const cost = TERRAIN[state.map.tiles[pos.y][pos.x]].cost[profile]
+      return flatCost && cost !== null ? 1 : cost
+    },
     occupancyAt: (pos): Occupancy => {
       const other = unitAt(state, pos)
       if (!other || other.id === unit.id) return 'free'
@@ -635,6 +640,14 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
           const healed = Math.min(Math.trunc((unit.maxHp * tile.healPerTurn) / 100), unit.maxHp - unit.hp)
           unit.hp += healed
           log(state, 'terrainHeal', `${nameOf(unit)} — ${tile.name}에서 ${healed} 회복`)
+        }
+
+        // 장비 MP 회복 (태평요술서 — 원작 확정: 매턴 MP 10)
+        const mpRegen = equippedItems(unit).reduce((sum, item) => sum + (item.mpRegenPerTurn ?? 0), 0)
+        if (mpRegen > 0 && unit.mp < unit.maxMp) {
+          const regained = Math.min(mpRegen, unit.maxMp - unit.mp)
+          unit.mp += regained
+          log(state, 'mpRegen', `${nameOf(unit)} — 책략치 ${regained} 회복`)
         }
       }
       break

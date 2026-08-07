@@ -118,17 +118,16 @@ describe('장비 → effectiveStats', () => {
   it('무기/방어구/보조구 보너스가 모두 합산된다', () => {
     const bare = statsWith({})
     const armed = statsWith({ weapon: 'woodSword', armor: 'leatherArmor', accessory: 'leatherShield' })
-    expect(armed.atk).toBe(bare.atk + 8) // 목검
-    expect(armed.def).toBe(bare.def + 8 + 6) // 가죽 갑옷 + 가죽 방패
+    expect(armed.atk).toBe(bare.atk + EQUIPMENT.woodSword.bonus.atk!)
+    expect(armed.def).toBe(bare.def + EQUIPMENT.leatherArmor.bonus.def! + EQUIPMENT.leatherShield.bonus.def!)
     expect(armed.mind).toBe(bare.mind)
   })
 
-  it('한 장비가 여러 능력치를 올릴 수 있다 (옷·보물)', () => {
+  it('한 장비가 여러 능력치를 올릴 수 있다 (옷)', () => {
     const bare = statsWith({})
-    const robed = statsWith({ armor: 'silkRobe', accessory: 'taipingYaoshu' })
-    expect(robed.def).toBe(bare.def + 8)
-    expect(robed.mind).toBe(bare.mind + 12 + 24)
-    expect(robed.morale).toBe(bare.morale + 16)
+    const robed = statsWith({ armor: 'silkRobe' })
+    expect(robed.def).toBe(bare.def + EQUIPMENT.silkRobe.bonus.def!)
+    expect(robed.mind).toBe(bare.mind + EQUIPMENT.silkRobe.bonus.mind!)
   })
 
   it('미등록 장비 id는 조용히 무시된다 (데이터 개편 내성)', () => {
@@ -161,7 +160,6 @@ describe('moveOf', () => {
     const base = classOf(unitOf(startBattle(mkStage(), 1), 'caocao')).move
     expect(moveWith({})).toBe(base)
     expect(moveWith({ accessory: 'swiftHorse' })).toBe(base + 1) // 준마
-    expect(moveWith({ accessory: 'dilu' })).toBe(base + 2) // 적로
   })
 
   it('이동범위 계산에 실제로 반영된다 (준마 = 한 칸 더)', () => {
@@ -272,7 +270,44 @@ describe('equipItem / unequipItem', () => {
     const campaign = equipItem(withStock(['ironSword']), 'caocao', 'ironSword')
     const state = startBattle(mkStage(), 1, campaign.roster)
     const bare = startBattle(mkStage(), 1, [entry('caocao', OFFICERS.caocao.level)])
-    expect(effectiveStats(unitOf(state, 'caocao')).atk).toBe(effectiveStats(unitOf(bare, 'caocao')).atk + 26)
+    expect(effectiveStats(unitOf(state, 'caocao')).atk).toBe(
+      effectiveStats(unitOf(bare, 'caocao')).atk + EQUIPMENT.ironSword.bonus.atk!,
+    )
+  })
+})
+
+// ---------- 보물 고유 효과 (원작 확정 — docs/research/equipment.md §2) ----------
+
+describe('보물 고유 효과', () => {
+  it('적로: 진입 가능한 모든 지형의 소비 이동력이 1이 된다', () => {
+    // (1,1) 남쪽에 숲(보병 코스트 2)과 강(진입 불가)을 심어 직접 비용 비교
+    const stage = mkStage()
+    stage.map.tiles[2][1] = 'forest' // (1,2)
+    stage.map.tiles[3][1] = 'forest' // (1,3)
+    stage.map.tiles[5][1] = 'river' // (1,5)
+    const rangeWith = (equipment: EquipmentMap) => {
+      const state = startBattle(stage, 1, [entry('caocao', 3, equipment)])
+      return movementRangeOf(state, unitOf(state, 'caocao'))
+    }
+    const forest2 = keyOf({ x: 1, y: 3 })
+    expect(rangeWith({}).get(forest2)?.cost).toBe(4) // 숲 2칸 = 2+2
+    expect(rangeWith({ accessory: 'dilu' }).get(forest2)?.cost).toBe(2) // 전 칸 코스트 1
+    // 진입 불가 지형(강)은 적로로도 불가
+    expect(rangeWith({ accessory: 'dilu' }).has(keyOf({ x: 1, y: 5 }))).toBe(false)
+  })
+
+  it('태평요술서: 페이즈 시작 시 MP 10 회복 (최대치 캡)', () => {
+    let state = startBattle(mkStage(), 1, [entry('caocao', 3, { accessory: 'taipingYaoshu' })])
+    const before = unitOf(state, 'caocao')
+    before.mp = 0
+    state = applyAction(state, { type: 'endPhase' }) // → 적 페이즈
+    state = applyAction(state, { type: 'endPhase' }) // → 턴 2 아군 페이즈 시작
+    expect(unitOf(state, 'caocao').mp).toBe(10)
+    // 최대치 초과 회복 없음
+    unitOf(state, 'caocao').mp = unitOf(state, 'caocao').maxMp
+    state = applyAction(state, { type: 'endPhase' })
+    state = applyAction(state, { type: 'endPhase' })
+    expect(unitOf(state, 'caocao').mp).toBe(unitOf(state, 'caocao').maxMp)
   })
 })
 

@@ -106,8 +106,10 @@ export interface EquipmentDef {
   slot: EquipSlot
   /** 부대 능력치 가산 (effectiveStats에 합산) */
   bonus: Partial<Record<'atk' | 'def' | 'mind' | 'agi' | 'morale', number>>
-  moveBonus?: number // 이동력 가산 (준마/적로)
+  moveBonus?: number // 이동력 가산 (준마)
   expMultiplier?: number // 획득 경험치 배율 (맹덕신서 1.5)
+  mpRegenPerTurn?: number // 매턴 페이즈 시작 시 MP 회복 (태평요술서 = 10, 원작 확정)
+  allTerrainCost1?: boolean // 진입 가능 전 지형 소비 이동력 1 (적로, 원작 확정)
   price: number | null // null = 비매품(보물)
   tier: 1 | 2 | 3 // 상점 해금 단계 (아군 평균 레벨 연동, campaign-ux.md 1부 §3)
   isTreasure?: boolean // 보물 — 판매 불가 (원작: 영걸전은 가능, 조조전은 불가)
