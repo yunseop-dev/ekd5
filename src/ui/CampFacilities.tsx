@@ -498,7 +498,7 @@ function StorageTab({ campaign, onChange }: TabProps) {
         {/* 능력치 열매 — 3단계 일반 장비를 만렙에서 팔면 얻는다 (equipment.md §1) */}
         <h4>능력치 열매 ({fruits.length})</h4>
         {fruits.length === 0 ? (
-          <p className="dim">열매가 없다. 3단계 장비를 최대 레벨까지 키운 뒤 상점에서 팔면 열매가 남는다.</p>
+          <p className="dim">열매가 없다. 장비를 최대 레벨까지 키운 뒤 상점에서 팔면 열매가 남는다.</p>
         ) : (
           <div className="fac-fruits">
             {fruits.map((row) => {
