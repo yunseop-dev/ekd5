@@ -25,7 +25,6 @@ import {
   canEquip,
   completeStory,
   equipItem,
-  FRUIT_EXP_AMOUNT,
   FRUIT_STAT_BONUS,
   INITIAL_GOLD,
   newCampaign,
@@ -48,7 +47,9 @@ import type {
   UnitState,
 } from './types'
 import {
-  EQUIP_EXP_ON_HIT,
+  EQUIP_EXP_ARMOR_HIT,
+  EQUIP_EXP_WEAPON_HIT,
+  EQUIP_EXP_WEAPON_MISS,
   EQUIP_EXP_PER_LEVEL,
   EQUIP_GROWTH_NORMAL,
   EQUIP_GROWTH_TREASURE,
@@ -495,10 +496,10 @@ describe('buyItem / sellItem', () => {
     expect(sellItem(withStock(['leatherShield'], 0), 0).gold).toBe(Math.trunc(price / 2))
   })
 
-  it('반값은 레벨과 무관하게 기본가 기준이다 (만렙 3단계만 열매로 예외)', () => {
+  it('반값은 레벨과 무관하게 기본가 기준이고, 만렙이면 열매가 얹힌다 (tier 무관 — 원작 확정)', () => {
     const grown = withStock([{ itemId: 'bronzeSword', level: 3, exp: 0 }], 0)
     expect(sellItem(grown, 0).gold).toBe(Math.trunc(EQUIPMENT.bronzeSword.price! / 2))
-    expect(sellItem(grown, 0).fruits).toEqual([]) // 2단계는 만렙이어도 열매가 안 나온다
+    expect(sellItem(grown, 0).fruits).toEqual(['expFruit']) // 골드 + 열매 동시 지급
   })
 
   it('보물은 판매할 수 없다 (원작 규칙)', () => {
@@ -854,26 +855,36 @@ describe('무구성장 — 전투 훅', () => {
     throw new Error('해당 조건의 시드를 찾지 못했다')
   }
 
-  it('명중 횟수만큼 공격자 무기와 피격자 방어구에 경험치가 쌓인다', () => {
+  it('명중 횟수만큼 공격자 무기와 피격자 방어구에 경험치가 쌓인다 (레벨 비교 등급제)', () => {
     const next = clash(seedWhere(true), gear)
-    const player = unitOf(next, 'caocao')
-    const enemy = unitOf(next, 'yellowInfantry')
+    const player = unitOf(next, 'caocao') // Lv3
+    const enemy = unitOf(next, 'yellowInfantry') // Lv5
     const myHits = count(next, ['hit', 'crit']) // 아군 → 적 (2회 공격 포함)
     const counterHits = count(next, ['counterHit', 'counterCrit']) // 적 반격
+    const counterMisses = next.log.filter((e) => e.type === 'miss' && e.targetId === player.id).length
 
     expect(myHits).toBeGreaterThan(0)
-    expect(growth(player.equipment.weapon)).toBe(myHits * EQUIP_EXP_ON_HIT)
-    expect(growth(enemy.equipment.weapon)).toBe(counterHits * EQUIP_EXP_ON_HIT)
-    // 방어구는 "맞은 횟수"로 자란다 — 적은 방어구가 없으니 아군 갑옷만 오른다
-    expect(growth(player.equipment.armor)).toBe(counterHits * EQUIP_EXP_ON_HIT)
+    // 조조(Lv3) → 적(Lv5): 상대가 높으니 무기 higher
+    expect(growth(player.equipment.weapon)).toBe(myHits * EQUIP_EXP_WEAPON_HIT.higher)
+    // 적(Lv5) → 조조(Lv3): 상대가 낮으니 무기 lower (+반격 미스는 miss 획득)
+    expect(growth(enemy.equipment.weapon)).toBe(
+      counterHits * EQUIP_EXP_WEAPON_HIT.lower + counterMisses * EQUIP_EXP_WEAPON_MISS,
+    )
+    // 방어구는 "맞은 횟수"로 자란다 — 공격자(Lv5)가 높으니 armor higher. 적은 방어구가 없다
+    expect(growth(player.equipment.armor)).toBe(counterHits * EQUIP_EXP_ARMOR_HIT.higher)
   })
 
-  it('빗나가면 아무 장비도 자라지 않는다 (원작: 빗나가면 거의 못 얻는다)', () => {
+  it('빗나가면 무기는 소량(miss)만 얻고, 회피한 쪽 방어구는 0 (원작 확정)', () => {
     const next = clash(seedWhere(false), gear)
     const player = unitOf(next, 'caocao')
-    expect(count(next, ['miss'])).toBeGreaterThan(0)
+    const enemy = unitOf(next, 'yellowInfantry')
+    const myMisses = next.log.filter((e) => e.type === 'miss' && e.targetId === enemy.id).length
+    const counterHits = count(next, ['counterHit', 'counterCrit'])
+    expect(myMisses).toBeGreaterThan(0)
     expect(count(next, ['hit', 'crit'])).toBe(0)
-    expect(growth(player.equipment.weapon)).toBe(0)
+    expect(growth(player.equipment.weapon)).toBe(myMisses * EQUIP_EXP_WEAPON_MISS)
+    // 조조가 맞은 만큼만 갑옷이 자란다 (회피분은 0)
+    expect(growth(player.equipment.armor)).toBe(counterHits * EQUIP_EXP_ARMOR_HIT.higher)
   })
 
   it('보조구는 전투로 자라지 않는다 (성장 대상은 무기/방어구뿐)', () => {
@@ -882,7 +893,7 @@ describe('무구성장 — 전투 훅', () => {
   })
 
   it('필요 경험치를 채우면 레벨업하고 로그가 남는다', () => {
-    const almost = EQUIP_EXP_PER_LEVEL - EQUIP_EXP_ON_HIT
+    const almost = EQUIP_EXP_PER_LEVEL - EQUIP_EXP_WEAPON_HIT.higher
     const next = clash(seedWhere(true), { weapon: { itemId: 'yitianSword', level: 1, exp: almost } })
     const weapon = unitOf(next, 'caocao').equipment.weapon!
     expect(weapon.level).toBe(2)
@@ -904,7 +915,7 @@ describe('무구성장 — 전투 훅', () => {
     })
     // 보물은 Lv3에서 멈추지 않고 Lv9까지 자란다
     const treasure = clash(seedWhere(true), {
-      weapon: { itemId: 'yitianSword', level: EQUIP_MAX_LEVEL_NORMAL, exp: EQUIP_EXP_PER_LEVEL - EQUIP_EXP_ON_HIT },
+      weapon: { itemId: 'yitianSword', level: EQUIP_MAX_LEVEL_NORMAL, exp: EQUIP_EXP_PER_LEVEL - EQUIP_EXP_WEAPON_HIT.higher },
     })
     expect(unitOf(treasure, 'caocao').equipment.weapon!.level).toBe(EQUIP_MAX_LEVEL_NORMAL + 1)
   })
@@ -983,7 +994,7 @@ describe('FRUITS 데이터', () => {
   })
 })
 
-describe('sellItem — 만렙 3단계 장비는 열매가 나온다', () => {
+describe('sellItem — 만렙 일반 장비는 열매가 나온다 (tier 무관, 골드 동시 — 원작 확정)', () => {
   it('카테고리별 열매 매트릭스 (검→경험 / 창→무력 / 활→운 / 부채·보검→지력 / 갑옷→통솔 / 옷→민첩)', () => {
     const matrix: [string, string][] = [
       ['ironSword', 'expFruit'],
@@ -998,9 +1009,15 @@ describe('sellItem — 만렙 3단계 장비는 열매가 나온다', () => {
       const campaign = withStock([{ itemId, level: EQUIP_MAX_LEVEL_NORMAL, exp: 0 }], 0)
       const next = sellItem(campaign, 0)
       expect(next.fruits, itemId).toEqual([fruitId])
-      expect(next.gold, itemId).toBe(0) // 열매가 나오면 골드는 안 준다
+      expect(next.gold, itemId).toBe(Math.trunc(EQUIPMENT[itemId].price! / 2)) // 골드도 함께 (원작: 동시 지급)
       expect(next.inventory, itemId).toEqual([])
     }
+  })
+
+  it('tier1 장비도 만렙이면 열매가 나온다 (원작 확정: tier 무관)', () => {
+    const next = sellItem(withStock([{ itemId: 'woodSword', level: EQUIP_MAX_LEVEL_NORMAL, exp: 0 }], 0), 0)
+    expect(next.fruits).toEqual(['expFruit'])
+    expect(next.gold).toBe(Math.trunc(EQUIPMENT.woodSword.price! / 2))
   })
 
   it('만렙이 아니면 3단계 장비도 반값 골드로 팔린다', () => {
@@ -1060,16 +1077,20 @@ describe('useFruit', () => {
     expect(after.def).toBe(before.def)
   })
 
-  it('경험의 열매는 경험치 +50 (레벨업 포함)', () => {
+  it('경험의 열매는 레벨 +1, 잔여 경험치 유지 (원작 확정)', () => {
     const base = withFruits(['expFruit', 'expFruit'])
-    const once = useFruit(base, 'caocao', 0)
-    expect(rosterOf(once).exp).toBe(FRUIT_EXP_AMOUNT)
-    expect(rosterOf(once).level).toBe(rosterOf(base).level)
-    // 두 번째 열매로 100을 넘겨 레벨업
+    // 잔여 경험치가 있어도 그대로 두고 레벨만 오른다
+    const withExp = {
+      ...base,
+      roster: base.roster.map((r) => (r.officerId === 'caocao' ? { ...r, exp: 37 } : r)),
+    }
+    const once = useFruit(withExp, 'caocao', 0)
+    expect(rosterOf(once).level).toBe(rosterOf(base).level + 1)
+    expect(rosterOf(once).exp).toBe(37)
+    expect(rosterOf(once).statBonus).toEqual({})
+    // 두 번째 열매로 한 번 더
     const twice = useFruit(once, 'caocao', 0)
-    expect(rosterOf(twice).level).toBe(rosterOf(base).level + 1)
-    expect(rosterOf(twice).exp).toBe(0)
-    expect(rosterOf(twice).statBonus).toEqual({})
+    expect(rosterOf(twice).level).toBe(rosterOf(base).level + 2)
   })
 
   it('인덱스로 지목한 열매만 소모된다', () => {

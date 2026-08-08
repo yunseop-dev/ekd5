@@ -49,12 +49,33 @@ export const FRUITS: Record<string, FruitDef> = {
  * 카테고리 필드를 따로 두지 않고 id로 직접 매핑한다 — 3단계 장비는 카테고리당 하나뿐이고,
  * 새 3단계 장비를 추가하면 여기에도 등록해야 한다(데이터 정합 테스트가 누락을 잡는다).
  */
+// 원작 확정(equipment.md 증보): tier 무관 — 만렙 일반 장비면 카테고리별 열매
 export const FRUIT_ON_SELL: Record<string, string> = {
-  ironSword: 'expFruit', // 검 → 경험
-  ironSpear: 'strFruit', // 창 → 무력
-  ironBow: 'luckFruit', // 활 → 운
-  ironFan: 'intFruit', // 부채 → 지력
-  ironGemSword: 'intFruit', // 보검 → 지력
-  ironArmor: 'ldrFruit', // 갑옷 → 통솔
-  battleRobe: 'agiFruit', // 옷 → 민첩
+  // 검 → 경험
+  woodSword: 'expFruit',
+  bronzeSword: 'expFruit',
+  ironSword: 'expFruit',
+  // 창 → 무력
+  woodSpear: 'strFruit',
+  bronzeSpear: 'strFruit',
+  ironSpear: 'strFruit',
+  // 활 → 운
+  woodBow: 'luckFruit',
+  bronzeBow: 'luckFruit',
+  ironBow: 'luckFruit',
+  // 부채·보검 → 지력
+  bambooFan: 'intFruit',
+  whiteFeatherFan: 'intFruit',
+  ironFan: 'intFruit',
+  stoneGemSword: 'intFruit',
+  bronzeGemSword: 'intFruit',
+  ironGemSword: 'intFruit',
+  // 갑옷 → 통솔
+  leatherArmor: 'ldrFruit',
+  bronzeArmor: 'ldrFruit',
+  ironArmor: 'ldrFruit',
+  // 옷 → 민첩
+  clothRobe: 'agiFruit',
+  silkRobe: 'agiFruit',
+  battleRobe: 'agiFruit',
 }

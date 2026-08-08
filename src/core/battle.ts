@@ -44,7 +44,9 @@ import type {
 } from './types'
 import {
   CRIT_MULTIPLIER,
-  EQUIP_EXP_ON_HIT,
+  EQUIP_EXP_ARMOR_HIT,
+  EQUIP_EXP_WEAPON_HIT,
+  EQUIP_EXP_WEAPON_MISS,
   EQUIP_EXP_PER_LEVEL,
   EQUIP_GROWTH_NORMAL,
   EQUIP_GROWTH_TREASURE,
@@ -360,7 +362,8 @@ function subjectParticle(word: string): string {
  * 무기는 공격이 명중했을 때, 방어구는 피격당했을 때 성장한다(원작: 빗나가면 거의 못 얻는다).
  * 최대 레벨(일반 3/보물 9)에 닿으면 경험치는 더 쌓이지 않는다.
  */
-function growEquipment(state: BattleState, unit: UnitState, slot: EquipSlot): void {
+function growEquipment(state: BattleState, unit: UnitState, slot: EquipSlot, amount: number): void {
+  if (amount <= 0) return
   const instance = unit.equipment?.[slot]
   if (!instance) return
   const def = EQUIPMENT[instance.itemId]
@@ -368,7 +371,7 @@ function growEquipment(state: BattleState, unit: UnitState, slot: EquipSlot): vo
   const max = equipMaxLevel(def)
   if (instance.level >= max) return
 
-  instance.exp += EQUIP_EXP_ON_HIT
+  instance.exp += amount
   while (instance.exp >= EQUIP_EXP_PER_LEVEL && instance.level < max) {
     instance.exp -= EQUIP_EXP_PER_LEVEL
     instance.level += 1
@@ -403,6 +406,8 @@ function resolveStrike(
   state.rngState = hitRoll.nextState
   if (!hitRoll.value) {
     log(state, 'miss', `${nameOf(attacker)}의 공격이 빗나갔다!`, { targetId: defender.id, amount: 0 })
+    // 미스: 무기는 소량 획득, 회피한 쪽 방어구는 0 (원작 확정 — equipment.md 증보)
+    growEquipment(state, attacker, 'weapon', EQUIP_EXP_WEAPON_MISS)
     return false
   }
 
@@ -436,9 +441,20 @@ function resolveStrike(
   )
   dealDamage(state, defender, dmg)
   grantExp(state, attacker, defender.level, defender.hp === 0)
-  // 무구성장은 데미지 확정 후 — 이번 타격의 데미지는 성장 전 보정치로 계산된다
-  growEquipment(state, attacker, 'weapon')
-  growEquipment(state, defender, 'armor')
+  // 무구성장은 데미지 확정 후 — 이번 타격의 데미지는 성장 전 보정치로 계산된다.
+  // 획득량은 상대 레벨 비교로 등급 (원작 확정 비율, equipment.md 증보)
+  growEquipment(
+    state,
+    attacker,
+    'weapon',
+    defender.level >= attacker.level ? EQUIP_EXP_WEAPON_HIT.higher : EQUIP_EXP_WEAPON_HIT.lower,
+  )
+  growEquipment(
+    state,
+    defender,
+    'armor',
+    attacker.level >= defender.level ? EQUIP_EXP_ARMOR_HIT.higher : EQUIP_EXP_ARMOR_HIT.lower,
+  )
   return true
 }
 
@@ -676,6 +692,19 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
             })
             dealDamage(state, target, dmg)
             grantExp(state, caster, target.level, target.hp === 0)
+            // 원작 확정: 책략 명중도 무기(부채·보검) exp, 책략 피격도 방어구 exp (equipment.md 증보)
+            growEquipment(
+              state,
+              caster,
+              'weapon',
+              target.level >= caster.level ? EQUIP_EXP_WEAPON_HIT.higher : EQUIP_EXP_WEAPON_HIT.lower,
+            )
+            growEquipment(
+              state,
+              target,
+              'armor',
+              caster.level >= target.level ? EQUIP_EXP_ARMOR_HIT.higher : EQUIP_EXP_ARMOR_HIT.lower,
+            )
           } else {
             target.buffs.push({ ...strategy.buff!, remainingTurns: strategy.buff!.duration })
             log(state, 'debuff', `${nameOf(caster)}의 ${strategy.name} → ${nameOf(target)}`)

@@ -6,7 +6,6 @@ import { FRUIT_ON_SELL, FRUITS } from '../data/fruits'
 import { OFFICERS } from '../data/officers'
 import { STAGES } from '../data/stages'
 // (착용 제한 판정은 OFFICERS.classId만으로 충분 — CLASSES 참조 불필요)
-import { applyExp } from './formulas'
 import type {
   BattleState,
   EquipInstance,
@@ -16,7 +15,7 @@ import type {
   OfficerStats,
   StageDef,
 } from './types'
-import { EQUIP_MAX_LEVEL_NORMAL } from './types'
+import { EQUIP_MAX_LEVEL_NORMAL, MAX_LEVEL } from './types'
 
 /** 로스터 1명 = 전투 사이로 이월되는 성장치 전부 (HP/MP는 레벨에서 재계산) */
 export interface RosterEntry {
@@ -66,10 +65,8 @@ export interface CampaignState {
 /** 초기 군자금 — 서장 1단계 상점에서 tier1 장비 1~2점을 살 수 있는 수준 (설계값) */
 export const INITIAL_GOLD = 500
 
-/** 능력치 열매 1개의 장수 능력치 상승폭 — ⚠ 원작 미확보 설계값. 부대 능력치로는 ÷2 되어 +1 */
+/** 능력치 열매 1개의 장수 능력치 상승폭 — 원작 확정 +2 (짝수 관례, 부대 능력치로는 +1). 경험의 열매는 레벨 +1 */
 export const FRUIT_STAT_BONUS = 2
-/** 경험의 열매 1개가 주는 부대 경험치 — ⚠ 원작 미확보 설계값 (레벨업 1/2) */
-export const FRUIT_EXP_AMOUNT = 50
 
 // 원작은 story|battle 노드의 조건부 DAG — 전투 없는 노드, 전투 뒤 후속 노드,
 // 선택지/클리어 방식에 따른 스테이지 스킵이 존재한다 (campaign-ux.md 1부 §3.3).
@@ -291,7 +288,7 @@ export function buyItem(campaign: CampaignState, itemId: string): CampaignState 
 /**
  * 창고의 inventoryIndex번 장비를 판매.
  * 원작 확정 규칙(equipment.md §1): **3단계 일반 장비를 Lv3(만렙)에 팔면 골드가 아니라 능력치 열매**가 나온다.
- * 그 외에는 기본가의 반값 골드 — 레벨이 올라도 판매가는 오르지 않는다(만렙 판매의 유일한 보상이 열매).
+ * 판매가는 항상 기본가의 반값 골드. 만렙(일반 Lv3) 장비는 **골드에 더해 열매**를 준다 (원작 확정 — 동시 지급).
  * 보물은 판매 불가 (원작: 영걸전은 가능, 조조전은 불가). 장착 중인 장비는 창고에 없으니 자연히 팔리지 않는다.
  */
 export function sellItem(campaign: CampaignState, inventoryIndex: number): CampaignState {
@@ -302,19 +299,20 @@ export function sellItem(campaign: CampaignState, inventoryIndex: number): Campa
   const rest = removeAt(campaign.inventory, inventoryIndex)
   if (!rest) return campaign
 
-  const fruitId = item.tier === 3 && instance.level >= EQUIP_MAX_LEVEL_NORMAL ? FRUIT_ON_SELL[item.id] : undefined
+  // 원작 확정(equipment.md 증보): tier 무관, 일반 장비가 만렙이면 열매 — 골드도 함께 지급
+  const fruitId = instance.level >= EQUIP_MAX_LEVEL_NORMAL ? FRUIT_ON_SELL[item.id] : undefined
   return {
     ...campaign,
     roster: campaign.roster.map(cloneEntry),
-    gold: campaign.gold + (fruitId ? 0 : Math.trunc(item.price / 2)),
+    gold: campaign.gold + Math.trunc(item.price / 2),
     inventory: cloneInventory(rest),
     fruits: fruitId ? [...campaign.fruits, fruitId] : [...campaign.fruits],
   }
 }
 
 /**
- * 열매 사용 — 능력치 열매는 장수 능력치 +2(부대 능력치로는 +1), 경험의 열매는 부대 경험치 +50.
- * 경험의 열매는 applyExp를 그대로 재사용하므로 레벨업까지 일어난다.
+ * 열매 사용 — 능력치 열매는 장수 능력치 +2(부대 능력치로는 +1),
+ * 경험의 열매는 **레벨 +1** (원작 확정, 잔여 경험치 유지 — 영걸전 일기토와 같은 방식). Lv50 캡.
  * 범위 밖 인덱스 / 미등록 열매 / 로스터 밖 장수면 원본 그대로.
  */
 export function useFruit(campaign: CampaignState, officerId: string, fruitIndex: number): CampaignState {
@@ -331,8 +329,7 @@ export function useFruit(campaign: CampaignState, officerId: string, fruitIndex:
       const clone = cloneEntry(entry)
       if (entry.officerId !== officerId) return clone
       if (fruit.stat === 'exp') {
-        const progress = applyExp(entry.level, entry.exp, FRUIT_EXP_AMOUNT)
-        return { ...clone, level: progress.level, exp: progress.exp }
+        return { ...clone, level: Math.min(MAX_LEVEL, entry.level + 1) }
       }
       const current = clone.statBonus[fruit.stat] ?? 0
       return { ...clone, statBonus: { ...clone.statBonus, [fruit.stat]: current + FRUIT_STAT_BONUS } }

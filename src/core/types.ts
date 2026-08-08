@@ -328,7 +328,13 @@ export const EQUIP_MAX_LEVEL_NORMAL = 3 // 상점 일반 장비 (원작 확정)
 export const EQUIP_MAX_LEVEL_TREASURE = 9 // 보물 (원작 확정)
 export const EQUIP_GROWTH_NORMAL = 10 // 레벨당 보정치 상승 — 원작 확정
 export const EQUIP_GROWTH_TREASURE = 9 // 보물은 상점템보다 낮다 — 원작 확정("만렙 상점템에 소폭 밀림")
-/** 레벨업 필요 장비 경험치 — ⚠ 원작 수치 미확보, 설계값 (부대 EXP_PER_LEVEL과 같은 100) */
+/** 레벨업 필요 장비 경험치 — 원작 확정 99, 1% 차이라 부대와 같은 100으로 통일 (equipment.md 증보) */
 export const EQUIP_EXP_PER_LEVEL = 100
-/** 타격 1회당 장비 경험치 (무기=명중 시, 방어구=피격 시) — ⚠ 설계값. 원작은 "빗나가면 거의 못 얻음" 서술만 확보 */
-export const EQUIP_EXP_ON_HIT = 25
+/**
+ * 장비 경험치 획득량 — 원작 확정 비율(무기 3/2/미스1, 방어구 4/3/회피0)에
+ * 짧은 캠페인 보정 k=3을 곱한 값 (equipment.md 증보 "반영 결정").
+ * higher = 상대 레벨이 나 이상일 때, lower = 미만일 때.
+ */
+export const EQUIP_EXP_WEAPON_HIT = { higher: 9, lower: 6 } as const
+export const EQUIP_EXP_WEAPON_MISS = 3
+export const EQUIP_EXP_ARMOR_HIT = { higher: 12, lower: 9 } as const // 회피 시 0
