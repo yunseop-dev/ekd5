@@ -222,6 +222,7 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
+  min-width: 0;
 }
 .fac-item-name { font-weight: 700; }
 .fac-item-slot {
@@ -250,10 +251,104 @@
   border-radius: 3px;
   background: #14100b;
   border: 1px solid #3a3226;
+  white-space: nowrap;
 }
 .fac-chip.up { color: #7ce08a; border-color: #3d6b44; }
 .fac-chip.down { color: #e08a7c; border-color: #6b3d36; }
 .fac-chip.flat { color: #857a66; }
+
+/* ---------- 장비 개체: 레벨 / EXP 미니 바 / MAX (v0.6) ---------- */
+
+.fac-equip-tag {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.fac-lv {
+  font-size: 11px;
+  font-weight: 700;
+  color: #d8b96a;
+  white-space: nowrap;
+}
+
+/* 레벨 진행 미니 바 — 텍스트 줄 안에 들어가는 24px 폭 */
+.fac-exp {
+  display: inline-block;
+  width: 24px;
+  height: 4px;
+  background: #14100b;
+  border: 1px solid #3a3226;
+  border-radius: 2px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.fac-exp > span {
+  display: block;
+  height: 100%;
+  background: #8ab4d8;
+}
+
+.fac-max {
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  color: #14100b;
+  background: #d8b96a;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+/* ---------- 능력치 열매 ---------- */
+
+.fac-fruits {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 26vh;
+  overflow-y: auto;
+}
+
+.fac-fruit-row {
+  display: grid;
+  grid-template-columns: 20px minmax(48px, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  background: #1f1a13;
+  border: 1px solid #4a4132;
+  border-radius: 6px;
+  color: #e8dcc8;
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+.fac-fruit-row:hover:not(:disabled) { border-color: #7ce08a; background: #23291d; }
+.fac-fruit-row.disabled,
+.fac-fruit-row:disabled { opacity: 0.45; cursor: default; }
+
+.fac-fruit-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  border-radius: 50%;
+  background: #2b3a26;
+  border: 1px solid #5f8a52;
+  color: #9ce08a;
+}
+
+.fac-fruit-action {
+  font-size: 11px;
+  color: #857a66;
+  white-space: nowrap;
+}
+.fac-fruit-row:hover:not(:disabled) .fac-fruit-action { color: #9ce08a; }
 
 /* ---------- 상점 ---------- */
 
@@ -293,7 +388,7 @@
 
 .fac-shop-row {
   display: grid;
-  grid-template-columns: minmax(72px, 120px) 48px 1fr auto auto;
+  grid-template-columns: minmax(88px, 148px) 48px 1fr auto auto;
   align-items: center;
   gap: 8px;
   padding: 6px 9px;
@@ -325,6 +420,13 @@
 }
 .fac-buy-btn:hover:not(:disabled),
 .fac-sell-btn:hover { background: #55482f; border-color: #d8b96a; }
+
+/* 만렙 3단계 일반 장비 → 능력치 열매로 교환되는 판매 (equipment.md §1) */
+.fac-sell-btn.fruit {
+  color: #9ce08a;
+  border-color: #5f8a52;
+}
+.fac-sell-btn.fruit:hover { background: #2b3a26; border-color: #9ce08a; }
 .fac-buy-btn:disabled {
   opacity: 0.5;
   border-color: #4a4132;

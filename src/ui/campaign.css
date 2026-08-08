@@ -122,7 +122,7 @@
   border: 2px solid #9cc2ff;
 }
 
-.roster-name { font-weight: 700; }
+.roster-name { font-weight: 700; min-width: 0; }
 .roster-class { color: #bfb39c; font-size: 12px; }
 .roster-level { text-align: right; }
 .roster-stat { color: #bfb39c; font-size: 12px; text-align: right; white-space: nowrap; }
@@ -130,6 +130,58 @@
 .gold-display { color: #d8b96a; font-weight: 700; font-size: 14px; }
 
 .equip-bonus { color: #7ce08a; font-style: normal; font-size: 12px; }
+
+/* 장비 개체 레벨 / EXP / MAX (v0.6) — 목록·장비 줄 공용 */
+.equip-lv {
+  font-size: 11px;
+  font-weight: 700;
+  color: #d8b96a;
+  white-space: nowrap;
+}
+
+.equip-exp {
+  display: inline-block;
+  width: 22px;
+  height: 4px;
+  margin-left: 5px;
+  vertical-align: middle;
+  background: #14100b;
+  border: 1px solid #3a3226;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.equip-exp > span {
+  display: block;
+  height: 100%;
+  background: #8ab4d8;
+}
+
+.equip-max {
+  margin-left: 5px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  color: #14100b;
+  background: #d8b96a;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+/* 능력치 열매 누적 뱃지 */
+.fruit-badge {
+  margin-left: 6px;
+  padding: 0 5px;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  color: #9ce08a;
+  background: #23291d;
+  border: 1px solid #5f8a52;
+  border-radius: 3px;
+  white-space: nowrap;
+}
 
 /* 전투 유닛 정보의 장비 줄 */
 .equip-line {

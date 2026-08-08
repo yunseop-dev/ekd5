@@ -1,15 +1,36 @@
-// v0.5 막사 시설 — 창고·장비 / 상점 (docs/research/campaign-ux.md 1부 §26·30)
+// v0.6 막사 시설 — 창고·장비 / 상점 / 능력치 열매 (docs/research/campaign-ux.md 1부 §26·30, equipment.md §1·§2)
 // 원작 막사는 "창고 담당 장수 클릭 = 장비 교체", "물자 담당 클릭 = 아이템 매매".
 // 걸어다니는 허브 없이 캠페인 허브 위에 전면 오버레이 1장으로 두 기능을 얹는다.
 // 거래/장착은 즉시 확정(확인 모달 없음, 원작식) — 상태 저장은 부모(onChange) 책임.
+//
+// v0.6: 장비는 개체(EquipInstance = itemId + level + exp)다. 표시/미리보기 모두
+// 레벨이 반영된 실효 보정(equipInstanceBonus)을 쓰고, 창고 조작은 인덱스 기반이다.
 
 import { useEffect, useMemo, useState } from 'react'
+import { equipInstanceBonus } from '../core/battle'
 import type { CampaignState, RosterEntry } from '../core/campaign'
-import { avgRosterLevel, buyItem, canEquip, equipItem, sellItem, shopTierFor, unequipItem } from '../core/campaign'
+import {
+  avgRosterLevel,
+  buyItem,
+  canEquip,
+  equipItem,
+  sellItem,
+  shopTierFor,
+  unequipItem,
+  // 코어 순수 함수지만 이름이 use* — React Hook 규칙 오탐을 피해 별칭으로 받는다.
+  useFruit as applyFruit,
+} from '../core/campaign'
 import { combatStats, maxHp, maxMp } from '../core/formulas'
-import type { EquipSlot, EquipmentDef } from '../core/types'
+import {
+  EQUIP_EXP_PER_LEVEL,
+  EQUIP_MAX_LEVEL_NORMAL,
+  EQUIP_MAX_LEVEL_TREASURE,
+  EXP_PER_LEVEL,
+} from '../core/types'
+import type { EquipInstance, EquipSlot, EquipmentDef, OfficerStats } from '../core/types'
 import { CLASSES } from '../data/classes'
 import { EQUIPMENT } from '../data/equipment'
+import { FRUITS } from '../data/fruits'
 import { OFFICERS } from '../data/officers'
 import { CLASS_ICON } from './BattleBoard'
 // .panel-box/.stat-grid(battle.css), .roster-row/.dim/.title-btn(campaign.css) 재사용
@@ -31,19 +52,40 @@ const STAT_LABEL: Record<StatKey, string> = {
   morale: '사기',
 }
 
+/** 장수 원 능력치 키 — 열매가 올리는 값 (RosterEntry.statBonus) */
+const OFFICER_STAT_KEYS = ['str', 'ldr', 'int', 'agi', 'luck'] as const
+type OfficerStatKey = (typeof OFFICER_STAT_KEYS)[number]
+const OFFICER_STAT_LABEL: Record<OfficerStatKey, string> = {
+  str: '무력',
+  ldr: '통솔',
+  int: '지력',
+  agi: '민첩',
+  luck: '운',
+}
+/** 코어 FruitDef.stat 이 장수 능력치 키든 부대 능력치 키든 라벨을 찾게 둔다 */
+const FRUIT_STAT_LABEL: Record<string, string> = {
+  str: '무력',
+  ldr: '통솔',
+  int: '지력',
+  agi: '민첩',
+  luck: '운',
+  atk: '공격',
+  def: '방어',
+  mind: '정신',
+  morale: '사기',
+  exp: '경험치',
+}
+const fruitStatLabel = (stat: string): string => FRUIT_STAT_LABEL[stat] ?? stat
+
 const SLOTS: EquipSlot[] = ['weapon', 'armor', 'accessory']
 const SLOT_LABEL: Record<EquipSlot, string> = { weapon: '무기', armor: '방어구', accessory: '보조' }
 const SLOT_ICON: Record<EquipSlot, string> = { weapon: '武', armor: '甲', accessory: '珍' }
 
-const statBonus = (def: EquipmentDef): StatDelta => def.bonus
+const defBonus = (def: EquipmentDef): StatDelta => def.bonus
 /** null = 비매품(보물) */
 const priceOf = (def: EquipmentDef): number | null => def.price
 const moveBonusOf = (def: EquipmentDef): number => def.moveBonus ?? 0
 const expMultiplierOf = (def: EquipmentDef): number => def.expMultiplier ?? 1
-const sellPriceOf = (def: EquipmentDef): number | null => {
-  const p = priceOf(def)
-  return p === null ? null : Math.floor(p / 2)
-}
 const isTreasure = (def: EquipmentDef): boolean => def.isTreasure === true
 
 function defOf(itemId: string | null | undefined): EquipmentDef | null {
@@ -51,19 +93,78 @@ function defOf(itemId: string | null | undefined): EquipmentDef | null {
   return EQUIPMENT[itemId] ?? null
 }
 
+/** 개체 → 정의. 미등록 id 내성 */
+function defOfInstance(inst: EquipInstance | null | undefined): EquipmentDef | null {
+  return inst ? defOf(inst.itemId) : null
+}
+
 const signed = (n: number): string => (n > 0 ? `+${n}` : `${n}`.replace('-', '−'))
 
-/** "공격 +16 · 이동 +1 · 경험치 ×1.5" */
+// ---------- 장비 개체(레벨/EXP) ----------
+
+const maxLevelOf = (def: EquipmentDef): number =>
+  isTreasure(def) ? EQUIP_MAX_LEVEL_TREASURE : EQUIP_MAX_LEVEL_NORMAL
+
+const isMaxLevel = (inst: EquipInstance, def: EquipmentDef): boolean => inst.level >= maxLevelOf(def)
+
+/** 레벨이 반영된 실효 능력치 보정 — 계산 규칙은 코어(battle.equipInstanceBonus) 단일 출처 */
+const instanceBonus = (inst: EquipInstance): StatDelta => equipInstanceBonus(inst) as StatDelta
+
+const expPercent = (inst: EquipInstance): number =>
+  Math.max(0, Math.min(100, Math.round((inst.exp / EQUIP_EXP_PER_LEVEL) * 100)))
+
+/** "의천검 Lv2" + 작은 EXP 바 (만렙은 MAX 뱃지) */
+function EquipTag({
+  inst,
+  def,
+  showMeter = true,
+}: {
+  inst: EquipInstance
+  def: EquipmentDef
+  showMeter?: boolean
+}) {
+  const max = isMaxLevel(inst, def)
+  return (
+    <span className="fac-equip-tag">
+      <span className="fac-item-name">{def.name}</span>
+      <strong className="fac-lv">Lv{inst.level}</strong>
+      {showMeter &&
+        (max ? (
+          <span className="fac-max" title={`최대 레벨 (Lv${maxLevelOf(def)})`}>
+            MAX
+          </span>
+        ) : (
+          <span className="fac-exp" title={`EXP ${inst.exp}/${EQUIP_EXP_PER_LEVEL}`}>
+            <span style={{ width: `${expPercent(inst)}%` }} />
+          </span>
+        ))}
+    </span>
+  )
+}
+
+/** 개체 툴팁 본문 — "EXP 30/100 · 설명" */
+function instanceTitle(inst: EquipInstance, def: EquipmentDef): string {
+  const head = isMaxLevel(inst, def) ? `Lv${inst.level} MAX` : `Lv${inst.level} · EXP ${inst.exp}/${EQUIP_EXP_PER_LEVEL}`
+  return `${def.name} (${head})\n${def.description}`
+}
+
+/** "공격 +16 · 이동 +1 · 경험치 ×1.5" — 개체 레벨 반영 실효치 */
+function instanceEffectText(inst: EquipInstance, def: EquipmentDef): string {
+  return formatEffect(instanceBonus(inst), moveBonusOf(def), expMultiplierOf(def))
+}
+
+/** 상점 진열(미보유 = Lv1 기준)용 */
 function effectText(def: EquipmentDef): string {
+  return formatEffect(defBonus(def), moveBonusOf(def), expMultiplierOf(def))
+}
+
+function formatEffect(bonus: StatDelta, move: number, exp: number): string {
   const parts: string[] = []
-  const bonus = statBonus(def)
   for (const k of STAT_KEYS) {
     const v = bonus[k]
     if (v) parts.push(`${STAT_LABEL[k]} ${signed(v)}`)
   }
-  const mv = moveBonusOf(def)
-  if (mv) parts.push(`이동 ${signed(mv)}`)
-  const exp = expMultiplierOf(def)
+  if (move) parts.push(`이동 ${signed(move)}`)
   if (exp !== 1) parts.push(`경험치 ×${exp}`)
   return parts.length > 0 ? parts.join(' · ') : '효과 없음'
 }
@@ -77,11 +178,18 @@ function classesLabel(def: EquipmentDef): string {
 
 // ---------- 로스터 장비 합산 ----------
 
-function equippedIds(entry: RosterEntry): Array<{ slot: EquipSlot; def: EquipmentDef }> {
-  const out: Array<{ slot: EquipSlot; def: EquipmentDef }> = []
+interface EquippedRow {
+  slot: EquipSlot
+  inst: EquipInstance
+  def: EquipmentDef
+}
+
+function equippedRows(entry: RosterEntry): EquippedRow[] {
+  const out: EquippedRow[] = []
   for (const slot of SLOTS) {
-    const def = defOf(entry.equipment?.[slot])
-    if (def) out.push({ slot, def })
+    const inst = entry.equipment?.[slot]
+    const def = defOfInstance(inst)
+    if (inst && def) out.push({ slot, inst, def })
   }
   return out
 }
@@ -96,8 +204,8 @@ function equipTotals(entry: RosterEntry): EquipTotals {
   const stats: StatDelta = {}
   let move = 0
   let expMultiplier = 1
-  for (const { def } of equippedIds(entry)) {
-    const bonus = statBonus(def)
+  for (const { inst, def } of equippedRows(entry)) {
+    const bonus = instanceBonus(inst)
     for (const k of STAT_KEYS) {
       if (bonus[k]) stats[k] = (stats[k] ?? 0) + (bonus[k] ?? 0)
     }
@@ -107,11 +215,12 @@ function equipTotals(entry: RosterEntry): EquipTotals {
   return { stats, move, expMultiplier }
 }
 
-/** 장착 시 순증감 — 같은 슬롯에 이미 낀 장비를 교체하는 경우까지 반영 */
-function previewDelta(entry: RosterEntry, next: EquipmentDef): EquipTotals {
-  const cur = defOf(entry.equipment?.[next.slot])
-  const nextBonus = statBonus(next)
-  const curBonus = cur ? statBonus(cur) : {}
+/** 장착 시 순증감 — 같은 슬롯에 이미 낀 장비(개체 레벨 포함)를 교체하는 경우까지 반영 */
+function previewDelta(entry: RosterEntry, next: EquipInstance, nextDef: EquipmentDef): EquipTotals {
+  const curInst = entry.equipment?.[nextDef.slot]
+  const curDef = defOfInstance(curInst)
+  const nextBonus = instanceBonus(next)
+  const curBonus = curInst && curDef ? instanceBonus(curInst) : {}
   const stats: StatDelta = {}
   for (const k of STAT_KEYS) {
     const d = (nextBonus[k] ?? 0) - (curBonus[k] ?? 0)
@@ -119,8 +228,8 @@ function previewDelta(entry: RosterEntry, next: EquipmentDef): EquipTotals {
   }
   return {
     stats,
-    move: moveBonusOf(next) - (cur ? moveBonusOf(cur) : 0),
-    expMultiplier: expMultiplierOf(next) / (cur ? expMultiplierOf(cur) : 1),
+    move: moveBonusOf(nextDef) - (curDef ? moveBonusOf(curDef) : 0),
+    expMultiplier: expMultiplierOf(nextDef) / (curDef ? expMultiplierOf(curDef) : 1),
   }
 }
 
@@ -149,6 +258,87 @@ function DeltaChips({ delta }: { delta: EquipTotals }) {
   )
 }
 
+// ---------- 창고 행 ----------
+
+interface InvRow {
+  index: number
+  inst: EquipInstance
+  def: EquipmentDef
+}
+
+function inventoryRows(campaign: CampaignState): InvRow[] {
+  return campaign.inventory
+    .map((inst, index) => ({ index, inst, def: defOfInstance(inst) }))
+    .filter((r): r is InvRow => r.def !== null)
+}
+
+// ---------- 열매 ----------
+
+/**
+ * 사용 결과 미리보기 — 코어 useFruit 를 그대로 돌려 차분한다.
+ * 증가량 상수(+2 / 경험 +50)를 UI가 몰라도 정확하고, 사용 불가(반환값 === campaign)도 같이 판정된다.
+ */
+function fruitPreview(
+  campaign: CampaignState,
+  officerId: string,
+  fruitIndex: number,
+): { usable: boolean; text: string } {
+  const fruitId = campaign.fruits[fruitIndex]
+  const def = FRUITS[fruitId]
+  const next = applyFruit(campaign, officerId, fruitIndex)
+  const usable = next !== campaign
+  let text = def ? fruitStatLabel(String(def.stat)) : '?'
+  if (usable) {
+    const before = campaign.roster.find((r) => r.officerId === officerId)
+    const after = next.roster.find((r) => r.officerId === officerId)
+    const beforeBonus: Partial<OfficerStats> = before?.statBonus ?? {}
+    const afterBonus: Partial<OfficerStats> = after?.statBonus ?? {}
+    let matched = false
+    for (const k of OFFICER_STAT_KEYS) {
+      const d = (afterBonus[k] ?? 0) - (beforeBonus[k] ?? 0)
+      if (d !== 0) {
+        text = `${OFFICER_STAT_LABEL[k]} ${signed(d)}`
+        matched = true
+        break
+      }
+    }
+    // 경험의 열매 — 능력치가 아니라 부대 경험치/레벨이 오른다
+    if (!matched && before && after) {
+      const levelUp = after.level - before.level
+      const gained = Math.max(0, levelUp * EXP_PER_LEVEL + (after.exp - before.exp))
+      if (gained > 0 || levelUp > 0) {
+        text = `경험치 +${gained}${levelUp > 0 ? ` (Lv${after.level})` : ''}`
+      }
+    }
+  }
+  return { usable, text }
+}
+
+/** 판매 결과 미리보기 — 코어 sellItem 을 그대로 돌려 금전/열매 획득을 차분한다 */
+function sellPreview(
+  campaign: CampaignState,
+  index: number,
+): { ok: boolean; gold: number; fruitName: string | null } {
+  const next = sellItem(campaign, index)
+  if (next === campaign) return { ok: false, gold: 0, fruitName: null }
+  const counts = new Map<string, number>()
+  for (const f of campaign.fruits) counts.set(f, (counts.get(f) ?? 0) + 1)
+  let gained: string | null = null
+  for (const f of next.fruits) {
+    const left = counts.get(f) ?? 0
+    if (left === 0) {
+      gained = f
+      break
+    }
+    counts.set(f, left - 1)
+  }
+  return {
+    ok: true,
+    gold: next.gold - campaign.gold,
+    fruitName: gained ? (FRUITS[gained]?.name ?? gained) : null,
+  }
+}
+
 // ---------- 창고·장비 탭 ----------
 
 interface TabProps {
@@ -161,23 +351,21 @@ function StorageTab({ campaign, onChange }: TabProps) {
   const selected = campaign.roster.find((r) => r.officerId === selectedId) ?? campaign.roster[0] ?? null
 
   const inventory = useMemo(() => {
-    const rows = campaign.inventory
-      .map((itemId, index) => ({ index, itemId, def: defOf(itemId) }))
-      .filter((r): r is { index: number; itemId: string; def: EquipmentDef } => r.def !== null)
+    const rows = inventoryRows(campaign)
     if (!selected) return rows
     // 착용 가능(빈 슬롯 → 상승 교체품 → 나머지) → 병과 불가 순
-    const rank = (def: EquipmentDef): number => {
-      if (!canEquip(selected.officerId, def.id)) return 3
-      if (!defOf(selected.equipment?.[def.slot])) return 0
-      return deltaScore(previewDelta(selected, def)) > 0 ? 1 : 2
+    const rank = (row: InvRow): number => {
+      if (!canEquip(selected.officerId, row.inst.itemId)) return 3
+      if (!selected.equipment?.[row.def.slot]) return 0
+      return deltaScore(previewDelta(selected, row.inst, row.def)) > 0 ? 1 : 2
     }
     return rows.sort(
       (a, b) =>
-        rank(a.def) - rank(b.def) ||
-        deltaScore(previewDelta(selected, b.def)) - deltaScore(previewDelta(selected, a.def)) ||
+        rank(a) - rank(b) ||
+        deltaScore(previewDelta(selected, b.inst, b.def)) - deltaScore(previewDelta(selected, a.inst, a.def)) ||
         a.def.name.localeCompare(b.def.name, 'ko'),
     )
-  }, [campaign.inventory, selected])
+  }, [campaign, selected])
 
   if (!selected) return <p className="dim">부대가 없다.</p>
 
@@ -185,13 +373,18 @@ function StorageTab({ campaign, onChange }: TabProps) {
   const cls = CLASSES[officer.classId]
   const base = combatStats(officer.stats, cls.growth, selected.level)
   const totals = equipTotals(selected)
+  const fruits = campaign.fruits.map((id, index) => ({ index, id, def: FRUITS[id] }))
 
-  const doEquip = (itemId: string) => {
-    const next = equipItem(campaign, selected.officerId, itemId)
+  const doEquip = (index: number) => {
+    const next = equipItem(campaign, selected.officerId, index)
     if (next !== campaign) onChange(next)
   }
   const doUnequip = (slot: EquipSlot) => {
     const next = unequipItem(campaign, selected.officerId, slot)
+    if (next !== campaign) onChange(next)
+  }
+  const doUseFruit = (index: number) => {
+    const next = applyFruit(campaign, selected.officerId, index)
     if (next !== campaign) onChange(next)
   }
 
@@ -216,12 +409,17 @@ function StorageTab({ campaign, onChange }: TabProps) {
                 <span className="roster-level">Lv {r.level}</span>
                 <span className="fac-slot-icons">
                   {SLOTS.map((slot) => {
-                    const def = defOf(r.equipment?.[slot])
+                    const inst = r.equipment?.[slot]
+                    const def = defOfInstance(inst)
                     return (
                       <span
                         key={slot}
                         className={`fac-slot-icon${def ? ' filled' : ''}`}
-                        title={def ? `${SLOT_LABEL[slot]}: ${def.name}` : `${SLOT_LABEL[slot]}: 없음`}
+                        title={
+                          inst && def
+                            ? `${SLOT_LABEL[slot]}: ${def.name} Lv${inst.level}`
+                            : `${SLOT_LABEL[slot]}: 없음`
+                        }
                       >
                         {def ? SLOT_ICON[slot] : '·'}
                       </span>
@@ -241,20 +439,23 @@ function StorageTab({ campaign, onChange }: TabProps) {
         </h3>
         <div className="fac-slots">
           {SLOTS.map((slot) => {
-            const def = defOf(selected.equipment?.[slot])
+            const inst = selected.equipment?.[slot]
+            const def = defOfInstance(inst)
             return (
               <button
                 key={slot}
                 className={`fac-slot${def ? '' : ' empty'}`}
                 onClick={() => def && doUnequip(slot)}
                 disabled={!def}
-                title={def ? `${def.name} 해제 → 창고` : undefined}
+                title={inst && def ? `${instanceTitle(inst, def)}\n클릭하면 해제 → 창고` : undefined}
               >
                 <span className="fac-slot-tag">{SLOT_LABEL[slot]}</span>
-                {def ? (
+                {inst && def ? (
                   <>
-                    <span className="fac-slot-name">{def.name}</span>
-                    <span className="fac-slot-effect">{effectText(def)}</span>
+                    <span className="fac-slot-name">
+                      <EquipTag inst={inst} def={def} />
+                    </span>
+                    <span className="fac-slot-effect">{instanceEffectText(inst, def)}</span>
                     <span className="fac-slot-action">해제</span>
                   </>
                 ) : (
@@ -293,6 +494,37 @@ function StorageTab({ campaign, onChange }: TabProps) {
             </span>
           )}
         </div>
+
+        {/* 능력치 열매 — 3단계 일반 장비를 만렙에서 팔면 얻는다 (equipment.md §1) */}
+        <h4>능력치 열매 ({fruits.length})</h4>
+        {fruits.length === 0 ? (
+          <p className="dim">열매가 없다. 3단계 장비를 최대 레벨까지 키운 뒤 상점에서 팔면 열매가 남는다.</p>
+        ) : (
+          <div className="fac-fruits">
+            {fruits.map((row) => {
+              const pv = fruitPreview(campaign, selected.officerId, row.index)
+              const name = row.def?.name ?? row.id
+              return (
+                <button
+                  key={`${row.id}-${row.index}`}
+                  className={`fac-fruit-row${pv.usable ? '' : ' disabled'}`}
+                  disabled={!pv.usable}
+                  onClick={() => doUseFruit(row.index)}
+                  title={
+                    pv.usable
+                      ? `${row.def?.description ?? name} — 클릭하면 ${officer.name}에게 사용 (${pv.text})`
+                      : `${officer.name}에게는 사용할 수 없다`
+                  }
+                >
+                  <span className="fac-fruit-icon">果</span>
+                  <span className="fac-item-name">{name}</span>
+                  <span className={`fac-chip ${pv.usable ? 'up' : 'flat'}`}>{pv.text}</span>
+                  <span className="fac-fruit-action">{pv.usable ? '사용' : '불가'}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
       </section>
 
       {/* ③ 창고 (인벤토리) */}
@@ -303,25 +535,25 @@ function StorageTab({ campaign, onChange }: TabProps) {
         ) : (
           <div className="fac-inventory">
             {inventory.map((row) => {
-              const wearable = canEquip(selected.officerId, row.itemId)
-              const delta = previewDelta(selected, row.def)
+              const wearable = canEquip(selected.officerId, row.inst.itemId)
+              const delta = previewDelta(selected, row.inst, row.def)
               return (
                 <button
-                  key={`${row.itemId}-${row.index}`}
+                  key={`${row.inst.itemId}-${row.index}`}
                   className={`fac-item-row${wearable ? '' : ' fac-unwearable'}`}
                   disabled={!wearable}
-                  onClick={() => doEquip(row.itemId)}
+                  onClick={() => doEquip(row.index)}
                   title={
                     wearable
-                      ? `${row.def.description} — 클릭하면 ${officer.name}에게 장착`
-                      : `${cls.name}은(는) 착용할 수 없다 (${classesLabel(row.def)})`
+                      ? `${instanceTitle(row.inst, row.def)}\n클릭하면 ${officer.name}에게 장착`
+                      : `${instanceTitle(row.inst, row.def)}\n${cls.name}은(는) 착용할 수 없다 (${classesLabel(row.def)})`
                   }
                 >
                   <span className="fac-item-head">
-                    <span className="fac-item-name">{row.def.name}</span>
+                    <EquipTag inst={row.inst} def={row.def} />
                     <span className="fac-item-slot">{SLOT_LABEL[row.def.slot]}</span>
                   </span>
-                  <span className="fac-item-effect">{effectText(row.def)}</span>
+                  <span className="fac-item-effect">{instanceEffectText(row.inst, row.def)}</span>
                   <span className="fac-item-delta">
                     {wearable ? <DeltaChips delta={delta} /> : <span className="fac-forbidden">병과 불가</span>}
                   </span>
@@ -366,20 +598,14 @@ function ShopTab({ campaign, onChange }: TabProps) {
       }))
   }, [])
 
-  const sellable = useMemo(
-    () =>
-      campaign.inventory
-        .map((itemId, index) => ({ index, itemId, def: defOf(itemId) }))
-        .filter((r): r is { index: number; itemId: string; def: EquipmentDef } => r.def !== null),
-    [campaign.inventory],
-  )
+  const sellable = useMemo(() => inventoryRows(campaign), [campaign])
 
   const doBuy = (itemId: string) => {
     const next = buyItem(campaign, itemId)
     if (next !== campaign) onChange(next)
   }
-  const doSell = (itemId: string) => {
-    const next = sellItem(campaign, itemId)
+  const doSell = (index: number) => {
+    const next = sellItem(campaign, index)
     if (next !== campaign) onChange(next)
   }
 
@@ -390,6 +616,7 @@ function ShopTab({ campaign, onChange }: TabProps) {
         <span className="fac-tier-note">
           평균 Lv {avgText} — {unlockedTier}단계 상점
         </span>
+        {campaign.fruits.length > 0 && <span className="fac-tier-note">열매 {campaign.fruits.length}개 보유</span>}
       </div>
 
       <div className="fac-shop-body">
@@ -441,19 +668,35 @@ function ShopTab({ campaign, onChange }: TabProps) {
             <p className="dim">팔 물건이 없다.</p>
           ) : (
             sellable.map((row) => {
-              const sell = isTreasure(row.def) ? null : sellPriceOf(row.def)
+              const pv = sellPreview(campaign, row.index)
               return (
-                <div key={`${row.itemId}-${row.index}`} className="fac-shop-row" title={row.def.description}>
-                  <span className="fac-item-name">{row.def.name}</span>
+                <div
+                  key={`${row.inst.itemId}-${row.index}`}
+                  className="fac-shop-row"
+                  title={instanceTitle(row.inst, row.def)}
+                >
+                  <span className="fac-item-head">
+                    <EquipTag inst={row.inst} def={row.def} />
+                  </span>
                   <span className="fac-item-slot">{SLOT_LABEL[row.def.slot]}</span>
-                  <span className="fac-item-effect">{effectText(row.def)}</span>
-                  {sell === null ? (
-                    <span className="fac-nosale" title="보물은 팔 수 없다">
-                      비매품
+                  <span className="fac-item-effect">{instanceEffectText(row.inst, row.def)}</span>
+                  {!pv.ok ? (
+                    <span className="fac-nosale" title={isTreasure(row.def) ? '보물은 팔 수 없다' : undefined}>
+                      {isTreasure(row.def) ? '비매품' : '판매 불가'}
                     </span>
                   ) : (
-                    <button className="fac-sell-btn" onClick={() => doSell(row.itemId)}>
-                      판매 (반값 {sell.toLocaleString('ko-KR')})
+                    <button
+                      className={`fac-sell-btn${pv.fruitName ? ' fruit' : ''}`}
+                      onClick={() => doSell(row.index)}
+                      title={
+                        pv.fruitName
+                          ? `최대 레벨 3단계 장비 — 팔면 ${pv.fruitName}이(가) 남는다`
+                          : `반값 ${pv.gold.toLocaleString('ko-KR')} 금전`
+                      }
+                    >
+                      {pv.fruitName
+                        ? `판매 → ${pv.fruitName}`
+                        : `판매 (반값 ${pv.gold.toLocaleString('ko-KR')})`}
                     </button>
                   )}
                 </div>
@@ -472,7 +715,7 @@ type Tab = 'storage' | 'shop'
 
 interface Props {
   campaign: CampaignState
-  /** 모든 거래/장착 결과를 부모로 전달 (저장은 부모 책임) */
+  /** 모든 거래/장착/열매 결과를 부모로 전달 (저장은 부모 책임) */
   onChange: (next: CampaignState) => void
   onClose: () => void
 }

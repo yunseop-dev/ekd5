@@ -1,6 +1,24 @@
-import { classOf, effectiveStats, equippedItems, moveOf, officerOf, terrainEffectOf } from '../core/battle'
-import type { BattleState, UnitState } from '../core/types'
+import { classOf, effectiveStats, moveOf, officerOf, terrainEffectOf } from '../core/battle'
+import type { BattleState, EquipInstance, EquipSlot, EquipmentDef, UnitState } from '../core/types'
+import { EQUIP_EXP_PER_LEVEL, EQUIP_MAX_LEVEL_NORMAL, EQUIP_MAX_LEVEL_TREASURE } from '../core/types'
+import { EQUIPMENT } from '../data/equipment'
 import { TERRAIN } from '../data/terrain'
+
+const SLOTS: EquipSlot[] = ['weapon', 'armor', 'accessory']
+
+/** 장착 개체 + 정의 (미등록 id 는 조용히 무시 — 구버전 세이브 내성) */
+function equippedInstances(unit: UnitState): Array<{ inst: EquipInstance; def: EquipmentDef }> {
+  const out: Array<{ inst: EquipInstance; def: EquipmentDef }> = []
+  for (const slot of SLOTS) {
+    const inst = unit.equipment?.[slot]
+    const def = inst ? EQUIPMENT[inst.itemId] : undefined
+    if (inst && def) out.push({ inst, def })
+  }
+  return out
+}
+
+const maxLevelOf = (def: EquipmentDef): number =>
+  def.isTreasure ? EQUIP_MAX_LEVEL_TREASURE : EQUIP_MAX_LEVEL_NORMAL
 
 export function UnitInfoPanel({ state, unit }: { state: BattleState; unit: UnitState }) {
   const officer = officerOf(unit)
@@ -8,7 +26,7 @@ export function UnitInfoPanel({ state, unit }: { state: BattleState; unit: UnitS
   const stats = effectiveStats(unit)
   const tile = TERRAIN[state.map.tiles[unit.pos.y][unit.pos.x]]
   // 아군/적군/우군 공통 — 원작도 적장 장비를 정보 패널에서 확인 가능
-  const items = equippedItems(unit)
+  const items = equippedInstances(unit)
 
   return (
     <div className="panel-box">
@@ -33,8 +51,27 @@ export function UnitInfoPanel({ state, unit }: { state: BattleState; unit: UnitS
         </span>
         <span>이동 {moveOf(unit)}</span>
       </div>
-      <div className="equip-line" title={items.map((i) => `${i.name}: ${i.description}`).join('\n')}>
-        장비 {items.length > 0 ? items.map((i) => i.name).join(' · ') : '없음'}
+      <div
+        className="equip-line"
+        title={items
+          .map(({ inst, def }) => {
+            const lv =
+              inst.level >= maxLevelOf(def)
+                ? `Lv${inst.level} MAX`
+                : `Lv${inst.level} · EXP ${inst.exp}/${EQUIP_EXP_PER_LEVEL}`
+            return `${def.name} (${lv}): ${def.description}`
+          })
+          .join('\n')}
+      >
+        장비{' '}
+        {items.length > 0
+          ? items.map(({ inst, def }, i) => (
+              <span key={`${def.id}-${i}`}>
+                {i > 0 && ' · '}
+                {def.name} <strong className="equip-lv">Lv{inst.level}</strong>
+              </span>
+            ))
+          : '없음'}
       </div>
     </div>
   )
