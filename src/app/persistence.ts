@@ -5,7 +5,8 @@
 import { openDB, type IDBPDatabase } from 'idb'
 import type { CampaignState, RosterEntry } from '../core/campaign'
 import { canEquip, currentNode, INITIAL_GOLD } from '../core/campaign'
-import type { EquipmentMap, EquipSlot } from '../core/types'
+import type { EquipInstance, EquipmentMap, EquipSlot, OfficerStats } from '../core/types'
+import { EQUIP_EXP_PER_LEVEL, EQUIP_MAX_LEVEL_NORMAL, EQUIP_MAX_LEVEL_TREASURE } from '../core/types'
 import { EQUIPMENT } from '../data/equipment'
 import { STAGES } from '../data/stages'
 
@@ -45,8 +46,30 @@ function requestPersistence(): void {
 
 const EQUIP_SLOTS: EquipSlot[] = ['weapon', 'armor', 'accessory']
 
+const STAT_KEYS: (keyof OfficerStats)[] = ['str', 'ldr', 'int', 'agi', 'luck']
+
 /**
- * 장비 맵 정규화 — 알려진 슬롯 + 문자열 값만 남긴다.
+ * 장비 1점 정규화 — v2까지는 문자열 id, v3부터는 인스턴스({itemId, level, exp}).
+ * 문자열이면 Lv1 인스턴스로 승계한다. 형식이 아예 아니면 null(해당 슬롯/창고 칸만 버린다).
+ */
+function normalizeInstance(value: unknown): EquipInstance | null {
+  if (typeof value === 'string') return { itemId: value, level: 1, exp: 0 }
+  if (typeof value !== 'object' || value === null) return null
+  const raw = value as Record<string, unknown>
+  if (typeof raw.itemId !== 'string') return null
+  const def = EQUIPMENT[raw.itemId]
+  const max = def ? (def.isTreasure ? EQUIP_MAX_LEVEL_TREASURE : EQUIP_MAX_LEVEL_NORMAL) : EQUIP_MAX_LEVEL_TREASURE
+  const level = typeof raw.level === 'number' && Number.isFinite(raw.level) ? Math.trunc(raw.level) : 1
+  const exp = typeof raw.exp === 'number' && Number.isFinite(raw.exp) ? Math.trunc(raw.exp) : 0
+  return {
+    itemId: raw.itemId,
+    level: Math.min(Math.max(1, level), max),
+    exp: Math.min(Math.max(0, exp), EQUIP_EXP_PER_LEVEL - 1),
+  }
+}
+
+/**
+ * 장비 맵 정규화 — 알려진 슬롯 + 정규화 가능한 값만 남긴다.
  * 미등록 장비 id를 여기서 걸러내지 않는 이유: 데이터 개편으로 사라진 id는 battle/campaign 쪽이
  * 조용히 무시하도록 만들어 뒀고, 세이브를 통째로 거부하는 편이 훨씬 나쁜 결과이기 때문.
  */
@@ -55,33 +78,57 @@ function normalizeEquipment(value: unknown): EquipmentMap {
   const raw = value as Record<string, unknown>
   const map: EquipmentMap = {}
   for (const slot of EQUIP_SLOTS) {
-    if (typeof raw[slot] === 'string') map[slot] = raw[slot] as string
+    const instance = normalizeInstance(raw[slot])
+    if (instance) map[slot] = instance
   }
   return map
 }
 
+/** 열매로 오른 능력치 보정 — 유한한 숫자만 남긴다 (v2 이전 세이브에는 없다) */
+function normalizeStatBonus(value: unknown): Partial<OfficerStats> {
+  if (typeof value !== 'object' || value === null) return {}
+  const raw = value as Record<string, unknown>
+  const bonus: Partial<OfficerStats> = {}
+  for (const key of STAT_KEYS) {
+    const amount = raw[key]
+    if (typeof amount === 'number' && Number.isFinite(amount)) bonus[key] = Math.trunc(amount)
+  }
+  return bonus
+}
+
 /**
  * 저장된 JSON은 신뢰할 수 없다 (수동 편집/구버전) — 구조 검사 후에만 통과.
- * v1(장비/군자금 이전) 세이브는 거부하지 않고 v2로 **승계 마이그레이션**한다:
- * 군자금 = 초기치, 창고 = 빈 목록, 각 부대의 장비 = 빈 슬롯. 성장치(레벨/경험치)는 그대로 살린다.
+ * v1(장비/군자금 이전)·v2(무구성장 이전) 세이브는 거부하지 않고 v3로 **승계 마이그레이션**한다:
+ *  - v1 → 군자금 = 초기치, 창고 = 빈 목록, 각 부대의 장비 = 빈 슬롯. 성장치(레벨/경험치)는 살린다.
+ *  - v2 → 장비/창고의 문자열 id를 Lv1 인스턴스로, 열매 목록·능력치 보정은 빈 값으로 채운다.
+ * 병과 착용 제한 정화는 버전과 무관하게 항상 수행한다.
  */
 export function validateCampaign(data: unknown): CampaignState | null {
   if (typeof data !== 'object' || data === null) return null
   const raw = data as Record<string, unknown>
-  if (raw.version !== 1 && raw.version !== 2) return null
-  const legacy = raw.version === 1
+  if (raw.version !== 1 && raw.version !== 2 && raw.version !== 3) return null
+  const legacy = raw.version === 1 // v1 = 장비/경제 도입 이전
   if (typeof raw.nodeId !== 'string') return null
   if (!Array.isArray(raw.roster) || !Array.isArray(raw.clearedStages)) return null
   if (!raw.clearedStages.every((s) => typeof s === 'string')) return null
 
-  // v2 전용 필드 — v1 세이브에는 아예 없으므로 기본값을 채워 승계한다
+  // v2+ 전용 필드 — v1 세이브에는 아예 없으므로 기본값을 채워 승계한다
   let gold = INITIAL_GOLD
-  let inventory: string[] = []
+  let inventory: EquipInstance[] = []
   if (!legacy) {
     if (typeof raw.gold !== 'number' || !Number.isFinite(raw.gold)) return null
-    if (!Array.isArray(raw.inventory) || !raw.inventory.every((s) => typeof s === 'string')) return null
+    if (!Array.isArray(raw.inventory)) return null
+    const instances = raw.inventory.map(normalizeInstance)
+    if (instances.some((i) => i === null)) return null // 창고 칸이 장비도 아니면 세이브가 깨진 것
     gold = raw.gold
-    inventory = [...(raw.inventory as string[])]
+    inventory = instances as EquipInstance[]
+  }
+
+  // v3 전용 필드 — 없으면 빈 목록으로 승계. 문자열 아닌 항목이 섞이면 깨진 세이브로 본다.
+  let fruits: string[] = []
+  if (raw.fruits !== undefined) {
+    if (!Array.isArray(raw.fruits) || !raw.fruits.every((f) => typeof f === 'string')) return null
+    fruits = [...(raw.fruits as string[])]
   }
 
   const roster: RosterEntry[] = []
@@ -95,10 +142,10 @@ export function validateCampaign(data: unknown): CampaignState | null {
     // 미등록 id는 기존 방침대로 슬롯에 남긴다(읽기 쪽이 조용히 무시).
     const equipment = legacy ? {} : normalizeEquipment(entry.equipment)
     for (const slot of EQUIP_SLOTS) {
-      const itemId = equipment[slot]
-      if (itemId && EQUIPMENT[itemId] && !canEquip(entry.officerId, itemId)) {
+      const instance = equipment[slot]
+      if (instance && EQUIPMENT[instance.itemId] && !canEquip(entry.officerId, instance.itemId)) {
         delete equipment[slot]
-        inventory.push(itemId)
+        inventory.push(instance) // 성장분(레벨/경험치)은 잃지 않고 창고로
       }
     }
     roster.push({
@@ -106,16 +153,18 @@ export function validateCampaign(data: unknown): CampaignState | null {
       level: entry.level,
       exp: entry.exp,
       equipment,
+      statBonus: normalizeStatBonus(entry.statBonus),
     })
   }
 
   return {
-    version: 2,
+    version: 3,
     nodeId: raw.nodeId,
     roster,
     clearedStages: raw.clearedStages as string[],
     gold,
     inventory,
+    fruits,
   }
 }
 

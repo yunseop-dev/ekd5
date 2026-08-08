@@ -156,7 +156,7 @@ describe('스테이지 3 — 황건 본진 소탕', () => {
     // 두 전투를 거친 로스터(≈Lv6)면 협곡→성문→성채까지 실제로 진행돼 장각을 잡는다
     const roster = STAGE_03.units
       .filter((u) => u.faction === 'player')
-      .map((u) => ({ officerId: u.officerId, level: 6, exp: 0, equipment: {} }))
+      .map((u) => ({ officerId: u.officerId, level: 6, exp: 0, equipment: {}, statBonus: {} }))
     const grown = simulate(startBattle(STAGE_03, 42, roster), 400)
     expect(grown.result).toBe('victory')
     expect(grown.units.find((u) => u.isBoss)!.hp).toBe(0)

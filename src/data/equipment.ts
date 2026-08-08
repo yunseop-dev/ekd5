@@ -6,7 +6,10 @@
 //   창 +5% / 활 -15% 계열 오프셋, 방어구 = 무기 동급, 옷 = -12% + 정신 혼합.
 //   보물: 청강검 = tier2~3 사이(초반 강력, 최종 상점템에 소폭 밀림 — 원작 구도),
 //   적로 = 전 지형 코스트 1, 태평요술서 = 매턴 MP 10 (둘 다 원작 확정 효과).
-// ⚠ 무구성장(장비 경험치 → Lv3/Lv9)은 v0.5 미구현. 고정 보정치만 쓴다.
+//
+// v0.6: 무구성장 도입 — bonus는 Lv1 기준값이고, growthStat에 레벨당 +10(보물 +9)이 얹힌다.
+//   성장 대상은 원작대로 무기/방어구뿐이다(보조구는 growthStat 없음 = 성장하지 않음).
+//   3단계 일반 장비는 Lv3에 팔면 능력치 열매가 나온다 → data/fruits.ts FRUIT_ON_SELL.
 
 import type { EquipmentDef } from '../core/types'
 
@@ -20,6 +23,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { atk: 10 },
     price: 300,
     tier: 1,
+    growthStat: 'atk',
     description: '수련용 나무 검. 없는 것보다는 낫다.',
   },
   bronzeSword: {
@@ -30,6 +34,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { atk: 30 },
     price: 800,
     tier: 2,
+    growthStat: 'atk',
     description: '청동을 벼려 만든 검. 관군의 표준 장비다.',
   },
   ironSword: {
@@ -40,6 +45,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { atk: 55 },
     price: 2000,
     tier: 3,
+    growthStat: 'atk',
     description: '단단한 철검. 명장의 손에서 위력을 발한다.',
   },
 
@@ -52,6 +58,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { atk: 11 },
     price: 350,
     tier: 1,
+    growthStat: 'atk',
     description: '끝을 깎아 세운 나무 창. 길이가 곧 무기다.',
   },
   bronzeSpear: {
@@ -62,6 +69,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { atk: 32 },
     price: 900,
     tier: 2,
+    growthStat: 'atk',
     description: '청동 창날을 물린 장병기.',
   },
   ironSpear: {
@@ -72,6 +80,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { atk: 58 },
     price: 2200,
     tier: 3,
+    growthStat: 'atk',
     description: '철제 창날이 갑옷을 꿰뚫는다.',
   },
 
@@ -84,6 +93,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { atk: 9 },
     price: 320,
     tier: 1,
+    growthStat: 'atk',
     description: '나무를 휘어 만든 단궁.',
   },
   bronzeBow: {
@@ -94,6 +104,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { atk: 26 },
     price: 850,
     tier: 2,
+    growthStat: 'atk',
     description: '동으로 보강한 활. 시위가 묵직하다.',
   },
   ironBow: {
@@ -104,6 +115,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { atk: 47 },
     price: 2100,
     tier: 3,
+    growthStat: 'atk',
     description: '철궁. 화살이 방패를 뚫고 지나간다.',
   },
 
@@ -116,6 +128,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { mind: 10 },
     price: 400,
     tier: 1,
+    growthStat: 'mind',
     description: '대나무 살로 엮은 부채. 책략의 기운을 모은다.',
   },
   whiteFeatherFan: {
@@ -126,7 +139,19 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { mind: 28 },
     price: 1000,
     tier: 2,
+    growthStat: 'mind',
     description: '흰 깃털 부채. 군사의 위엄이 서려 있다.',
+  },
+  ironFan: {
+    id: 'ironFan',
+    name: '철선',
+    slot: 'weapon',
+    classes: ['strategist'],
+    bonus: { mind: 52 },
+    price: 2200,
+    tier: 3,
+    growthStat: 'mind',
+    description: '철살을 물린 부채. 부치면 바람이 칼처럼 인다.',
   },
 
   // ---------- 무기: 보검 (풍수사 — 원작은 도사·풍수사 전용, equipment.md §5) ----------
@@ -138,6 +163,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { mind: 10 },
     price: 400,
     tier: 1,
+    growthStat: 'mind',
     description: '돌을 갈아 만든 의식용 보검. 기를 다스린다.',
   },
   bronzeGemSword: {
@@ -148,7 +174,19 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { mind: 26 },
     price: 950,
     tier: 2,
+    growthStat: 'mind',
     description: '구리로 벼린 보검. 풍수의 힘이 깃든다.',
+  },
+  ironGemSword: {
+    id: 'ironGemSword',
+    name: '철보검',
+    slot: 'weapon',
+    classes: ['geomancer'],
+    bonus: { mind: 47 },
+    price: 2100,
+    tier: 3,
+    growthStat: 'mind',
+    description: '철을 벼려 만든 보검. 기가 칼끝에 모인다.',
   },
 
   // ---------- 방어구: 갑옷 (무관계) ----------
@@ -160,6 +198,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { def: 10 },
     price: 340,
     tier: 1,
+    growthStat: 'def',
     description: '무두질한 가죽 갑옷. 가볍고 값이 싸다.',
   },
   bronzeArmor: {
@@ -170,6 +209,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { def: 30 },
     price: 880,
     tier: 2,
+    growthStat: 'def',
     description: '청동 비늘을 덧댄 갑옷.',
   },
   ironArmor: {
@@ -180,6 +220,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { def: 55 },
     price: 2100,
     tier: 3,
+    growthStat: 'def',
     description: '두꺼운 철 갑옷. 화살도 튕겨낸다.',
   },
 
@@ -192,6 +233,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { def: 5, mind: 6 },
     price: 300,
     tier: 1,
+    growthStat: 'def',
     description: '거친 무명으로 지은 옷. 몸이 가볍다.',
   },
   silkRobe: {
@@ -202,7 +244,19 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     bonus: { def: 13, mind: 14 },
     price: 820,
     tier: 2,
+    growthStat: 'def',
     description: '고운 비단옷. 마음을 다스리기에 좋다.',
+  },
+  battleRobe: {
+    id: 'battleRobe',
+    name: '전투복',
+    slot: 'armor',
+    classes: ['strategist', 'geomancer'],
+    bonus: { def: 24, mind: 25 },
+    price: 2000,
+    tier: 3,
+    growthStat: 'def',
+    description: '실전을 견디도록 지은 옷. 문관에게도 갑옷이 필요하다.',
   },
 
   // ---------- 보조구 ----------
@@ -237,6 +291,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     price: null,
     tier: 1,
     isTreasure: true,
+    growthStat: 'atk',
     description: '조조가 처음부터 지닌 명검. 하늘에 의지한다는 이름을 가졌다.',
   },
   qinggangSword: {
@@ -248,6 +303,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     price: null,
     tier: 3,
     isTreasure: true,
+    growthStat: 'atk',
     description: '조조가 아끼던 명검. 무엇이든 베어낸다.',
   },
   dilu: {

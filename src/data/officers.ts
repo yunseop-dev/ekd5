@@ -55,11 +55,14 @@ export const OFFICERS: Record<string, OfficerDef> = {
   },
 
   // ---- 적군 (황건적) ----
+  // 잡병도 1단계 무기를 지닌다 (원작: 적 부대도 병과 기본 장비를 갖고 나온다).
+  // 방어구는 주지 않는다 — 황건적은 오합지졸이라는 원작 묘사 + 초반 난이도 조정.
   yellowInfantry: {
     id: 'yellowInfantry',
     name: '황건적병',
     stats: { str: 60, ldr: 50, int: 20, agi: 50, luck: 40 },
     classId: 'heavyInfantry',
+    initialEquipment: { weapon: 'woodSword' },
     level: 1,
   },
   yellowArcher: {
@@ -67,6 +70,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '황건궁병',
     stats: { str: 58, ldr: 44, int: 24, agi: 56, luck: 40 },
     classId: 'archer',
+    initialEquipment: { weapon: 'woodBow' },
     level: 1,
   },
   yellowCavalry: {
@@ -74,6 +78,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '황건기병',
     stats: { str: 64, ldr: 48, int: 20, agi: 60, luck: 42 },
     classId: 'lightCavalry',
+    initialEquipment: { weapon: 'woodSpear' },
     level: 1,
   },
   yellowShaman: {
@@ -81,6 +86,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '황건요술사',
     stats: { str: 26, ldr: 40, int: 78, agi: 58, luck: 44 },
     classId: 'strategist',
+    initialEquipment: { weapon: 'bambooFan' },
     level: 2,
   },
   chengYuanzhi: {

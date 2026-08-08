@@ -47,7 +47,7 @@ const unit = (state: BattleState, officerId: string): UnitState =>
 describe('newCampaign', () => {
   it('아군 6명이 장수 기본 레벨 / 경험치 0으로 편성된다', () => {
     const campaign = newCampaign()
-    expect(campaign.version).toBe(2)
+    expect(campaign.version).toBe(3)
     expect(campaign.roster.map((r) => r.officerId)).toEqual(PLAYER_OFFICER_IDS)
     for (const entry of campaign.roster) {
       expect(entry.level).toBe(OFFICERS[entry.officerId].level)
@@ -57,14 +57,25 @@ describe('newCampaign', () => {
     expect(campaign.nodeId).toBe(CAMPAIGN_NODES[0].id)
   })
 
-  it('v2: 초기 군자금 / 빈 창고 / 장수별 초기 장비(원작: 조조 = 의천검)로 시작한다', () => {
+  it('v3: 초기 군자금 / 빈 창고·열매 / 장수별 초기 장비(원작: 조조 = 의천검)로 시작한다', () => {
     const campaign = newCampaign()
     expect(campaign.gold).toBe(INITIAL_GOLD)
     expect(campaign.inventory).toEqual([])
+    expect(campaign.fruits).toEqual([])
     for (const entry of campaign.roster) {
-      expect(entry.equipment, entry.officerId).toEqual(OFFICERS[entry.officerId].initialEquipment ?? {})
+      // 정의는 슬롯 → itemId 문자열, 로스터는 Lv1 인스턴스
+      const expected = Object.entries(OFFICERS[entry.officerId].initialEquipment ?? {}).map(([slot, itemId]) => [
+        slot,
+        { itemId, level: 1, exp: 0 },
+      ])
+      expect(entry.equipment, entry.officerId).toEqual(Object.fromEntries(expected))
+      expect(entry.statBonus, entry.officerId).toEqual({})
     }
-    expect(campaign.roster.find((r) => r.officerId === 'caocao')!.equipment.weapon).toBe('yitianSword')
+    expect(campaign.roster.find((r) => r.officerId === 'caocao')!.equipment.weapon).toEqual({
+      itemId: 'yitianSword',
+      level: 1,
+      exp: 0,
+    })
   })
 })
 
@@ -165,8 +176,8 @@ describe('스토리 스크립트', () => {
 describe('startBattle(roster)', () => {
   it('로스터가 스테이지/장수 기본 레벨을 덮어쓰고 HP도 그 레벨로 계산된다', () => {
     const roster: RosterEntry[] = [
-      { officerId: 'caocao', level: 12, exp: 40, equipment: {} },
-      { officerId: 'xiahoudun', level: 9, exp: 5, equipment: {} },
+      { officerId: 'caocao', level: 12, exp: 40, equipment: {}, statBonus: {} },
+      { officerId: 'xiahoudun', level: 9, exp: 5, equipment: {}, statBonus: {} },
     ]
     const state = startBattle(mkStage(), 1, roster)
     const caocao = unit(state, 'caocao')
@@ -179,7 +190,7 @@ describe('startBattle(roster)', () => {
   })
 
   it('로스터에 없거나 적군이면 기존 규칙(스테이지 level → 장수 기본)을 유지한다', () => {
-    const state = startBattle(mkStage(), 1, [{ officerId: 'yellowInfantry', level: 40, exp: 0, equipment: {} }])
+    const state = startBattle(mkStage(), 1, [{ officerId: 'yellowInfantry', level: 40, exp: 0, equipment: {}, statBonus: {} }])
     expect(unit(state, 'caocao').level).toBe(OFFICERS.caocao.level)
     expect(unit(state, 'xiahoudun').level).toBe(7)
     expect(unit(state, 'yellowInfantry').level).toBe(OFFICERS.yellowInfantry.level)
@@ -216,8 +227,8 @@ describe('startBattle(deployment)', () => {
 
   it('stage.units의 player 정의를 무시하고 로스터 레벨을 적용하며 조조가 주인공이 된다', () => {
     const roster: RosterEntry[] = [
-      { officerId: 'caocao', level: 9, exp: 12, equipment: {} },
-      { officerId: 'dianwei', level: 4, exp: 3, equipment: {} },
+      { officerId: 'caocao', level: 9, exp: 12, equipment: {}, statBonus: {} },
+      { officerId: 'dianwei', level: 4, exp: 3, equipment: {}, statBonus: {} },
     ]
     const state = startBattle(slotStage(), 1, roster, ['caocao', 'dianwei'])
     // 스테이지에 level 7로 박혀 있던 하후돈은 출진하지 않았으므로 존재하지 않는다
@@ -368,7 +379,7 @@ describe('validateCampaign', () => {
     expect(validateCampaign(null)).toBeNull()
     expect(validateCampaign(undefined)).toBeNull()
     expect(validateCampaign('{}')).toBeNull()
-    expect(validateCampaign({ ...base, version: 3 })).toBeNull()
+    expect(validateCampaign({ ...base, version: 4 })).toBeNull()
     expect(validateCampaign({ ...base, nodeId: 1 })).toBeNull()
     expect(validateCampaign({ ...base, roster: 'nope' })).toBeNull()
     expect(validateCampaign({ ...base, roster: [{ officerId: 'caocao', level: 3 }] })).toBeNull()

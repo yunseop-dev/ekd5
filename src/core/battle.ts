@@ -7,6 +7,7 @@ import { OFFICERS } from '../data/officers'
 import { STRATEGIES } from '../data/strategies'
 import { TERRAIN } from '../data/terrain'
 import type { RosterEntry } from './campaign'
+import { toEquipmentMap } from './campaign'
 import type { CombatStats } from './formulas'
 import {
   affinityMultiplier,
@@ -29,8 +30,11 @@ import { nextInt, roll } from './rng'
 import type {
   BattleAction,
   BattleState,
+  EquipInstance,
   EquipmentDef,
+  EquipSlot,
   OfficerDef,
+  OfficerStats,
   StageDef,
   StageUnitDef,
   StrategyDef,
@@ -38,7 +42,15 @@ import type {
   UnitState,
   Vec2,
 } from './types'
-import { CRIT_MULTIPLIER } from './types'
+import {
+  CRIT_MULTIPLIER,
+  EQUIP_EXP_ON_HIT,
+  EQUIP_EXP_PER_LEVEL,
+  EQUIP_GROWTH_NORMAL,
+  EQUIP_GROWTH_TREASURE,
+  EQUIP_MAX_LEVEL_NORMAL,
+  EQUIP_MAX_LEVEL_TREASURE,
+} from './types'
 
 // ---------- 조회 헬퍼 ----------
 
@@ -58,20 +70,66 @@ const hostileTo = (a: UnitState['faction']): UnitState['faction'][] =>
 
 export const isHostile = (a: UnitState, b: UnitState): boolean => hostileTo(a.faction).includes(b.faction)
 
+/** 장착 중인 장비 인스턴스 목록 (미등록 id 포함 — 정의 조회는 호출부에서) */
+export function equippedInstances(unit: UnitState): EquipInstance[] {
+  return Object.values(unit.equipment ?? {}).filter((i): i is EquipInstance => i !== undefined)
+}
+
 /**
  * 장착 중인 장비 정의 목록.
  * 알 수 없는 id는 조용히 무시한다 — 구버전 세이브 승계/데이터 개편 내성 (equipment 자체가 없어도 안전).
  */
 export function equippedItems(unit: UnitState): EquipmentDef[] {
-  const slots: (string | undefined)[] = Object.values(unit.equipment ?? {})
-  return slots.map((id) => (id ? EQUIPMENT[id] : undefined)).filter((e): e is EquipmentDef => e !== undefined)
+  return equippedInstances(unit)
+    .map((i) => EQUIPMENT[i.itemId])
+    .filter((e): e is EquipmentDef => e !== undefined)
 }
 
-/** 장비 + 버프 반영된 실효 전투 능력치 (장비 가산 → 버프 순서) */
+/** 장비 종류별 최대 레벨 (일반 Lv3 / 보물 Lv9 — 원작 확정) */
+export function equipMaxLevel(def: EquipmentDef): number {
+  return def.isTreasure ? EQUIP_MAX_LEVEL_TREASURE : EQUIP_MAX_LEVEL_NORMAL
+}
+
+/** 레벨당 성장량 (일반 +10 / 보물 +9 — 원작 확정) */
+export function equipGrowthPerLevel(def: EquipmentDef): number {
+  return def.isTreasure ? EQUIP_GROWTH_TREASURE : EQUIP_GROWTH_NORMAL
+}
+
+/**
+ * 인스턴스 1점의 실효 보정치 = def.bonus + growthStat에 (level-1) × 성장량 (무구성장).
+ * 미등록 id는 빈 보정치. level은 최대 레벨로 잘라서 계산한다(망가진 세이브 내성).
+ */
+export function equipInstanceBonus(instance: EquipInstance): EquipmentDef['bonus'] {
+  const def = EQUIPMENT[instance.itemId]
+  if (!def) return {}
+  const bonus: EquipmentDef['bonus'] = { ...def.bonus }
+  if (def.growthStat) {
+    const level = Math.min(Math.max(1, instance.level), equipMaxLevel(def))
+    const grown = (level - 1) * equipGrowthPerLevel(def)
+    if (grown > 0) bonus[def.growthStat] = (bonus[def.growthStat] ?? 0) + grown
+  }
+  return bonus
+}
+
+/** 열매 보정을 얹은 장수 능력치 */
+function boostedStats(unit: UnitState): OfficerStats {
+  const base = officerOf(unit).stats
+  const bonus = unit.statBonus
+  if (!bonus) return base
+  return {
+    str: base.str + (bonus.str ?? 0),
+    ldr: base.ldr + (bonus.ldr ?? 0),
+    int: base.int + (bonus.int ?? 0),
+    agi: base.agi + (bonus.agi ?? 0),
+    luck: base.luck + (bonus.luck ?? 0),
+  }
+}
+
+/** 장비(무구성장 포함) + 열매 + 버프 반영된 실효 전투 능력치 (열매 → 장비 가산 → 버프 순서) */
 export function effectiveStats(unit: UnitState): CombatStats {
-  const base = combatStats(officerOf(unit).stats, classOf(unit).growth, unit.level)
-  for (const item of equippedItems(unit)) {
-    for (const [stat, amount] of Object.entries(item.bonus)) {
+  const base = combatStats(boostedStats(unit), classOf(unit).growth, unit.level)
+  for (const instance of equippedInstances(unit)) {
+    for (const [stat, amount] of Object.entries(equipInstanceBonus(instance))) {
       base[stat as keyof CombatStats] += amount
     }
   }
@@ -233,8 +291,10 @@ export function createBattle(
       acted: false,
       statuses: [],
       buffs: [],
-      // 아군은 캠페인 로스터 우선, 적/우군·자유 전투는 스테이지 정의(적장 장비 — 원작: 격파 드랍과 연결)
-      equipment: { ...(entry?.equipment ?? def.equipment ?? officer.initialEquipment ?? {}) },
+      // 아군은 캠페인 로스터 우선, 적/우군·자유 전투는 스테이지 정의(적장 장비 — 원작: 격파 드랍과 연결).
+      // 정의 표기(문자열 id)든 인스턴스든 여기서 전부 인스턴스로 정규화된다.
+      equipment: toEquipmentMap(entry?.equipment ?? def.equipment ?? officer.initialEquipment),
+      statBonus: { ...(entry?.statBonus ?? {}) },
       isLeader: def.isLeader,
       isBoss: def.isBoss,
       behavior: def.behavior,
@@ -286,6 +346,39 @@ function grantExp(state: BattleState, unit: UnitState, targetLevel: number, defe
     unit.level = progress.level
     log(state, 'levelUp', `${nameOf(unit)} 레벨 ${progress.level} 달성!`)
   }
+}
+
+/** 한글 주격 조사 — 받침 있으면 '이', 없으면 '가' (로그 문장용) */
+function subjectParticle(word: string): string {
+  const code = word.charCodeAt(word.length - 1)
+  if (Number.isNaN(code) || code < 0xac00 || code > 0xd7a3) return '이(가)'
+  return (code - 0xac00) % 28 === 0 ? '가' : '이'
+}
+
+/**
+ * 무구성장 — 타격 1회당 장비 경험치를 얹고 레벨업을 처리한다 (state 직접 수정).
+ * 무기는 공격이 명중했을 때, 방어구는 피격당했을 때 성장한다(원작: 빗나가면 거의 못 얻는다).
+ * 최대 레벨(일반 3/보물 9)에 닿으면 경험치는 더 쌓이지 않는다.
+ */
+function growEquipment(state: BattleState, unit: UnitState, slot: EquipSlot): void {
+  const instance = unit.equipment?.[slot]
+  if (!instance) return
+  const def = EQUIPMENT[instance.itemId]
+  if (!def?.growthStat) return // 성장하지 않는 장비(보조구)와 미등록 id는 대상 아님
+  const max = equipMaxLevel(def)
+  if (instance.level >= max) return
+
+  instance.exp += EQUIP_EXP_ON_HIT
+  while (instance.exp >= EQUIP_EXP_PER_LEVEL && instance.level < max) {
+    instance.exp -= EQUIP_EXP_PER_LEVEL
+    instance.level += 1
+    log(
+      state,
+      'equipLevelUp',
+      `${nameOf(unit)}의 ${def.name}${subjectParticle(def.name)} Lv${instance.level}가 되었다!`,
+    )
+  }
+  if (instance.level >= max) instance.exp = 0 // 만렙 도달 시 경험치 고정 (applyExp와 같은 처리)
 }
 
 function dealDamage(state: BattleState, target: UnitState, amount: number): void {
@@ -343,6 +436,9 @@ function resolveStrike(
   )
   dealDamage(state, defender, dmg)
   grantExp(state, attacker, defender.level, defender.hp === 0)
+  // 무구성장은 데미지 확정 후 — 이번 타격의 데미지는 성장 전 보정치로 계산된다
+  growEquipment(state, attacker, 'weapon')
+  growEquipment(state, defender, 'armor')
   return true
 }
 
@@ -435,7 +531,7 @@ function triggerReinforcements(
         acted: false,
         statuses: [],
         buffs: [],
-        equipment: { ...(def.equipment ?? officer.initialEquipment ?? {}) },
+        equipment: toEquipmentMap(def.equipment ?? officer.initialEquipment),
         isLeader: def.isLeader,
         isBoss: def.isBoss,
         behavior: def.behavior,

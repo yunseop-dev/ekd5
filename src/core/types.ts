@@ -54,8 +54,11 @@ export interface OfficerDef {
   stats: OfficerStats
   classId: string
   level: number
-  /** 합류 시 장착하고 있는 장비 (원작: 조조 = 의천검, campaign-ux.md §7.2) */
-  initialEquipment?: EquipmentMap
+  /**
+   * 합류 시 장착하고 있는 장비 (원작: 조조 = 의천검, campaign-ux.md §7.2).
+   * 정의는 슬롯 → 장비 id로 간결하게 쓰고, 인스턴스화(Lv1)는 생성 시점(createBattle/newCampaign)에 한다.
+   */
+  initialEquipment?: EquipmentIdMap
 }
 
 // 성장 등급: 레벨당 성장치. S=+5, A=+4, B=+3, C=+2
@@ -99,7 +102,7 @@ export interface UnitClassDef {
 // ---------- 장비 / 보물 ----------
 
 // 조조전 장비 슬롯 3개: 무기 / 방어구(갑옷·옷) / 보조구(방패·기마·서적) (docs/research/caocao.md §6).
-// v0.5는 무구성장(장비 레벨업 Lv1~3/보물 Lv9)을 구현하지 않는다 — 고정 보정치만.
+// v0.6부터 무구성장(장비 자체가 사용으로 레벨업 — 일반 Lv3/보물 Lv9)을 구현한다 (equipment.md §1~2).
 export type EquipSlot = 'weapon' | 'armor' | 'accessory'
 
 export interface EquipmentDef {
@@ -117,11 +120,39 @@ export interface EquipmentDef {
   price: number | null // null = 비매품(보물)
   tier: 1 | 2 | 3 // 상점 해금 단계 (아군 평균 레벨 연동, campaign-ux.md 1부 §3)
   isTreasure?: boolean // 보물 — 판매 불가 (원작: 영걸전은 가능, 조조전은 불가)
+  /** 무구성장으로 오르는 능력치. undefined = 성장하지 않는 장비(보조구류) */
+  growthStat?: 'atk' | 'def' | 'mind'
   description: string
 }
 
-/** 슬롯 → 장비 id. 비어 있는 슬롯은 키 자체가 없다 */
-export type EquipmentMap = Partial<Record<EquipSlot, string>>
+/**
+ * 장비 1점의 실체 — 같은 종류라도 개체마다 레벨/경험치가 다르다 (원작 무구성장).
+ * level은 1부터. 실효 보정치 = def.bonus + growthStat에 (level-1) × 성장량.
+ */
+export interface EquipInstance {
+  itemId: string
+  level: number
+  exp: number
+}
+
+/** 슬롯 → 장비 인스턴스. 비어 있는 슬롯은 키 자체가 없다 (런타임/세이브 표현) */
+export type EquipmentMap = Partial<Record<EquipSlot, EquipInstance>>
+
+/** 슬롯 → 장비 id. 데이터 정의(장수 초기 장비/스테이지 적 장비)용 간결 표기 */
+export type EquipmentIdMap = Partial<Record<EquipSlot, string>>
+
+/** 정의 표기와 인스턴스를 모두 허용하는 입력 — createBattle이 인스턴스로 정규화한다 */
+export type EquipmentInput = Partial<Record<EquipSlot, string | EquipInstance>>
+
+// ---------- 능력치 열매 (원작: 3단계 장비를 Lv3에 판매 → 열매, equipment.md §1) ----------
+
+export interface FruitDef {
+  id: string
+  name: string
+  /** 올려주는 장수 능력치. 'exp' = 경험의 열매(경험치 획득) */
+  stat: 'str' | 'ldr' | 'int' | 'agi' | 'luck' | 'exp'
+  description: string
+}
 
 // ---------- 책략 ----------
 
@@ -178,8 +209,10 @@ export interface UnitState {
   acted: boolean // 이번 페이즈 행동(공격/책략/대기) 완료 여부
   statuses: StatusEffect[]
   buffs: StatBuff[]
-  /** 장착 장비 — 캠페인 로스터에서 복사됨. 비캠페인 전투는 빈 객체 */
+  /** 장착 장비 인스턴스 — 캠페인 로스터에서 복사됨. 비캠페인 전투는 빈 객체 */
   equipment: EquipmentMap
+  /** 열매로 영구 상승한 장수 능력치 보정 (effectiveStats에서 officer.stats에 합산) */
+  statBonus?: Partial<OfficerStats>
   isLeader?: boolean // 주인공: 격파당하면 패배
   isBoss?: boolean // 격파 시 승리 조건 대상
   behavior?: 'guard' | 'pursue' // AI: guard = 사거리 진입 전 대기
@@ -221,7 +254,7 @@ export interface StageUnitDef {
   pos: Vec2
   level?: number // 생략 시 장수 기본 레벨
   /** 적/우군 장비 (아군은 캠페인 로스터가 우선). 생략 시 장수 initialEquipment */
-  equipment?: EquipmentMap
+  equipment?: EquipmentInput
   isLeader?: boolean
   isBoss?: boolean
   behavior?: 'guard' | 'pursue'
@@ -288,3 +321,14 @@ export const MAX_LEVEL = 50
 export const EXP_PER_LEVEL = 100 // 전 구간 고정 (조조전 원작 사양)
 export const CRIT_MULTIPLIER = 1.5
 export const PROMOTION_LEVELS = { tier2: 15, tier3: 30 } as const
+
+// ---------- 무구성장 (equipment.md §1~2) ----------
+
+export const EQUIP_MAX_LEVEL_NORMAL = 3 // 상점 일반 장비 (원작 확정)
+export const EQUIP_MAX_LEVEL_TREASURE = 9 // 보물 (원작 확정)
+export const EQUIP_GROWTH_NORMAL = 10 // 레벨당 보정치 상승 — 원작 확정
+export const EQUIP_GROWTH_TREASURE = 9 // 보물은 상점템보다 낮다 — 원작 확정("만렙 상점템에 소폭 밀림")
+/** 레벨업 필요 장비 경험치 — ⚠ 원작 수치 미확보, 설계값 (부대 EXP_PER_LEVEL과 같은 100) */
+export const EQUIP_EXP_PER_LEVEL = 100
+/** 타격 1회당 장비 경험치 (무기=명중 시, 방어구=피격 시) — ⚠ 설계값. 원작은 "빗나가면 거의 못 얻음" 서술만 확보 */
+export const EQUIP_EXP_ON_HIT = 25
