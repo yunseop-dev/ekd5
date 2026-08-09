@@ -41,4 +41,51 @@ export const STORY_SCRIPTS: Record<string, DialogueLine[]> = {
     { speaker: 'guojia', text: '옳습니다. 졸병은 두어도 좋습니다 — 장각을 베면 무리는 스스로 흩어집니다.' },
     { speaker: 'caocao', text: '이번 싸움으로 황건은 끝난다. 전군, 산을 넘어라!' },
   ],
+
+  // s10 — 제1부 개막. 동탁 전횡과 반동탁 연합 결성
+  coalition: [
+    { speaker: null, text: '황건이 스러진 자리에, 서량에서 올라온 동탁이 낙양을 틀어쥐었다.' },
+    { speaker: null, text: '황제를 갈아치우고 태후를 죽인 그 손에, 조정은 숨소리조차 내지 못했다.' },
+    { speaker: 'caocao', text: '역적 하나를 치우니 더 큰 역적이 들어앉았군. 격문을 띄웠다.' },
+    { speaker: 'xunyu', text: '열여덟 진의 제후가 응했습니다. 맹주는 원소, 선봉은 손견입니다.' },
+    { speaker: 'xiahoudun', text: '열여덟이라. 머릿수는 좋은데 저마다 딴 주머니를 차고 있소.' },
+    { speaker: 'guojia', text: '동탁은 사수관에 화웅을 세웠습니다. 관 앞에서 이미 제후의 장수 넷이 베였습니다.' },
+    { speaker: 'dianwei', text: '그럼 다섯 번째는 제가 서겠습니다.' },
+    { speaker: 'caocao', text: '문은 하나뿐이다. 화웅을 관 뒤로 몰아넣고, 문이 열리거든 단숨에 들어간다.' },
+  ],
+
+  // s11 — 사수관 함락 후 호로관(여포)
+  toHulao: [
+    { speaker: null, text: '사수관이 열렸다. 화웅의 목이 연합의 진문에 걸렸다.' },
+    { speaker: 'xiahouyuan', text: '관을 넘었는데도 제후들은 술잔만 돌리고 있습니다. 진군할 기색이 없습니다.' },
+    { speaker: 'guojia', text: '동탁이 호로관으로 물러났습니다. 이번에는 여포가 직접 나섰습니다.' },
+    { speaker: 'xunyu', text: '여포입니다. 방천화극에 적토마, 사람으로 셈할 상대가 아닙니다.' },
+    { speaker: 'xiahoudun', text: '사람이든 귀신이든 창에 찔리면 피가 나오오.' },
+    { speaker: 'caocao', text: '길이 좁다. 여포는 저 협로로 혼자 밀고 내려올 것이다 — 그게 저자의 성미다.' },
+    { speaker: 'guojia', text: '오히려 기회입니다. 좁은 목에 가두고 여럿이 에워싸십시오.' },
+    { speaker: 'caocao', text: '여포만 꺾으면 관은 스스로 닫힌다. 전군, 협로로!' },
+  ],
+
+  // s12 — c01에서 회군을 고른 갈래
+  retreat: [
+    { speaker: 'caocao', text: '…멈춘다. 전군, 말머리를 돌려라.' },
+    { speaker: 'xiahoudun', text: '맹덕! 저 불길이 보이지 않소? 지금이 아니면 언제란 말이오!' },
+    { speaker: 'caocao', text: '보인다. 그러니 멈추는 것이다. 우리 군만으로 형양의 좁은 길을 지날 수는 없다.' },
+    { speaker: 'guojia', text: '옳은 판단입니다. 서영이 이미 길목에 매복을 깔았다는 보고가 있었습니다.' },
+    { speaker: 'xunyu', text: '연합은 어차피 흩어집니다. 남는 것은 우리 군의 병력뿐입니다.' },
+    { speaker: null, text: '낙양은 사흘 밤을 탔다. 조조의 군세는 그 불빛을 등지고 물러났다.' },
+    { speaker: 'caocao', text: '오늘 쫓지 못한 것은 훗날 갚는다. 반드시 갚는다.' },
+  ],
+
+  // s13 — 제1부 종장 (게이지 분기 문구는 표시 계층 몫)
+  chapterEnd: [
+    { speaker: null, text: '동탁은 장안으로 옮겨 앉았고, 반동탁 연합은 한 해를 넘기지 못하고 흩어졌다.' },
+    { speaker: 'xunyu', text: '맹주부터가 제 땅을 늘리는 데 바빴습니다. 처음부터 한마음이었던 적이 없습니다.' },
+    { speaker: 'guojia', text: '그래도 얻은 것이 있습니다. 이제 천하는 조조라는 이름을 압니다.' },
+    { speaker: 'xiahoudun', text: '이름값은 창으로 지키는 거요. 병사를 더 모읍시다.' },
+    { speaker: 'caocao', text: '연합은 끝났다. 이제부터는 남의 격문이 아니라 내 깃발로 움직인다.' },
+    { speaker: 'dianwei', text: '어디로 가든 앞장은 제 자리입니다.' },
+    { speaker: 'caocao', text: '연주로 간다. 땅을 얻고, 군을 기르고, 다시 낙양을 본다.' },
+    { speaker: null, text: '— 제1부 「패왕 탄생」 완 —' },
+  ],
 }

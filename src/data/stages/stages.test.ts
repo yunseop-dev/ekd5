@@ -13,6 +13,9 @@ import { STAGES } from './index'
 import { STAGE_01 } from './stage01'
 import { STAGE_02 } from './stage02'
 import { STAGE_03 } from './stage03'
+import { STAGE_04 } from './stage04'
+import { STAGE_05 } from './stage05'
+import { STAGE_06 } from './stage06'
 
 /** 아군도 AI로 조작해 전투를 완주시키는 헬퍼 */
 function simulate(state: BattleState, maxRounds: number, onTurnStart?: (s: BattleState) => void): BattleState {
@@ -170,7 +173,7 @@ describe('스테이지 3 — 황건 본진 소탕', () => {
     expect(grown.units.find((u) => u.isBoss)!.hp).toBe(0)
   })
 
-  it('출진 명단으로 시작하면 슬롯에 배치되고 적 배치는 그대로다', () => {
+  it('출진 명단으로 시작하면 슬롯에 배치되고 적 배치는 그대로다 (stage03)', () => {
     const state = startBattle(STAGE_03, 1, undefined, ['caocao', 'dianwei', 'xunyu', 'guojia'])
     const players = livingUnits(state, 'player')
     expect(players.map((u) => u.officerId)).toEqual(['caocao', 'dianwei', 'xunyu', 'guojia'])
@@ -178,5 +181,92 @@ describe('스테이지 3 — 황건 본진 소탕', () => {
     const boss = state.units.find((u) => u.isBoss)!
     expect(boss.officerId).toBe('zhangJiao')
     expect(boss.pos).toEqual({ x: 7, y: 1 })
+  })
+})
+
+// ---------- 제1부 「패왕 탄생」 (v0.7) ----------
+
+/** 스테이지 클리어 로스터 근사 — 지정 레벨 + 장수 초기 장비 */
+const rosterAt = (stage: typeof STAGE_04, level: number) =>
+  stage.units
+    .filter((u) => u.faction === 'player')
+    .map((u) => ({
+      officerId: u.officerId,
+      level,
+      exp: 0,
+      equipment: toEquipmentMap(OFFICERS[u.officerId].initialEquipment),
+      statBonus: {},
+    }))
+
+describe('스테이지 4 — 사수관 전투', () => {
+  it('관문 구조: 성문은 하나뿐이고 보스(화웅)는 그 뒤에 선다', () => {
+    const gates: string[] = []
+    for (let y = 0; y < STAGE_04.map.height; y++) {
+      for (let x = 0; x < STAGE_04.map.width; x++) {
+        if (STAGE_04.map.tiles[y][x] === 'gate') gates.push(`${x},${y}`)
+      }
+    }
+    expect(gates).toEqual(['11,5'])
+    const boss = STAGE_04.units.find((u) => u.isBoss)!
+    expect(boss.officerId).toBe('huaXiong')
+    expect(boss.pos).toEqual({ x: 12, y: 5 }) // 성문 바로 뒤
+  })
+
+  it('턴 3에 관 안쪽 증원이 들어온다', () => {
+    const spawnsAtTurn: Record<number, number> = {}
+    simulate(startBattle(STAGE_04, 42, rosterAt(STAGE_04, 7)), 400, (s) => {
+      spawnsAtTurn[s.turn] = s.units.length
+    })
+    if (spawnsAtTurn[3] !== undefined) {
+      expect(spawnsAtTurn[3]).toBeGreaterThanOrEqual(STAGE_04.units.length + 2)
+    }
+  })
+
+  it('stage03 클리어 로스터(Lv7 + 장비)면 관문을 뚫고 승리한다', () => {
+    // 밸런스 기준선 — 직전 스테이지를 클리어한 실플레이 조건에서 이길 수 있어야 한다
+    const grown = simulate(startBattle(STAGE_04, 42, rosterAt(STAGE_04, 7)), 400)
+    expect(grown.result).toBe('victory')
+  })
+
+  it('장수 기본 레벨로도 크래시 없이 승패가 난다', () => {
+    expect(['victory', 'defeat']).toContain(simulate(startBattle(STAGE_04, 7), 400).result)
+  })
+})
+
+describe('스테이지 5 — 호로관 전투', () => {
+  it('여포는 첫 턴부터 밀고 나오는 보스이고 승리조건은 여포 격파뿐이다', () => {
+    const boss = STAGE_05.units.find((u) => u.isBoss)!
+    expect(boss.officerId).toBe('lüBu')
+    expect(boss.behavior).toBe('pursue')
+    expect(STAGE_05.victory).toEqual([{ type: 'defeatBoss' }])
+    // 전멸시키지 않아도 이긴다 — 원작 "여포 퇴각" 재현
+    expect(STAGE_05.victory.some((v) => v.type === 'annihilation')).toBe(false)
+  })
+
+  it('AI vs AI 시뮬레이션이 크래시 없이 승패를 낸다 (도전적 난이도 — 양쪽 허용)', () => {
+    expect(['victory', 'defeat']).toContain(simulate(startBattle(STAGE_05, 42, rosterAt(STAGE_05, 8)), 400).result)
+    expect(['victory', 'defeat']).toContain(simulate(startBattle(STAGE_05, 7), 400).result)
+  })
+})
+
+describe('스테이지 6 — 동탁 추격전', () => {
+  it('초기 적은 미끼 규모지만 2단 증원으로 8기 이상이 더 나온다', () => {
+    const initial = STAGE_06.units.filter((u) => u.faction === 'enemy')
+    expect(initial.length).toBeGreaterThanOrEqual(4)
+    expect(initial.length).toBeLessThanOrEqual(5)
+    const waves = STAGE_06.reinforcements
+    expect(waves.map((w) => w.trigger)).toEqual([
+      { type: 'turnStart', turn: 2 },
+      { type: 'turnStart', turn: 3 },
+    ])
+    expect(waves.reduce((n, w) => n + w.units.length, 0)).toBeGreaterThanOrEqual(8)
+    // 후방 본대는 이유가 이끈다
+    expect(waves[1].units.some((u) => u.officerId === 'liRu')).toBe(true)
+    expect(STAGE_06.victory).toEqual([{ type: 'annihilation' }])
+  })
+
+  it('AI vs AI 시뮬레이션이 크래시 없이 승패를 낸다 (고난도 — 양쪽 허용)', () => {
+    expect(['victory', 'defeat']).toContain(simulate(startBattle(STAGE_06, 42, rosterAt(STAGE_06, 9)), 600).result)
+    expect(['victory', 'defeat']).toContain(simulate(startBattle(STAGE_06, 7), 600).result)
   })
 })

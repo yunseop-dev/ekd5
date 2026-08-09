@@ -123,4 +123,59 @@ export const OFFICERS: Record<string, OfficerDef> = {
     initialEquipment: { accessory: 'taipingYaoshu' },
     level: 6,
   },
+
+  // ---- 적군 (동탁군 · 서량병) ----
+  // 황건적과 달리 정규군이다 — 잡병도 레벨 4에 방어구를 갖추고, 부장급은 2단계 무기를 든다.
+  westInfantry: {
+    id: 'westInfantry',
+    name: '서량보병',
+    stats: { str: 66, ldr: 56, int: 22, agi: 52, luck: 44 },
+    classId: 'heavyInfantry',
+    initialEquipment: { weapon: 'woodSword', armor: 'leatherArmor' },
+    level: 4,
+  },
+  westCavalry: {
+    id: 'westCavalry',
+    name: '서량기병',
+    stats: { str: 70, ldr: 54, int: 22, agi: 64, luck: 46 },
+    classId: 'lightCavalry',
+    initialEquipment: { weapon: 'woodSpear', armor: 'leatherArmor' },
+    level: 4,
+  },
+  westArcher: {
+    id: 'westArcher',
+    name: '서량궁병',
+    stats: { str: 64, ldr: 48, int: 26, agi: 60, luck: 44 },
+    classId: 'archer',
+    initialEquipment: { weapon: 'woodBow', armor: 'leatherArmor' },
+    level: 4,
+  },
+  // 사수관 수문장 — 관 앞에서 제후의 장수들을 연달아 벤 보스급 무장
+  huaXiong: {
+    id: 'huaXiong',
+    name: '화웅',
+    stats: { str: 88, ldr: 74, int: 40, agi: 76, luck: 58 },
+    classId: 'lightCavalry',
+    initialEquipment: { weapon: 'bronzeSpear', armor: 'leatherArmor' },
+    level: 7,
+  },
+  // 동탁의 사위이자 당대 최강 — 제1부에서 정면으로 이길 수 없게 설계된 벽
+  lüBu: {
+    id: 'lüBu',
+    name: '여포',
+    stats: { str: 98, ldr: 80, int: 30, agi: 94, luck: 70 },
+    classId: 'lightCavalry',
+    // 방천화극과 적토마를 함께 지닌다. 적토마만 전리품으로 떨어진다(극은 원작처럼 끝까지 여포의 것).
+    initialEquipment: { weapon: 'fangtianHalberd', armor: 'bronzeArmor', accessory: 'chituma' },
+    level: 10,
+  },
+  // 동탁의 모사 — 낙양 방화와 천도를 진언한 책사
+  liRu: {
+    id: 'liRu',
+    name: '이유',
+    stats: { str: 26, ldr: 60, int: 92, agi: 62, luck: 56 },
+    classId: 'strategist',
+    initialEquipment: { weapon: 'bambooFan', armor: 'clothRobe' },
+    level: 7,
+  },
 }

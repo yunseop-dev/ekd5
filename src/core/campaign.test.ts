@@ -7,12 +7,17 @@ import { OFFICERS } from '../data/officers'
 import { STAGES } from '../data/stages'
 import { STORY_SCRIPTS } from '../data/story'
 import { livingUnits, startBattle } from './battle'
-import type { GrowthSnapshot, RosterEntry } from './campaign'
+import type { CampaignNode, GrowthSnapshot, RosterEntry } from './campaign'
 import {
   applyVictory,
   CAMPAIGN_NODES,
+  clampGauge,
+  completeChoice,
   completeStory,
   currentNode,
+  GAUGE_INITIAL,
+  GAUGE_MAX,
+  GAUGE_MIN,
   growthSummary,
   INITIAL_GOLD,
   isCampaignFinished,
@@ -47,7 +52,7 @@ const unit = (state: BattleState, officerId: string): UnitState =>
 describe('newCampaign', () => {
   it('아군 6명이 장수 기본 레벨 / 경험치 0으로 편성된다', () => {
     const campaign = newCampaign()
-    expect(campaign.version).toBe(3)
+    expect(campaign.version).toBe(4)
     expect(campaign.roster.map((r) => r.officerId)).toEqual(PLAYER_OFFICER_IDS)
     for (const entry of campaign.roster) {
       expect(entry.level).toBe(OFFICERS[entry.officerId].level)
@@ -80,24 +85,68 @@ describe('newCampaign', () => {
 })
 
 describe('캠페인 노드', () => {
-  it('첫 노드부터 next를 따라가면 모든 노드를 지나 null로 끝난다', () => {
+  /** 첫 노드부터 next를 따라간다. choice 노드에서는 optionIndex번 갈래를 탄다 */
+  const walk = (optionIndex: number): string[] => {
     const visited: string[] = []
-    let node = currentNode(newCampaign())
+    let node: CampaignNode | null = currentNode(newCampaign())
     while (node) {
       visited.push(node.id)
-      node = node.next ? (CAMPAIGN_NODES.find((n) => n.id === node!.next) ?? null) : null
+      const nextId: string | null =
+        node.type === 'choice' ? node.options[optionIndex].next : node.type === 'end' ? null : node.next
+      node = nextId ? (CAMPAIGN_NODES.find((n) => n.id === nextId) ?? null) : null
     }
-    // story ↔ battle 교대 체인 (battle id n01/n02는 v0.3 세이브 호환용으로 유지)
-    expect(visited).toEqual(['s00', 'n01', 's01', 'n02', 's02', 'n03'])
-    expect(visited.length).toBe(CAMPAIGN_NODES.length)
+    return visited
+  }
+
+  it('추격 갈래로 따라가면 동탁 추격전을 거쳐 종막에 닿는다', () => {
+    expect(walk(0)).toEqual([
+      's00', 'n01', 's01', 'n02', 's02', 'n03',
+      's10', 'n11', 's11', 'n12', 'c01', 'n13', 's13', 'fin',
+    ])
   })
 
-  it('battle 노드는 stage01→03, story 노드는 스크립트를 가리킨다', () => {
+  it('회군 갈래로 따라가면 전투 노드(n13)를 건너뛰고 종막에 닿는다', () => {
+    const visited = walk(1)
+    expect(visited).toEqual([
+      's00', 'n01', 's01', 'n02', 's02', 'n03',
+      's10', 'n11', 's11', 'n12', 'c01', 's12', 's13', 'fin',
+    ])
+    expect(visited).not.toContain('n13')
+  })
+
+  it('두 갈래를 합치면 모든 노드가 정확히 한 번씩 등장한다 (고아 노드 없음)', () => {
+    const all = new Set([...walk(0), ...walk(1)])
+    expect([...all].sort()).toEqual(CAMPAIGN_NODES.map((n) => n.id).sort())
+  })
+
+  it('battle 노드는 stage01→06, story 노드는 스크립트를 가리킨다', () => {
     const battles = CAMPAIGN_NODES.filter((n) => n.type === 'battle')
-    expect(battles.map((n) => n.stageId)).toEqual(['stage01', 'stage02', 'stage03'])
+    expect(battles.map((n) => n.stageId)).toEqual([
+      'stage01', 'stage02', 'stage03', 'stage04', 'stage05', 'stage06',
+    ])
     const stories = CAMPAIGN_NODES.filter((n) => n.type === 'story')
-    expect(stories.map((n) => n.scriptId)).toEqual(['intro', 'afterStage01', 'afterStage02'])
+    expect(stories.map((n) => n.scriptId)).toEqual([
+      'intro', 'afterStage01', 'afterStage02', 'coalition', 'toHulao', 'retreat', 'chapterEnd',
+    ])
     for (const node of stories) expect(node.title.length).toBeGreaterThan(0)
+  })
+
+  it('모든 next/선택지 목적지가 실제 노드를 가리킨다', () => {
+    const ids = new Set(CAMPAIGN_NODES.map((n) => n.id))
+    for (const node of CAMPAIGN_NODES) {
+      if (node.type === 'choice') {
+        expect(node.options.length, node.id).toBeGreaterThanOrEqual(2)
+        for (const option of node.options) {
+          expect(ids.has(option.next), `${node.id} → ${option.next}`).toBe(true)
+          expect(option.text.length, node.id).toBeGreaterThan(0)
+        }
+        expect(node.prompt.length, node.id).toBeGreaterThan(0)
+      } else if (node.type !== 'end' && node.next !== null) {
+        expect(ids.has(node.next), `${node.id} → ${node.next}`).toBe(true)
+      }
+    }
+    // 종막은 정확히 하나
+    expect(CAMPAIGN_NODES.filter((n) => n.type === 'end').map((n) => n.id)).toEqual(['fin'])
   })
 
   it('stageForNode가 실제 스테이지 데이터를 돌려준다', () => {
@@ -321,20 +370,106 @@ describe('applyVictory', () => {
     expect(twice.clearedStages).toEqual(['stage01'])
   })
 
-  it('마지막 노드를 클리어하면 nodeId는 그대로 두고 완주 판정이 켜진다', () => {
-    const stageIds = ['stage01', 'stage02', 'stage03']
-    let campaign = completeStory(newCampaign()) // s00 → n01
-    expect(isCampaignFinished(campaign)).toBe(false)
-
-    for (const stageId of stageIds) {
-      campaign = applyVictory(campaign, startBattle(mkStage({ id: stageId }), 1, campaign.roster))
-      expect(isCampaignFinished(campaign), stageId).toBe(stageId === 'stage03')
-      campaign = completeStory(campaign) // 후속 story 노드 소화 (마지막 전투 뒤에는 no-op)
+  /**
+   * 캠페인 전체를 자동 완주시킨다 — battle 노드는 즉시 승리, story는 소화,
+   * choice는 optionIndex번 갈래. end 노드에 닿으면 멈춘다.
+   */
+  const playThrough = (optionIndex: number) => {
+    let campaign = newCampaign()
+    for (let guard = 0; guard < 50 && !isCampaignFinished(campaign); guard++) {
+      const node = currentNode(campaign)!
+      if (node.type === 'battle') {
+        campaign = applyVictory(campaign, startBattle(mkStage({ id: node.stageId }), 1, campaign.roster))
+      } else if (node.type === 'story') {
+        campaign = completeStory(campaign)
+      } else if (node.type === 'choice') {
+        campaign = completeChoice(campaign, optionIndex)
+      }
     }
+    return campaign
+  }
 
-    expect(campaign.nodeId).toBe('n03')
-    expect(campaign.clearedStages).toEqual(stageIds)
+  it('추격 갈래를 끝까지 진행하면 6전투를 모두 클리어하고 종막에 닿는다', () => {
+    const campaign = playThrough(0)
+    expect(campaign.nodeId).toBe('fin')
     expect(isCampaignFinished(campaign)).toBe(true)
+    expect(campaign.clearedStages).toEqual([
+      'stage01', 'stage02', 'stage03', 'stage04', 'stage05', 'stage06',
+    ])
+    expect(campaign.gauge).toBe(GAUGE_INITIAL + 10) // 추격 = 사실 +10
+  })
+
+  it('회군 갈래를 끝까지 진행하면 stage06을 건너뛴 채 종막에 닿는다', () => {
+    const campaign = playThrough(1)
+    expect(campaign.nodeId).toBe('fin')
+    expect(isCampaignFinished(campaign)).toBe(true)
+    expect(campaign.clearedStages).toEqual(['stage01', 'stage02', 'stage03', 'stage04', 'stage05'])
+    expect(campaign.gauge).toBe(GAUGE_INITIAL - 10) // 회군 = 가상 -10
+  })
+
+  it('보상금은 노드에 박힌 값의 합이다 (추격 갈래)', () => {
+    // 추격 갈래는 전투 노드를 하나도 건너뛰지 않는다
+    const rewards = CAMPAIGN_NODES.filter((n) => n.type === 'battle').reduce((sum, n) => sum + n.rewardGold, 0)
+    expect(playThrough(0).gold).toBe(INITIAL_GOLD + rewards)
+  })
+})
+
+describe('completeChoice', () => {
+  /** 선택지 노드(c01) 앞에 선 캠페인 */
+  const atChoice = (gauge = GAUGE_INITIAL) => ({ ...newCampaign(), nodeId: 'c01', gauge })
+
+  it('첫 번째 갈래(추격)는 n13으로 가며 게이지가 사실 쪽으로 +10', () => {
+    const next = completeChoice(atChoice(), 0)
+    expect(next.nodeId).toBe('n13')
+    expect(currentNode(next)!.type).toBe('battle')
+    expect(next.gauge).toBe(GAUGE_INITIAL + 10)
+  })
+
+  it('두 번째 갈래(회군)는 전투를 건너뛰고 s12로 가며 게이지가 가상 쪽으로 -10', () => {
+    const next = completeChoice(atChoice(), 1)
+    expect(next.nodeId).toBe('s12')
+    expect(currentNode(next)!.type).toBe('story')
+    expect(next.gauge).toBe(GAUGE_INITIAL - 10)
+  })
+
+  it('게이지는 0~100으로 잘린다', () => {
+    expect(completeChoice(atChoice(GAUGE_MAX - 2), 0).gauge).toBe(GAUGE_MAX)
+    expect(completeChoice(atChoice(GAUGE_MIN + 3), 1).gauge).toBe(GAUGE_MIN)
+    expect(clampGauge(-40)).toBe(GAUGE_MIN)
+    expect(clampGauge(140)).toBe(GAUGE_MAX)
+    expect(clampGauge(50.9)).toBe(50)
+    expect(clampGauge(Number.NaN)).toBe(GAUGE_INITIAL)
+  })
+
+  it('choice가 아닌 노드 / 범위 밖 인덱스면 원본을 그대로 반환한다 (no-op)', () => {
+    const story = newCampaign() // s00 = story
+    expect(completeChoice(story, 0)).toBe(story)
+    const choice = atChoice()
+    expect(completeChoice(choice, 2)).toBe(choice)
+    expect(completeChoice(choice, -1)).toBe(choice)
+    expect(completeChoice(choice, 0.5)).toBe(choice)
+    const broken = { ...newCampaign(), nodeId: 'nope' }
+    expect(completeChoice(broken, 0)).toBe(broken)
+  })
+
+  it('원본을 변형하지 않고 로스터/창고를 복사해 넘긴다', () => {
+    const campaign = atChoice()
+    const snapshot = JSON.stringify(campaign)
+    const next = completeChoice(campaign, 0)
+    expect(JSON.stringify(campaign)).toBe(snapshot)
+    expect(next.roster).toEqual(campaign.roster)
+    expect(next.roster).not.toBe(campaign.roster)
+    expect(next.roster[0]).not.toBe(campaign.roster[0])
+    expect(next.inventory).not.toBe(campaign.inventory)
+  })
+
+  it('completeStory는 종막(end) 노드로도 전진한다', () => {
+    const atFinalStory = { ...newCampaign(), nodeId: 's13' }
+    const done = completeStory(atFinalStory)
+    expect(done.nodeId).toBe('fin')
+    expect(isCampaignFinished(done)).toBe(true)
+    // 종막에서는 더 이상 전진하지 않는다
+    expect(completeStory(done)).toBe(done)
   })
 })
 
@@ -379,12 +514,41 @@ describe('validateCampaign', () => {
     expect(validateCampaign(null)).toBeNull()
     expect(validateCampaign(undefined)).toBeNull()
     expect(validateCampaign('{}')).toBeNull()
-    expect(validateCampaign({ ...base, version: 4 })).toBeNull()
+    expect(validateCampaign({ ...base, version: 5 })).toBeNull()
     expect(validateCampaign({ ...base, nodeId: 1 })).toBeNull()
     expect(validateCampaign({ ...base, roster: 'nope' })).toBeNull()
     expect(validateCampaign({ ...base, roster: [{ officerId: 'caocao', level: 3 }] })).toBeNull()
     expect(validateCampaign({ ...base, roster: [{ officerId: 'caocao', level: 'x', exp: 0 }] })).toBeNull()
     expect(validateCampaign({ ...base, roster: [null] })).toBeNull()
     expect(validateCampaign({ ...base, clearedStages: [1] })).toBeNull()
+  })
+
+  it('v3 세이브는 게이지 중립(50)으로 v4에 승계된다', () => {
+    const { gauge: _drop, ...v3 } = newCampaign()
+    const restored = validateCampaign({ ...v3, version: 3 })!
+    expect(restored.version).toBe(4)
+    expect(restored.gauge).toBe(GAUGE_INITIAL)
+    // 나머지 필드는 손대지 않는다
+    expect(restored.roster).toEqual(newCampaign().roster)
+    expect(restored.gold).toBe(INITIAL_GOLD)
+  })
+
+  it('v1/v2 세이브도 게이지 중립으로 승계된다', () => {
+    const base = newCampaign()
+    const v1 = validateCampaign({ version: 1, nodeId: 'n01', roster: [{ officerId: 'caocao', level: 5, exp: 0 }], clearedStages: [] })!
+    expect(v1.version).toBe(4)
+    expect(v1.gauge).toBe(GAUGE_INITIAL)
+    const v2 = validateCampaign({ ...base, version: 2, fruits: undefined, gauge: undefined })!
+    expect(v2.version).toBe(4)
+    expect(v2.gauge).toBe(GAUGE_INITIAL)
+  })
+
+  it('게이지는 0~100 정수로 잘리고, 숫자가 아니면 중립으로 되돌린다', () => {
+    const base = newCampaign()
+    expect(validateCampaign({ ...base, gauge: 250 })!.gauge).toBe(GAUGE_MAX)
+    expect(validateCampaign({ ...base, gauge: -5 })!.gauge).toBe(GAUGE_MIN)
+    expect(validateCampaign({ ...base, gauge: 77.9 })!.gauge).toBe(77)
+    expect(validateCampaign({ ...base, gauge: 'high' })!.gauge).toBe(GAUGE_INITIAL)
+    expect(validateCampaign({ ...base, gauge: Number.NaN })!.gauge).toBe(GAUGE_INITIAL)
   })
 })

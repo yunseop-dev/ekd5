@@ -48,9 +48,42 @@ export type CampaignNode =
   // rewardGold: 승리 시 지급되는 군자금. 원작은 전투별 보상금이 데이터로 박혀 있다.
   | { id: string; type: 'battle'; stageId: string; rewardGold: number; next: string | null }
   | { id: string; type: 'story'; title: string; scriptId: string; next: string | null }
+  // 선택지 노드 — 원작 "사실/가상 게이지"를 움직이며 후속 노드를 가른다 (campaign-ux.md 1부 §5).
+  // 원작 03 동탁 추격전처럼 "그만둔다"를 고르면 전투 노드를 통째로 건너뛴다.
+  | {
+      id: string
+      type: 'choice'
+      title: string
+      prompt: string
+      speaker: string | null
+      options: CampaignChoiceOption[]
+    }
+  | { id: string; type: 'end'; title: string }
+
+export interface CampaignChoiceOption {
+  text: string
+  /** 게이지 증감. 양수 = 사실(史實) 쪽, 음수 = 가상 쪽. 원작 증감폭 4단계(2/5/10/20) */
+  gaugeDelta: number
+  next: string
+}
+
+/** 사실-가상 게이지 범위 — 합 100 고정이라 한쪽 값만 들고 다닌다 (빨강=사실 / 파랑=가상) */
+export const GAUGE_MIN = 0
+export const GAUGE_MAX = 100
+/** 시작값 — 어느 쪽으로도 기울지 않은 중립 */
+export const GAUGE_INITIAL = 50
+/** 분기 임계 — 한쪽이 85 이상(=반대쪽 15 이하)이면 진행 분기가 확정 방향으로 굳는다 */
+export const GAUGE_THRESHOLD_HIGH = 85
+export const GAUGE_THRESHOLD_LOW = 15
+
+/** 게이지를 0~100 정수로 자른다 */
+export function clampGauge(value: number): number {
+  if (!Number.isFinite(value)) return GAUGE_INITIAL
+  return Math.min(GAUGE_MAX, Math.max(GAUGE_MIN, Math.trunc(value)))
+}
 
 export interface CampaignState {
-  version: 3
+  version: 4
   nodeId: string
   roster: RosterEntry[]
   clearedStages: string[]
@@ -60,6 +93,11 @@ export interface CampaignState {
   inventory: EquipInstance[]
   /** 보유 열매 id 목록 (중복 허용) */
   fruits: string[]
+  /**
+   * 사실-가상 게이지 (0~100 정수). 높을수록 사실(빨강), 낮을수록 가상(파랑).
+   * 합 100 고정이므로 가상 쪽 값은 100 - gauge로 얻는다.
+   */
+  gauge: number
 }
 
 /** 초기 군자금 — 서장 1단계 상점에서 tier1 장비 1~2점을 살 수 있는 수준 (설계값) */
@@ -70,7 +108,8 @@ export const FRUIT_STAT_BONUS = 2
 
 // 원작은 story|battle 노드의 조건부 DAG — 전투 없는 노드, 전투 뒤 후속 노드,
 // 선택지/클리어 방식에 따른 스테이지 스킵이 존재한다 (campaign-ux.md 1부 §3.3).
-// v0.4는 story↔battle 교대 선형 체인까지. 분기/스킵은 next를 조건부로 바꿔 얹는다.
+// v0.7에서 제1부(반동탁 연합) 구간과 선택지 분기(c01)를 얹었다:
+//   c01에서 "그만둔다"(회군)를 고르면 동탁 추격전(n13) 전투 노드를 통째로 건너뛴다 — 원작 03 스킵 재현.
 // battle 노드 id(n01/n02)는 v0.3 세이브 호환을 위해 유지한다.
 export const CAMPAIGN_NODES: CampaignNode[] = [
   { id: 's00', type: 'story', title: '의용군 결성', scriptId: 'intro', next: 'n01' },
@@ -78,7 +117,30 @@ export const CAMPAIGN_NODES: CampaignNode[] = [
   { id: 's01', type: 'story', title: '관문을 지켜라', scriptId: 'afterStage01', next: 'n02' },
   { id: 'n02', type: 'battle', stageId: 'stage02', rewardGold: 400, next: 's02' },
   { id: 's02', type: 'story', title: '황건 본진', scriptId: 'afterStage02', next: 'n03' },
-  { id: 'n03', type: 'battle', stageId: 'stage03', rewardGold: 600, next: null },
+  { id: 'n03', type: 'battle', stageId: 'stage03', rewardGold: 600, next: 's10' },
+  // ---- 제1부 「패왕 탄생」 — 반동탁 연합 ----
+  { id: 's10', type: 'story', title: '반동탁 격문', scriptId: 'coalition', next: 'n11' },
+  { id: 'n11', type: 'battle', stageId: 'stage04', rewardGold: 700, next: 's11' },
+  { id: 's11', type: 'story', title: '호로관으로', scriptId: 'toHulao', next: 'n12' },
+  { id: 'n12', type: 'battle', stageId: 'stage05', rewardGold: 800, next: 'c01' },
+  {
+    id: 'c01',
+    type: 'choice',
+    title: '추격이냐 회군이냐',
+    prompt:
+      '동탁이 낙양을 불태우고 장안으로 도주했다. 연합의 제후들은 술잔만 기울일 뿐 아무도 움직이지 않는다.',
+    speaker: 'caocao',
+    // 원작 낙양 선택지 재현 — 실제 역사에서 조조는 홀로 추격했다(사실 루트).
+    // 증감폭 10 = 원작 4단계(2/5/10/20) 중 중상급 (campaign-ux.md 1부 §5).
+    options: [
+      { text: '지금 추격한다. 하늘이 준 기회다!', gaugeDelta: 10, next: 'n13' },
+      { text: '무리다. 훗날을 기약한다.', gaugeDelta: -10, next: 's12' },
+    ],
+  },
+  { id: 'n13', type: 'battle', stageId: 'stage06', rewardGold: 1000, next: 's13' },
+  { id: 's12', type: 'story', title: '회군', scriptId: 'retreat', next: 's13' },
+  { id: 's13', type: 'story', title: '1부 종장', scriptId: 'chapterEnd', next: 'fin' },
+  { id: 'fin', type: 'end', title: '제1부 완' },
 ]
 
 /** 초기 로스터 — 서장 클리어 후 6명 일괄 합류 커브를 압축한 구성 (campaign-ux.md 1부 §7) */
@@ -86,7 +148,7 @@ export const PLAYER_OFFICER_IDS = ['caocao', 'xiahoudun', 'dianwei', 'xiahouyuan
 
 export function newCampaign(): CampaignState {
   return {
-    version: 3,
+    version: 4,
     nodeId: CAMPAIGN_NODES[0].id,
     roster: PLAYER_OFFICER_IDS.map((officerId) => ({
       officerId,
@@ -100,6 +162,7 @@ export function newCampaign(): CampaignState {
     gold: INITIAL_GOLD,
     inventory: [],
     fruits: [],
+    gauge: GAUGE_INITIAL,
   }
 }
 
@@ -123,13 +186,36 @@ export function completeStory(campaign: CampaignState): CampaignState {
   const node = currentNode(campaign)
   if (!node || node.type !== 'story' || node.next === null) return campaign
   return {
-    version: 3,
+    version: 4,
     nodeId: node.next,
     roster: campaign.roster.map(cloneEntry),
     clearedStages: [...campaign.clearedStages],
     gold: campaign.gold,
     inventory: cloneInventory(campaign.inventory),
     fruits: [...campaign.fruits],
+    gauge: clampGauge(campaign.gauge),
+  }
+}
+
+/**
+ * 선택지 소화 → 게이지를 움직이고 고른 갈래로 전진 (원본 불변).
+ * choice 노드가 아니거나 범위 밖 인덱스면 아무 일도 하지 않고 원본을 그대로 돌려준다.
+ */
+export function completeChoice(campaign: CampaignState, optionIndex: number): CampaignState {
+  const node = currentNode(campaign)
+  if (!node || node.type !== 'choice') return campaign
+  if (!Number.isInteger(optionIndex)) return campaign
+  const option = node.options[optionIndex]
+  if (!option) return campaign
+  return {
+    version: 4,
+    nodeId: option.next,
+    roster: campaign.roster.map(cloneEntry),
+    clearedStages: [...campaign.clearedStages],
+    gold: campaign.gold,
+    inventory: cloneInventory(campaign.inventory),
+    fruits: [...campaign.fruits],
+    gauge: clampGauge(campaign.gauge + option.gaugeDelta),
   }
 }
 
@@ -141,12 +227,9 @@ const cloneEntry = (entry: RosterEntry): RosterEntry => ({
 
 const cloneInventory = (inventory: EquipInstance[]): EquipInstance[] => inventory.map((i) => ({ ...i }))
 
-/** 마지막 노드의 전투까지 클리어한 상태 */
+/** 종막(end) 노드에 도달한 상태 — 어느 갈래로 왔든 종장 story를 소화하면 켜진다 */
 export function isCampaignFinished(campaign: CampaignState): boolean {
-  const node = currentNode(campaign)
-  return (
-    node !== null && node.type === 'battle' && node.next === null && campaign.clearedStages.includes(node.stageId)
-  )
+  return currentNode(campaign)?.type === 'end'
 }
 
 /** 전투 상태에 붙어 있는 스테이지 정의 (attachStage) → 없으면 id로 조회 */
@@ -188,9 +271,9 @@ export function applyVictory(campaign: CampaignState, battleState: BattleState):
     : [...campaign.clearedStages, battleState.stageId]
 
   return {
-    version: 3,
-    // 마지막 노드면 제자리에 머문다 (isCampaignFinished로 판별)
-    nodeId: node?.next ?? campaign.nodeId,
+    version: 4,
+    // 막다른 노드(next null)나 전투 아닌 노드에서 불리면 제자리에 머문다
+    nodeId: (node?.type === 'battle' || node?.type === 'story' ? node.next : null) ?? campaign.nodeId,
     roster: campaign.roster.map((entry) => {
       const after = grown.get(entry.officerId)
       // 출진하지 않은 부대는 로스터 값 그대로. 출진했다면 레벨/경험치 + 장비 인스턴스를 회수한다.
@@ -202,6 +285,7 @@ export function applyVictory(campaign: CampaignState, battleState: BattleState):
     gold: campaign.gold + (node?.type === 'battle' ? node.rewardGold : 0),
     inventory: [...cloneInventory(campaign.inventory), ...lootFor(battleState).map(toEquipInstance)],
     fruits: [...campaign.fruits],
+    gauge: clampGauge(campaign.gauge),
   }
 }
 

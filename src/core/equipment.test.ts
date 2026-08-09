@@ -123,7 +123,8 @@ describe('EQUIPMENT 데이터', () => {
     for (const item of Object.values(EQUIPMENT)) {
       expect(item.price === null, item.id).toBe(item.isTreasure === true)
     }
-    expect(Object.values(EQUIPMENT).filter((i) => i.isTreasure).length).toBe(5)
+    // 의천검/청강검/적로/맹덕신서/태평요술서 + v0.7 방천화극/적토마
+    expect(Object.values(EQUIPMENT).filter((i) => i.isTreasure).length).toBe(7)
   })
 
   it('상점 장비 가격이 단계별 설계 구간 안에 있다', () => {
@@ -154,6 +155,27 @@ describe('EQUIPMENT 데이터', () => {
     expect(STAGES.find((s) => s.id === 'stage03')!.loot).toEqual([
       { trigger: 'bossKill', itemId: 'taipingYaoshu' },
     ])
+    expect(STAGES.find((s) => s.id === 'stage05')!.loot).toEqual([{ trigger: 'bossKill', itemId: 'chituma' }])
+  })
+
+  it('여포는 방천화극과 적토마를 들고 나오고, 떨어지는 것은 적토마뿐이다', () => {
+    // 원작 재현: 극은 끝까지 여포의 것으로 남는다 (전리품 목록에 없다)
+    const lüBu = OFFICERS.lüBu
+    expect(lüBu.initialEquipment?.weapon).toBe('fangtianHalberd')
+    expect(lüBu.initialEquipment?.accessory).toBe('chituma')
+    const loot = (STAGES.find((s) => s.id === 'stage05')!.loot ?? []).map((l) => l.itemId)
+    expect(loot).toContain('chituma')
+    expect(loot).not.toContain('fangtianHalberd')
+    // 보물 2종 데이터 정합 — 비매품·판매 불가·기병 전용
+    expect(EQUIPMENT.fangtianHalberd.classes).toEqual(['lightCavalry'])
+    expect(EQUIPMENT.fangtianHalberd.bonus).toEqual({ atk: 34, agi: 10 })
+    expect(EQUIPMENT.fangtianHalberd.growthStat).toBe('atk')
+    expect(EQUIPMENT.chituma.slot).toBe('accessory')
+    expect(EQUIPMENT.chituma.moveBonus).toBe(2)
+    for (const id of ['fangtianHalberd', 'chituma'] as const) {
+      expect(EQUIPMENT[id].price, id).toBeNull()
+      expect(EQUIPMENT[id].isTreasure, id).toBe(true)
+    }
   })
 })
 
@@ -627,7 +649,7 @@ describe('applyVictory — 보상금과 전리품', () => {
 
 // ---------- 세이브 마이그레이션 ----------
 
-describe('validateCampaign — v1/v2 → v3 승계', () => {
+describe('validateCampaign — v1/v2/v3 → v4 승계', () => {
   const v1Save = {
     version: 1,
     nodeId: 'n02',
@@ -638,10 +660,10 @@ describe('validateCampaign — v1/v2 → v3 승계', () => {
     clearedStages: ['stage01'],
   }
 
-  it('v1 세이브를 거부하지 않고 v3로 승계한다', () => {
+  it('v1 세이브를 거부하지 않고 v4로 승계한다', () => {
     const restored = validateCampaign(JSON.parse(JSON.stringify(v1Save)))!
     expect(restored).not.toBeNull()
-    expect(restored.version).toBe(3)
+    expect(restored.version).toBe(4)
     expect(restored.nodeId).toBe('n02')
     expect(restored.clearedStages).toEqual(['stage01'])
     // 성장치는 그대로 살리고, 없던 필드만 초기값으로 채운다
@@ -667,7 +689,7 @@ describe('validateCampaign — v1/v2 → v3 승계', () => {
     expect(unitOf(state, 'caocao').equipment).toEqual({})
   })
 
-  it('v3 라운드트립은 장비 인스턴스/군자금/창고/열매를 보존한다', () => {
+  it('v4 라운드트립은 장비 인스턴스/군자금/창고/열매/게이지를 보존한다', () => {
     const campaign = buyItem(equipItem(withStock(['ironSword']), 'caocao', 0), 'leatherArmor')
     const grown = {
       ...campaign,
@@ -692,7 +714,7 @@ describe('validateCampaign — v1/v2 → v3 승계', () => {
       inventory: ['woodSword', 'leatherShield'],
     }
     const restored = validateCampaign(v2Save)!
-    expect(restored.version).toBe(3)
+    expect(restored.version).toBe(4)
     expect(restored.roster[0].equipment).toEqual({
       weapon: { itemId: 'ironSword', level: 1, exp: 0 },
       armor: { itemId: 'leatherArmor', level: 1, exp: 0 },
@@ -730,7 +752,7 @@ describe('validateCampaign — v1/v2 → v3 승계', () => {
     expect(validateCampaign({ ...base, inventory: [1] })).toBeNull()
     expect(validateCampaign({ ...base, fruits: [1] })).toBeNull()
     expect(validateCampaign({ ...base, fruits: 'x' })).toBeNull()
-    expect(validateCampaign({ ...base, version: 4 })).toBeNull()
+    expect(validateCampaign({ ...base, version: 5 })).toBeNull()
   })
 
   it('망가진 장비 맵은 세이브를 버리지 않고 해당 슬롯만 떨어낸다', () => {

@@ -4,7 +4,7 @@
 
 import { openDB, type IDBPDatabase } from 'idb'
 import type { CampaignState, RosterEntry } from '../core/campaign'
-import { canEquip, currentNode, INITIAL_GOLD } from '../core/campaign'
+import { canEquip, clampGauge, currentNode, GAUGE_INITIAL, INITIAL_GOLD } from '../core/campaign'
 import type { EquipInstance, EquipmentMap, EquipSlot, OfficerStats } from '../core/types'
 import { EQUIP_EXP_PER_LEVEL, EQUIP_MAX_LEVEL_NORMAL, EQUIP_MAX_LEVEL_TREASURE } from '../core/types'
 import { EQUIPMENT } from '../data/equipment'
@@ -98,15 +98,16 @@ function normalizeStatBonus(value: unknown): Partial<OfficerStats> {
 
 /**
  * 저장된 JSON은 신뢰할 수 없다 (수동 편집/구버전) — 구조 검사 후에만 통과.
- * v1(장비/군자금 이전)·v2(무구성장 이전) 세이브는 거부하지 않고 v3로 **승계 마이그레이션**한다:
+ * v1(장비/군자금 이전)·v2(무구성장 이전)·v3(선택지/게이지 이전) 세이브는 거부하지 않고 v4로 **승계 마이그레이션**한다:
  *  - v1 → 군자금 = 초기치, 창고 = 빈 목록, 각 부대의 장비 = 빈 슬롯. 성장치(레벨/경험치)는 살린다.
  *  - v2 → 장비/창고의 문자열 id를 Lv1 인스턴스로, 열매 목록·능력치 보정은 빈 값으로 채운다.
+ *  - v3 → 사실-가상 게이지를 중립(50)으로 채운다. 선택지를 한 번도 지나지 않은 세이브와 같은 상태.
  * 병과 착용 제한 정화는 버전과 무관하게 항상 수행한다.
  */
 export function validateCampaign(data: unknown): CampaignState | null {
   if (typeof data !== 'object' || data === null) return null
   const raw = data as Record<string, unknown>
-  if (raw.version !== 1 && raw.version !== 2 && raw.version !== 3) return null
+  if (raw.version !== 1 && raw.version !== 2 && raw.version !== 3 && raw.version !== 4) return null
   const legacy = raw.version === 1 // v1 = 장비/경제 도입 이전
   if (typeof raw.nodeId !== 'string') return null
   if (!Array.isArray(raw.roster) || !Array.isArray(raw.clearedStages)) return null
@@ -130,6 +131,10 @@ export function validateCampaign(data: unknown): CampaignState | null {
     if (!Array.isArray(raw.fruits) || !raw.fruits.every((f) => typeof f === 'string')) return null
     fruits = [...(raw.fruits as string[])]
   }
+
+  // v4 전용 필드 — 없으면 중립(50)으로 승계. 숫자면 0~100 정수로 잘라 넣는다.
+  // 손상된 값(문자열/NaN)은 세이브를 거부하지 않고 중립으로 되돌린다 — 게이지 하나로 세이브를 버릴 이유가 없다.
+  const gauge = typeof raw.gauge === 'number' ? clampGauge(raw.gauge) : GAUGE_INITIAL
 
   const roster: RosterEntry[] = []
   for (const item of raw.roster) {
@@ -158,20 +163,22 @@ export function validateCampaign(data: unknown): CampaignState | null {
   }
 
   return {
-    version: 3,
+    version: 4,
     nodeId: raw.nodeId,
     roster,
     clearedStages: raw.clearedStages as string[],
     gold,
     inventory,
     fruits,
+    gauge,
   }
 }
 
 function stageNameOf(campaign: CampaignState): string {
   const node = currentNode(campaign)
   if (!node) return ''
-  if (node.type === 'story') return node.title
+  // battle 이외(story/choice/end)는 전부 제목을 그대로 쓴다
+  if (node.type !== 'battle') return node.title
   return STAGES.find((s) => s.id === node.stageId)?.name ?? node.stageId
 }
 
