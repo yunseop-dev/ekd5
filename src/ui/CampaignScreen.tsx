@@ -21,6 +21,7 @@ import { OFFICERS } from '../data/officers'
 import { STRATEGIES } from '../data/strategies'
 import { CLASS_ICON } from './BattleBoard'
 import { CampFacilities } from './CampFacilities'
+import { GaugeBar } from './GaugeBar'
 import './campaign.css'
 
 // ---------- v0.6 장비 개체 / 열매 보정 헬퍼 ----------
@@ -102,6 +103,26 @@ function victoryText(cond: VictoryCondition): string {
   }
 }
 
+/** 엔딩 문구 — 사실-가상 게이지 우세에 따라 3종 분기 (campaign-ux.md 1부 §5) */
+function endingText(gauge: number): { head: string; body: string } {
+  if (gauge >= 60) {
+    return {
+      head: '역사는 그대의 길을 따랐다',
+      body: `사실 우세 (사실 ${gauge} · 가상 ${100 - gauge}) — 기록된 그대로의 결말에 이르렀습니다.`,
+    }
+  }
+  if (gauge <= 40) {
+    return {
+      head: '그대는 새로운 역사를 썼다',
+      body: `가상 우세 (가상 ${100 - gauge} · 사실 ${gauge}) — 기록에 없던 길이 열렸습니다.`,
+    }
+  }
+  return {
+    head: '역사는 아직 어느 쪽도 아니다',
+    body: `사실 ${gauge} · 가상 ${100 - gauge} — 두 길의 경계에서 이야기가 멈춥니다.`,
+  }
+}
+
 function enemyCount(stage: StageDef): { initial: number; reinforcement: number } {
   return {
     initial: stage.units.filter((u) => u.faction === 'enemy').length,
@@ -144,6 +165,7 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle, onUpdate 
           {savedAt ? `자동 저장됨 · ${new Date(savedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}` : ''}
         </span>
         <span className="gold-display">금 {campaign.gold.toLocaleString('ko-KR')}</span>
+        <GaugeBar gauge={campaign.gauge} />
         <button className="title-btn" onClick={() => setFacilitiesOpen(true)}>
           막사 (상점·창고)
         </button>
@@ -158,10 +180,29 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle, onUpdate 
 
       <div className="campaign-grid">
         <section className="panel-box next-battle">
-          {finished ? (
+          {finished || node?.type === 'end' ? (
+            // 클리어 — 사실-가상 게이지 우세에 따라 문구가 갈린다
+            (() => {
+              const ending = endingText(campaign.gauge)
+              return (
+                <>
+                  <h3>{node?.type === 'end' ? node.title : '시나리오 클리어!'}</h3>
+                  <div className="battle-name">{ending.head}</div>
+                  <p>{ending.body}</p>
+                  <div className="ending-gauge">
+                    <GaugeBar gauge={campaign.gauge} />
+                  </div>
+                </>
+              )
+            })()
+          ) : node?.type === 'choice' ? (
             <>
-              <h3>시나리오 클리어!</h3>
-              <p>모든 전투에서 승리했습니다. 다음 장은 준비 중입니다.</p>
+              <h3>결단</h3>
+              <div className="battle-name">{node.title}</div>
+              <p className="dim">선택에 따라 사실-가상 게이지가 움직입니다.</p>
+              <button className="sortie-btn" onClick={onSortie} autoFocus>
+                결단을 내린다
+              </button>
             </>
           ) : node?.type === 'story' ? (
             <>

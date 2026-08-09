@@ -129,6 +129,111 @@
 
 .gold-display { color: #d8b96a; font-weight: 700; font-size: 14px; }
 
+/* ---------- 사실-가상 게이지 (합 100 고정, 임계 85/15 → 열세측 노랑) ---------- */
+
+.gauge-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.gauge-label { letter-spacing: 0.04em; }
+.gauge-label.fiction { color: #8ab4d8; }
+.gauge-label.fact { color: #e09a8a; }
+
+.gauge-track {
+  display: flex;
+  width: 120px;
+  height: 8px;
+  background: #14100b;
+  border: 1px solid #4a4132;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.gauge-seg { height: 100%; }
+.gauge-seg.fiction { background: #2d5da8; }
+.gauge-seg.fact { background: #a83a2d; }
+/* 임계 도달 시 열세측만 노랑 — 우세측 색은 그대로 둔다 */
+.gauge-seg.warn { background: #e0c04a; }
+
+/* ---------- 선택지 화면 (원작 실측: 초상 좌측 + 번호 스택 + 전체폭 파란 커서 바) ---------- */
+
+.choice-screen {
+  justify-content: flex-start;
+  cursor: default;
+}
+
+.choice-box {
+  align-self: center;
+  width: min(760px, calc(100% - 32px));
+  margin: auto 0;
+}
+
+.choice-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.choice-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: #857a66;
+}
+
+.choice-prompt {
+  margin: 4px 0 14px;
+  font-size: 17px;
+  line-height: 1.7;
+  color: #e8dcc8;
+  white-space: pre-wrap;
+}
+
+.choice-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.choice-option {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #e8dcc8;
+  font-size: 16px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* 커서 = 전체폭 파란 하이라이트 바 + 흰 글씨 */
+.choice-option.active {
+  background: #2d5da8;
+  border-color: #9cc2ff;
+  color: #fff;
+}
+
+.choice-num {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: #d8b96a;
+}
+.choice-option.active .choice-num { color: #fff; }
+
+.choice-option-text { min-width: 0; }
+
+/* ---------- 결단 / 클리어 카드 ---------- */
+
+.ending-gauge {
+  margin: 10px 0 4px;
+}
+
 .equip-bonus { color: #7ce08a; font-style: normal; font-size: 12px; }
 
 /* 장비 개체 레벨 / EXP / MAX (v0.6) — 목록·장비 줄 공용 */

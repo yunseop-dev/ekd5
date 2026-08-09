@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CampaignState } from '../core/campaign'
 import {
   applyVictory,
+  completeChoice,
   completeStory,
   currentNode,
   isCampaignFinished,
@@ -14,6 +15,7 @@ import { STORY_SCRIPTS } from '../data/story'
 import { BattleScreen } from '../ui/BattleScreen'
 import { CampaignScreen } from '../ui/CampaignScreen'
 import '../ui/campaign.css'
+import { ChoiceScreen } from '../ui/ChoiceScreen'
 import { DeployScreen } from '../ui/DeployScreen'
 import { DialogueScreen } from '../ui/DialogueScreen'
 import { loadCampaign, loadSaveMeta, saveCampaign } from './persistence'
@@ -26,6 +28,7 @@ type Screen =
   | { s: 'freeBattle'; stage: StageDef; seed: number }
   | { s: 'camp'; campaign: CampaignState; savedAt: number | null }
   | { s: 'story'; campaign: CampaignState; savedAt: number | null }
+  | { s: 'choice'; campaign: CampaignState; savedAt: number | null }
   | { s: 'deploy'; campaign: CampaignState; stage: StageDef; savedAt: number | null }
   | {
       s: 'campaignBattle'
@@ -158,7 +161,9 @@ export function App() {
           if (!node || isCampaignFinished(screen.campaign)) return
           if (node.type === 'story') {
             setScreen({ s: 'story', campaign: screen.campaign, savedAt: screen.savedAt })
-          } else {
+          } else if (node.type === 'choice') {
+            setScreen({ s: 'choice', campaign: screen.campaign, savedAt: screen.savedAt })
+          } else if (node.type === 'battle') {
             setScreen({ s: 'deploy', campaign: screen.campaign, stage: stageForNode(node), savedAt: screen.savedAt })
           }
         }}
@@ -178,6 +183,28 @@ export function App() {
         script={STORY_SCRIPTS[node.scriptId] ?? []}
         onDone={() => {
           const next = completeStory(screen.campaign)
+          void saveCampaign(next).then(() => {
+            setScreen({ s: 'camp', campaign: next, savedAt: Date.now() })
+          })
+        }}
+      />
+    )
+  }
+
+  if (screen.s === 'choice') {
+    const node = currentNode(screen.campaign)
+    if (!node || node.type !== 'choice') {
+      setScreen({ s: 'camp', campaign: screen.campaign, savedAt: screen.savedAt })
+      return null
+    }
+    return (
+      <ChoiceScreen
+        title={node.title}
+        prompt={node.prompt}
+        speaker={node.speaker}
+        options={node.options}
+        onPick={(index) => {
+          const next = completeChoice(screen.campaign, index)
           void saveCampaign(next).then(() => {
             setScreen({ s: 'camp', campaign: next, savedAt: Date.now() })
           })
