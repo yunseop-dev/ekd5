@@ -13,6 +13,7 @@ import {
   avgRosterLevel,
   buyItem,
   canEquip,
+  classIdOf,
   equipItem,
   sellItem,
   shopTierFor,
@@ -27,7 +28,7 @@ import {
   EQUIP_MAX_LEVEL_TREASURE,
   EXP_PER_LEVEL,
 } from '../core/types'
-import type { EquipInstance, EquipSlot, EquipmentDef, OfficerStats } from '../core/types'
+import type { EquipInstance, EquipSlot, EquipmentDef, OfficerStats, UnitClassDef } from '../core/types'
 import { CLASSES } from '../data/classes'
 import { EQUIPMENT } from '../data/equipment'
 import { FRUITS } from '../data/fruits'
@@ -76,6 +77,18 @@ const FRUIT_STAT_LABEL: Record<string, string> = {
   exp: '경험치',
 }
 const fruitStatLabel = (stat: string): string => FRUIT_STAT_LABEL[stat] ?? stat
+
+/** 2차 병과(v0.8)는 CLASS_ICON(1차 6종)에 없다 — 같은 계열(category) 아이콘으로 폴백 */
+const CATEGORY_ICON: Record<string, string> = {
+  lord: '主',
+  cavalry: '騎',
+  infantry: '步',
+  archer: '弓',
+  strategist: '策',
+  support: '風',
+}
+const classIcon = (cls: UnitClassDef): string =>
+  CLASS_ICON[cls.id] ?? CATEGORY_ICON[cls.category] ?? '?'
 
 const SLOTS: EquipSlot[] = ['weapon', 'armor', 'accessory']
 const SLOT_LABEL: Record<EquipSlot, string> = { weapon: '무기', armor: '방어구', accessory: '보조' }
@@ -370,7 +383,8 @@ function StorageTab({ campaign, onChange }: TabProps) {
   if (!selected) return <p className="dim">부대가 없다.</p>
 
   const officer = OFFICERS[selected.officerId]
-  const cls = CLASSES[officer.classId]
+  // v0.8: 승급했다면 RosterEntry.classId 가 실제 병과 — 성장/HP/MP/이동 전부 이 병과 기준
+  const cls = CLASSES[classIdOf(selected)]
   const base = combatStats(officer.stats, cls.growth, selected.level)
   const totals = equipTotals(selected)
   const fruits = campaign.fruits.map((id, index) => ({ index, id, def: FRUITS[id] }))
@@ -396,16 +410,16 @@ function StorageTab({ campaign, onChange }: TabProps) {
         <div className="fac-roster">
           {campaign.roster.map((r) => {
             const o = OFFICERS[r.officerId]
-            const c = CLASSES[o.classId]
+            const c = CLASSES[classIdOf(r)]
             return (
               <button
                 key={r.officerId}
                 className={`roster-row fac-roster-row${r.officerId === selected.officerId ? ' selected' : ''}`}
                 onClick={() => setSelectedId(r.officerId)}
               >
-                <span className="roster-icon f-player">{CLASS_ICON[c.id] ?? '?'}</span>
+                <span className="roster-icon f-player">{classIcon(c)}</span>
                 <span className="roster-name">{o.name}</span>
-                <span className="roster-class">{c.name}</span>
+                <span className={`roster-class${c.tier > 1 ? ' promoted' : ''}`}>{c.name}</span>
                 <span className="roster-level">Lv {r.level}</span>
                 <span className="fac-slot-icons">
                   {SLOTS.map((slot) => {

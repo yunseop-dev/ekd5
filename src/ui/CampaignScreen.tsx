@@ -1,10 +1,19 @@
 // 캠페인 허브 — 3열 그리드 1화면 (docs/research/campaign-ux.md 2부 §3)
 // 좌: 다음 전투 카드 / 중앙: 로스터 / 우: 선택 유닛 상세. 걸어다니는 허브 금지.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { equipInstanceBonus } from '../core/battle'
 import type { CampaignState, RosterEntry } from '../core/campaign'
-import { CAMPAIGN_NODES, currentNode, isCampaignFinished, stageForNode } from '../core/campaign'
+import {
+  CAMPAIGN_NODES,
+  PROMOTION_LEVEL,
+  canPromote,
+  classIdOf,
+  currentNode,
+  isCampaignFinished,
+  promoteOfficer,
+  stageForNode,
+} from '../core/campaign'
 import { combatStats, maxHp, maxMp } from '../core/formulas'
 import type {
   EquipInstance,
@@ -12,6 +21,7 @@ import type {
   EquipmentDef,
   OfficerStats,
   StageDef,
+  UnitClassDef,
   VictoryCondition,
 } from '../core/types'
 import { EQUIP_EXP_PER_LEVEL, EQUIP_MAX_LEVEL_NORMAL, EQUIP_MAX_LEVEL_TREASURE } from '../core/types'
@@ -22,7 +32,108 @@ import { STRATEGIES } from '../data/strategies'
 import { CLASS_ICON } from './BattleBoard'
 import { CampFacilities } from './CampFacilities'
 import { GaugeBar } from './GaugeBar'
+// .result-overlay/.result-box(battle.css) 재사용 — 승급 확인 오버레이
+import './battle.css'
 import './campaign.css'
+
+// ---------- v0.8 승급 ----------
+
+/** 2차 병과는 CLASS_ICON(1차 6종)에 없다 — 같은 계열(category) 아이콘으로 폴백 */
+const CATEGORY_ICON: Record<string, string> = {
+  lord: '主',
+  cavalry: '騎',
+  infantry: '步',
+  archer: '弓',
+  strategist: '策',
+  support: '風',
+}
+const classIcon = (cls: UnitClassDef): string =>
+  CLASS_ICON[cls.id] ?? CATEGORY_ICON[cls.category] ?? '?'
+
+/** 상위 병과 id (없으면 최종 병과) */
+const promotionTargetId = (cls: UnitClassDef): string | null => cls.promotesTo ?? null
+
+/** "중기병으로" / "군사로" — 받침(ㄹ 제외) 여부로 조사를 고른다 */
+function euroRo(word: string): string {
+  const code = word.charCodeAt(word.length - 1) - 0xac00
+  const jong = code >= 0 && code <= 11171 ? code % 28 : 0
+  return `${word}${jong === 0 || jong === 8 ? '로' : '으로'}`
+}
+
+const GROWTH_KEYS = ['atk', 'def', 'mind', 'agi', 'morale'] as const
+const GROWTH_LABEL: Record<(typeof GROWTH_KEYS)[number], string> = {
+  atk: '공격',
+  def: '방어',
+  mind: '정신',
+  agi: '순발',
+  morale: '사기',
+}
+const GRADE_RANK: Record<string, number> = { C: 0, B: 1, A: 2, S: 3 }
+
+const rangeText = (cls: UnitClassDef): string =>
+  cls.minRange === cls.maxRange ? `${cls.minRange}` : `${cls.minRange}~${cls.maxRange}`
+
+interface PromotionChange {
+  text: string
+  /** true=상승, false=하락, null=중립(신규 책략 등) */
+  up: boolean | null
+}
+
+/** 현재 병과 → 상위 병과 변화 요약. 값은 전부 CLASSES 비교로 뽑는다(하드코딩 금지) */
+function promotionChanges(from: UnitClassDef, to: UnitClassDef, level: number): PromotionChange[] {
+  const out: PromotionChange[] = []
+  const num = (label: string, a: number, b: number) => {
+    if (a !== b) out.push({ text: `${label} ${a} → ${b}`, up: b > a })
+  }
+  num('HP 최대치', maxHp(from, level), maxHp(to, level))
+  num('MP 최대치', maxMp(from, level), maxMp(to, level))
+  num('이동', from.move, to.move)
+  if (rangeText(from) !== rangeText(to)) {
+    out.push({ text: `사거리 ${rangeText(from)} → ${rangeText(to)}`, up: to.maxRange > from.maxRange })
+  }
+  for (const k of GROWTH_KEYS) {
+    const a = from.growth[k]
+    const b = to.growth[k]
+    if (a !== b) {
+      out.push({
+        text: `${GROWTH_LABEL[k]} 성장 ${a} → ${b}`,
+        up: (GRADE_RANK[b] ?? 0) > (GRADE_RANK[a] ?? 0),
+      })
+    }
+  }
+  const learned = to.strategies.filter((s) => !from.strategies.some((f) => f.strategyId === s.strategyId))
+  for (const s of learned) {
+    const name = STRATEGIES[s.strategyId]?.name ?? s.strategyId
+    out.push({
+      text: `신규 책략 ${name} (Lv${s.learnLevel}${s.learnLevel <= level ? ' — 즉시 습득' : ''})`,
+      up: null,
+    })
+  }
+  return out
+}
+
+interface PromotionInfo {
+  target: UnitClassDef | null
+  ok: boolean
+  /** 불가 사유 — 버튼 툴팁 */
+  reason: string | null
+  changes: PromotionChange[]
+}
+
+function promotionInfo(campaign: CampaignState, entry: RosterEntry, cls: UnitClassDef): PromotionInfo {
+  const targetId = promotionTargetId(cls)
+  const target = targetId ? (CLASSES[targetId] ?? null) : null
+  const ok = canPromote(campaign, entry.officerId)
+  const seals = campaign.seals ?? 0
+  let reason: string | null = null
+  if (!ok) {
+    if (!target) reason = '최종 병과 — 더 오를 곳이 없다'
+    else if (entry.level < PROMOTION_LEVEL) reason = `Lv${PROMOTION_LEVEL} 필요 (현재 ${entry.level})`
+    else if (seals <= 0) reason = '인수가 없다'
+    else reason = '지금은 승급할 수 없다'
+  }
+  return { target, ok, reason, changes: target ? promotionChanges(cls, target, entry.level) : [] }
+}
 
 // ---------- v0.6 장비 개체 / 열매 보정 헬퍼 ----------
 
@@ -145,6 +256,7 @@ interface Props {
 export function CampaignScreen({ campaign, savedAt, onSortie, onTitle, onUpdate }: Props) {
   const [selectedId, setSelectedId] = useState<string>(campaign.roster[0]?.officerId)
   const [facilitiesOpen, setFacilitiesOpen] = useState(false)
+  const [promoteOpen, setPromoteOpen] = useState(false)
   const finished = isCampaignFinished(campaign)
   const node = currentNode(campaign)
   const stage = !finished && node?.type === 'battle' ? stageForNode(node) : null
@@ -152,7 +264,29 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle, onUpdate 
 
   const selected = campaign.roster.find((r) => r.officerId === selectedId)
   const selOfficer = selected ? OFFICERS[selected.officerId] : null
-  const selClass = selOfficer ? CLASSES[selOfficer.classId] : null
+  // v0.8: 표시 병과는 승급 결과(RosterEntry.classId)를 따른다 — 원 병과가 아니다.
+  const selClass = selected ? (CLASSES[classIdOf(selected)] ?? null) : null
+  const seals = campaign.seals ?? 0
+  const promo = selected && selClass ? promotionInfo(campaign, selected, selClass) : null
+
+  // 선택이 바뀌면 열려 있던 확인창은 닫는다 (다른 장수에게 잘못 확정되는 사고 방지)
+  useEffect(() => setPromoteOpen(false), [selectedId])
+
+  useEffect(() => {
+    if (!promoteOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPromoteOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [promoteOpen])
+
+  const doPromote = () => {
+    if (!selected) return
+    const next = promoteOfficer(campaign, selected.officerId)
+    setPromoteOpen(false)
+    if (next !== campaign) onUpdate(next)
+  }
 
   return (
     <div className="campaign-screen">
@@ -165,6 +299,12 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle, onUpdate 
           {savedAt ? `자동 저장됨 · ${new Date(savedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}` : ''}
         </span>
         <span className="gold-display">금 {campaign.gold.toLocaleString('ko-KR')}</span>
+        <span
+          className={`seal-display${seals > 0 ? ' has' : ''}`}
+          title={`인수(印綬) — 장수 1명을 상위 병과로 승급시킨다 (Lv${PROMOTION_LEVEL} 이상)`}
+        >
+          인수 {seals}
+        </span>
         <GaugeBar gauge={campaign.gauge} />
         <button className="title-btn" onClick={() => setFacilitiesOpen(true)}>
           막사 (상점·창고)
@@ -246,7 +386,8 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle, onUpdate 
           <h3>부대 ({campaign.roster.length})</h3>
           {campaign.roster.map((r) => {
             const officer = OFFICERS[r.officerId]
-            const cls = CLASSES[officer.classId]
+            // v0.8: 승급 후에는 RosterEntry.classId 가 실제 병과 (능력치/성장도 이 병과 기준)
+            const cls = CLASSES[classIdOf(r)]
             // 원작 유닛 정보 패널 7필드(초상/이름/병과/Lv/HP/사기/Exp) 축약 재현
             // v0.6: 열매(statBonus)는 장수 능력치에 먼저 얹고, 장비는 개체 레벨 실효치로 더한다.
             const morale =
@@ -259,7 +400,7 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle, onUpdate 
                 className={`roster-row${r.officerId === selectedId ? ' selected' : ''}`}
                 onClick={() => setSelectedId(r.officerId)}
               >
-                <span className={`roster-icon f-player`}>{CLASS_ICON[cls.id] ?? '?'}</span>
+                <span className={`roster-icon f-player`}>{classIcon(cls)}</span>
                 <span className="roster-name">
                   {officer.name}
                   {fruit.total > 0 && (
@@ -268,7 +409,7 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle, onUpdate 
                     </em>
                   )}
                 </span>
-                <span className="roster-class">{cls.name}</span>
+                <span className={`roster-class${cls.tier > 1 ? ' promoted' : ''}`}>{cls.name}</span>
                 <span className="roster-level">Lv {r.level}</span>
                 <span className="roster-stat">HP {maxHp(cls, r.level)}</span>
                 <span className="roster-stat">사기 {morale}</span>
@@ -329,6 +470,35 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle, onUpdate 
                   )
                 })()}
               </div>
+
+              {/* 승급 — 인수 1개로 상위 병과 전직 (v0.8) */}
+              {promo && (
+                <button
+                  className={`promote-btn${promo.ok ? ' ready' : ''}`}
+                  disabled={!promo.ok}
+                  onClick={() => setPromoteOpen(true)}
+                  title={
+                    promo.ok && promo.target
+                      ? `${selClass.name} → ${promo.target.name} (인수 1 소모)`
+                      : (promo.reason ?? '승급할 수 없다')
+                  }
+                >
+                  {promo.ok && promo.target ? (
+                    <>
+                      <span className="promote-btn-label">승급</span>
+                      <span className="promote-btn-sub">
+                        {euroRo(promo.target.name)} 승급 (인수 1 소모)
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="promote-btn-label">승급</span>
+                      <span className="promote-btn-sub">{promo.reason}</span>
+                    </>
+                  )}
+                </button>
+              )}
+
               <h4>장비</h4>
               <ul className="strategy-list">
                 {SLOT_ORDER.map((slot) => {
@@ -378,6 +548,50 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle, onUpdate 
           )}
         </section>
       </div>
+
+      {/* 승급 확인 — 기존 전투 결과 오버레이(.result-overlay/.result-box) 재사용 */}
+      {promoteOpen && promo?.ok && promo.target && selected && selOfficer && selClass && (
+        <div
+          className="result-overlay"
+          onClick={() => setPromoteOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="승급 확인"
+        >
+          <div className="result-box promote-box" onClick={(e) => e.stopPropagation()}>
+            <h2>승급</h2>
+            <div className="promote-line">
+              <span className="promote-officer">{selOfficer.name}</span>
+              <span className="promote-from">
+                <em className="promote-icon">{classIcon(selClass)}</em>
+                {selClass.name}
+              </span>
+              <span className="promote-arrow">→</span>
+              <span className="promote-to">
+                <em className="promote-icon">{classIcon(promo.target)}</em>
+                {promo.target.name}
+              </span>
+            </div>
+            <ul className="promote-changes">
+              {promo.changes.map((c) => (
+                <li key={c.text} className={c.up === null ? 'flat' : c.up ? 'up' : 'down'}>
+                  {c.text}
+                </li>
+              ))}
+              {promo.changes.length === 0 && <li className="flat">수치 변화 없음</li>}
+            </ul>
+            <p className="promote-cost">
+              인수 1 소모 (보유 {seals} → {seals - 1})
+            </p>
+            <div className="promote-actions">
+              <button className="promote-confirm" onClick={doPromote} autoFocus>
+                승급한다
+              </button>
+              <button onClick={() => setPromoteOpen(false)}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

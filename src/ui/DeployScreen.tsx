@@ -4,8 +4,9 @@
 
 import { useMemo, useState } from 'react'
 import type { RosterEntry } from '../core/campaign'
+import { classIdOf } from '../core/campaign'
 import { keyOf } from '../core/movement'
-import type { StageDef } from '../core/types'
+import type { StageDef, UnitClassDef } from '../core/types'
 import { CLASSES } from '../data/classes'
 import { OFFICERS } from '../data/officers'
 import { TERRAIN } from '../data/terrain'
@@ -31,6 +32,18 @@ const SORT_LABEL: Record<SortMode, string> = {
 
 const CLASS_ORDER = Object.keys(CLASSES)
 
+/** 2차 병과(v0.8)는 CLASS_ICON(1차 6종)에 없다 — 같은 계열(category) 아이콘으로 폴백 */
+const CATEGORY_ICON: Record<string, string> = {
+  lord: '主',
+  cavalry: '騎',
+  infantry: '步',
+  archer: '弓',
+  strategist: '策',
+  support: '風',
+}
+const classIcon = (cls: UnitClassDef): string =>
+  CLASS_ICON[cls.id] ?? CATEGORY_ICON[cls.category] ?? '?'
+
 interface Props {
   stage: StageDef
   roster: RosterEntry[]
@@ -55,6 +68,14 @@ export function DeployScreen({ stage, roster, onConfirm, onBack }: Props) {
   const [sortMode, setSortMode] = useState<SortMode>('default')
 
   const deployment = useMemo(() => [...forced, ...picked.filter((id) => !forced.includes(id))], [forced, picked])
+
+  // v0.8: 표시 병과는 승급 결과(RosterEntry.classId)를 따른다 — OFFICERS.classId 는 원 병과
+  const entryById = useMemo(() => new Map(roster.map((r) => [r.officerId, r])), [roster])
+  const classOfOfficer = (officerId: string): UnitClassDef | null => {
+    const entry = entryById.get(officerId)
+    return entry ? (CLASSES[classIdOf(entry)] ?? null) : null
+  }
+
   const orderOf = (officerId: string): number => deployment.indexOf(officerId) + 1 // 0 = 미선택
 
   function toggle(officerId: string) {
@@ -80,7 +101,7 @@ export function DeployScreen({ stage, roster, onConfirm, onBack }: Props) {
     if (sortMode === 'level') {
       sorted.sort((a, b) => b.level - a.level || a.officerId.localeCompare(b.officerId))
     } else if (sortMode === 'class') {
-      const rank = (r: RosterEntry) => CLASS_ORDER.indexOf(OFFICERS[r.officerId].classId)
+      const rank = (r: RosterEntry) => CLASS_ORDER.indexOf(classIdOf(r))
       sorted.sort((a, b) => rank(a) - rank(b) || b.level - a.level)
     }
     return [...forcedRows, ...sorted]
@@ -136,7 +157,7 @@ export function DeployScreen({ stage, roster, onConfirm, onBack }: Props) {
           <div className="roster-list">
             {sortedRoster.map((r) => {
               const officer = OFFICERS[r.officerId]
-              const cls = CLASSES[officer.classId]
+              const cls = CLASSES[classIdOf(r)]
               const order = orderOf(r.officerId)
               const isForced = forced.includes(r.officerId)
               return (
@@ -153,9 +174,9 @@ export function DeployScreen({ stage, roster, onConfirm, onBack }: Props) {
                   onClick={() => toggle(r.officerId)}
                   title={isForced ? '강제 출진 — 해제할 수 없습니다' : undefined}
                 >
-                  <span className="roster-icon f-player">{CLASS_ICON[cls.id] ?? '?'}</span>
+                  <span className="roster-icon f-player">{classIcon(cls)}</span>
                   <span className="roster-name">{officer.name}</span>
-                  <span className="roster-class">{cls.name}</span>
+                  <span className={`roster-class${cls.tier > 1 ? ' promoted' : ''}`}>{cls.name}</span>
                   <span className="roster-level">Lv {r.level}</span>
                   <span className="deploy-badge">
                     {order > 0 ? circled(order) : ''}
@@ -197,7 +218,11 @@ export function DeployScreen({ stage, roster, onConfirm, onBack }: Props) {
                     >
                       {slotIndex !== undefined && (
                         <span className={`dp-slot${occupant ? ' filled' : ''}`}>
-                          {occupant ? (CLASS_ICON[OFFICERS[occupant.id].classId] ?? '?') : slotIndex + 1}
+                          {(() => {
+                            if (!occupantId || !occupant) return slotIndex + 1
+                            const cls = classOfOfficer(occupantId)
+                            return cls ? classIcon(cls) : '?'
+                          })()}
                         </span>
                       )}
                       {enemyCells.has(key) && <span className="dp-enemy" />}
@@ -232,7 +257,15 @@ export function DeployScreen({ stage, roster, onConfirm, onBack }: Props) {
               <li key={id}>
                 <span className="deploy-order-no">{circled(i + 1)}</span>
                 {OFFICERS[id].name}
-                <span className="roster-class"> {CLASSES[OFFICERS[id].classId].name}</span>
+                {(() => {
+                  const cls = classOfOfficer(id)
+                  return (
+                    <span className={`roster-class${cls && cls.tier > 1 ? ' promoted' : ''}`}>
+                      {' '}
+                      {cls?.name ?? ''}
+                    </span>
+                  )
+                })()}
                 {forced.includes(id) && <span className="lock-mark">🔒</span>}
               </li>
             ))}
