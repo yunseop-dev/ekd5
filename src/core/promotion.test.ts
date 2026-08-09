@@ -94,36 +94,36 @@ describe('병과 데이터 — 계열(lineage)과 승급 트리', () => {
     }
   })
 
-  it('클래스업 보너스: 2차는 1차보다 HP/MP 기본치가 낮지 않고 성장등급이 하락하지 않는다', () => {
-    const rank = { S: 4, A: 3, B: 2, C: 1 } as const
+  it('클래스업 보너스는 원작 공식 그대로 — HP/MP 기본치 +레벨성장치×2, 성장등급은 불변', () => {
+    // 근거: 나무위키 병과 문서 "클래스 업을 하면 그 순간 HP와 MP가 레벨 상승치의 2배만큼 증가"
+    //       + "영걸전, 공명전과 다르게 부대를 승급시켜도 능력치나 성장률에는 변화가 없다"
+    //       (조창 HP 107 + 49×5 + 2회×10 = 372 검산 일치, docs/research/promotion.md §2)
     for (const base of Object.values(CLASSES).filter((c) => c.tier === 1)) {
       const next = CLASSES[base.promotesTo!]
-      expect(next.hpBase, next.id).toBeGreaterThanOrEqual(base.hpBase)
-      expect(next.mpBase, next.id).toBeGreaterThanOrEqual(base.mpBase)
-      for (const key of ['atk', 'def', 'mind', 'agi', 'morale'] as const) {
-        expect(rank[next.growth[key]], `${next.id}.${key}`).toBeGreaterThanOrEqual(rank[base.growth[key]])
-      }
-      // 어딘가 하나는 실제로 올라야 승급의 의미가 있다
-      const improved =
-        next.hpBase > base.hpBase ||
-        next.mpBase > base.mpBase ||
-        (['atk', 'def', 'mind', 'agi', 'morale'] as const).some(
-          (k) => rank[next.growth[k]] > rank[base.growth[k]],
-        )
-      expect(improved, next.id).toBe(true)
+      expect(next.hpBase, next.id).toBe(base.hpBase + base.hpGrowth * 2)
+      expect(next.mpBase, next.id).toBe(base.mpBase + base.mpGrowth * 2)
+      expect(next.hpGrowth, next.id).toBe(base.hpGrowth)
+      expect(next.mpGrowth, next.id).toBe(base.mpGrowth)
+      expect(next.growth, next.id).toEqual(base.growth)
     }
   })
 
-  it('중기병은 원작대로 둔중하다 — 공방을 얻고 기동을 1 잃는다', () => {
-    expect(CLASSES.heavyCavalry.move).toBe(CLASSES.lightCavalry.move - 1)
-    expect(CLASSES.heavyCavalry.growth.atk).toBe('S')
-    expect(CLASSES.heavyCavalry.growth.def).toBe('A')
+  it('중기병은 원작대로 수치 무변화 — 이동력도 성장도 경기병 그대로 (보너스 HP/MP뿐)', () => {
+    expect(CLASSES.heavyCavalry.move).toBe(CLASSES.lightCavalry.move)
+    expect(CLASSES.heavyCavalry.growth).toEqual(CLASSES.lightCavalry.growth)
   })
 
-  it('연노병은 궁병의 사거리(2~2)와 원거리 성질을 유지한다', () => {
+  it('노병은 원작대로 사거리가 확장된 원거리 병과다 (궁병 2~2 → 노병 2~3)', () => {
     expect(CLASSES.crossbowman.minRange).toBe(2)
-    expect(CLASSES.crossbowman.maxRange).toBe(2)
+    expect(CLASSES.crossbowman.maxRange).toBe(3)
     expect(CLASSES.crossbowman.ranged).toBe(true)
+  })
+
+  it('방술사는 원작대로 계열 중 유일하게 2차에서 이동력이 오른다 (4→5)', () => {
+    expect(CLASSES.seniorGeomancer.move).toBe(CLASSES.geomancer.move + 1)
+    for (const base of Object.values(CLASSES).filter((c) => c.tier === 1 && c.id !== 'geomancer')) {
+      expect(CLASSES[base.promotesTo!].move, base.id).toBe(base.move)
+    }
   })
 
   it('모든 병과의 책략 참조가 실재한다', () => {
@@ -359,18 +359,18 @@ describe('createBattle — 로스터 병과 오버라이드', () => {
     expect(state.units.find((u) => u.officerId === 'xiahoudun')!.classId).toBe('heavyCavalry')
   })
 
-  it('2차 병과의 클래스업 보너스가 HP와 능력치로 나타난다', () => {
+  it('2차 병과의 클래스업 보너스는 HP/MP에만 나타난다 (원작: 능력치·성장률 무변화)', () => {
     const before = startBattle(stage('stage01'), 1, rosterFor(undefined))
     const after = startBattle(stage('stage01'), 1, rosterFor('heavyCavalry'))
     const u1 = before.units.find((u) => u.officerId === 'xiahoudun')!
     const u2 = after.units.find((u) => u.officerId === 'xiahoudun')!
 
     expect(u2.maxHp).toBe(maxHp(CLASSES.heavyCavalry, 15))
-    expect(u2.maxHp).toBeGreaterThan(u1.maxHp)
+    expect(u2.maxHp).toBe(u1.maxHp + CLASSES.lightCavalry.hpGrowth * 2)
     expect(u2.hp).toBe(u2.maxHp)
-    // 성장 A→S(공격) / B→A(방어)가 Lv15 누적으로 드러난다
-    expect(effectiveStats(u2).atk).toBeGreaterThan(effectiveStats(u1).atk)
-    expect(effectiveStats(u2).def).toBeGreaterThan(effectiveStats(u1).def)
+    // 능력치는 승급 전과 동일해야 한다 — 성장등급이 계열 단위로 하나뿐이므로
+    expect(effectiveStats(u2).atk).toBe(effectiveStats(u1).atk)
+    expect(effectiveStats(u2).def).toBe(effectiveStats(u1).def)
   })
 
   it('미등록 병과 오버라이드는 기본 병과로 되돌아간다 (세이브 내성)', () => {
