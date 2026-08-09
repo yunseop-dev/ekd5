@@ -473,40 +473,35 @@ function checkVictory(state: BattleState, stage: StageDef): void {
     return
   }
 
-  for (let i = 0; i < stage.victory.length; i++) {
-    const cond = stage.victory[i]
-    let met = false
+  const met = stage.victory.map((cond) => {
     switch (cond.type) {
       case 'annihilation':
-        met = livingUnits(state, 'enemy').length === 0
-        break
+        return livingUnits(state, 'enemy').length === 0
       case 'defeatBoss':
-        met = !state.units.some((u) => u.faction === 'enemy' && u.isBoss && u.hp > 0)
-        break
+        return !state.units.some((u) => u.faction === 'enemy' && u.isBoss && u.hp > 0)
       case 'reachPoint': {
         const unit = cond.unitId
           ? state.units.find((u) => u.id === cond.unitId || u.officerId === cond.unitId)
           : state.units.find((u) => u.faction === 'player' && u.isLeader)
-        met = !!unit && unit.hp > 0 && unit.pos.x === cond.pos.x && unit.pos.y === cond.pos.y
-        break
+        return !!unit && unit.hp > 0 && unit.pos.x === cond.pos.x && unit.pos.y === cond.pos.y
       }
       case 'surviveTurns':
-        met = state.turn > cond.turns
-        break
+        return state.turn > cond.turns
     }
-    if (met) {
-      state.result = 'victory'
-      log(state, 'victory', '승리!')
-      // 2차 승리조건 보너스 (시리즈 전통: 생존 전원 +50)
-      if (i > 0 && stage.bonusExp) {
-        for (const u of livingUnits(state, 'player')) {
-          const progress = applyExp(u.level, u.exp, stage.bonusExp)
-          u.level = progress.level
-          u.exp = progress.exp
-        }
-        log(state, 'bonus', `2차 승리조건 달성 — 생존 전원 경험치 +${stage.bonusExp}`)
+  })
+
+  if (met.some(Boolean)) {
+    state.result = 'victory'
+    log(state, 'victory', '승리!')
+    // 2차 승리조건 보너스 — 1차(index 0) 외의 조건을 하나라도 충족했으면 지급.
+    // 전멸 승리는 defeatBoss 등 하위 조건을 포함하므로, 순서가 아니라 충족 여부로 판정한다.
+    if (stage.bonusExp && met.some((m, i) => m && i > 0)) {
+      for (const u of livingUnits(state, 'player')) {
+        const progress = applyExp(u.level, u.exp, stage.bonusExp)
+        u.level = progress.level
+        u.exp = progress.exp
       }
-      return
+      log(state, 'bonus', `2차 승리조건 달성 — 생존 전원 경험치 +${stage.bonusExp}`)
     }
   }
 }

@@ -56,10 +56,9 @@ export const STAGE_04: StageDef = {
     // 보스 — 성문 바로 뒤. 문을 열지 않으면 닿을 수 없다
     { officerId: 'huaXiong', faction: 'enemy', pos: { x: 12, y: 5 }, isBoss: true, behavior: 'guard' },
   ],
-  // 1차 = 전멸, 2차 = 화웅 격파(관문 돌파 정밀 타격 — 달성 시 보너스 경험치).
-  // 순서 주의: 전멸이 보스 격파를 포함하므로 defeatBoss가 앞에 오면 2차 보너스가 뜨지 않는다.
+  // 1차 = 전멸, 2차 = 화웅 격파(관문 돌파 정밀 타격 — 달성 시 보너스 경험치)
   victory: [{ type: 'annihilation' }, { type: 'defeatBoss' }],
-  bonusExp: 50,
+  bonusExp: 150,
   reinforcements: [
     // 관 안쪽에서 성문으로 밀려나오는 증원 (성채 회복을 낀 지구전 압박)
     {

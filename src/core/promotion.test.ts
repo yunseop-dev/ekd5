@@ -523,7 +523,8 @@ describe('풀 캠페인 레벨 커브 (추격 루트 완주)', () => {
           startBattle(stageDef, 42, campaign.roster, deploymentFor(stageDef, campaign.roster)),
           600,
         )
-        results.push(`${node.id}(${stageDef.id}): ${state.result}`)
+        const bonusFired = state.log.some((l) => l.type === 'bonus')
+        results.push(`${node.id}(${stageDef.id}): ${state.result}${bonusFired ? '+보너스' : ''}`)
         campaign = applyVictory(campaign, state)
       } else break
     }
