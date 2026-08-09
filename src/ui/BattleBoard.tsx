@@ -13,6 +13,13 @@ const CLASS_ICON: Record<string, string> = {
   archer: '弓',
   strategist: '策',
   geomancer: '風',
+  // 2차 병과 — 계열 아이콘 유지
+  chancellor: '主',
+  heavyCavalry: '騎',
+  guardInfantry: '步',
+  crossbowman: '弓',
+  counselor: '策',
+  seniorGeomancer: '風',
 }
 
 interface Props {
