@@ -2,7 +2,8 @@
 // 검증 목표: 미끼 소부대를 쫓다 숲에 걸리는 매복 구조, 턴 2 측면 + 턴 3 후방의 2단 증원,
 //            전멸 단일 승리조건(도망칠 곳이 없다), 제1부 최고 난이도
 // 지형 구성: 사방이 트인 개활지 + 남북/좌우 숲 덤불 — 시야는 좋으나 측면이 전부 열려 있다
-// 밸런스: 미끼는 Lv6이지만 매복 본대는 Lv8이다. 시뮬 20판 기준 Lv9 로스터 승률 5%, Lv10 50%, Lv12 95% —
+// 밸런스: 미끼는 Lv8이지만 매복 본대는 Lv10이다(원작 러버밴딩 — 종반 적은 아군 평균에 연동).
+//         기본 장비 시뮬 20판 기준 Lv12 로스터 승률 45%지만 무구성장을 거친 캠페인 로스터는 뚫는다.
 //         선택지에서 "그만둔다"로 통째로 건너뛸 수 있는 전투라 의도적으로 벽을 높게 뒀다.
 
 import type { StageDef } from '../../core/types'
@@ -47,11 +48,11 @@ export const STAGE_06: StageDef = {
     { officerId: 'guojia', faction: 'player', pos: { x: 0, y: 4 } },
     { officerId: 'xunyu', faction: 'player', pos: { x: 0, y: 7 } },
     // 적 — 미끼 후미대. 수가 적어 쫓아붙기 쉽다
-    { officerId: 'westCavalry', faction: 'enemy', pos: { x: 9, y: 5 }, level: 6, behavior: 'pursue' },
-    { officerId: 'westCavalry', faction: 'enemy', pos: { x: 9, y: 6 }, level: 6, behavior: 'pursue' },
-    { officerId: 'westInfantry', faction: 'enemy', pos: { x: 10, y: 4 }, level: 6, behavior: 'guard' },
-    { officerId: 'westInfantry', faction: 'enemy', pos: { x: 11, y: 5 }, level: 6, behavior: 'guard' },
-    { officerId: 'westArcher', faction: 'enemy', pos: { x: 10, y: 7 }, level: 6, behavior: 'guard' },
+    { officerId: 'westCavalry', faction: 'enemy', pos: { x: 9, y: 5 }, level: 8, behavior: 'pursue' },
+    { officerId: 'westCavalry', faction: 'enemy', pos: { x: 9, y: 6 }, level: 8, behavior: 'pursue' },
+    { officerId: 'westInfantry', faction: 'enemy', pos: { x: 10, y: 4 }, level: 8, behavior: 'guard' },
+    { officerId: 'westInfantry', faction: 'enemy', pos: { x: 11, y: 5 }, level: 8, behavior: 'guard' },
+    { officerId: 'westArcher', faction: 'enemy', pos: { x: 10, y: 7 }, level: 8, behavior: 'guard' },
   ],
   // 매복이 드러나면 물러설 길이 없다 — 전멸만이 승리
   victory: [{ type: 'annihilation' }],
@@ -60,10 +61,10 @@ export const STAGE_06: StageDef = {
     {
       trigger: { type: 'turnStart', turn: 2 },
       units: [
-        { officerId: 'westCavalry', faction: 'enemy', pos: { x: 4, y: 0 }, level: 8, behavior: 'pursue' },
-        { officerId: 'westCavalry', faction: 'enemy', pos: { x: 12, y: 0 }, level: 8, behavior: 'pursue' },
-        { officerId: 'westCavalry', faction: 'enemy', pos: { x: 4, y: 11 }, level: 8, behavior: 'pursue' },
-        { officerId: 'westCavalry', faction: 'enemy', pos: { x: 12, y: 11 }, level: 8, behavior: 'pursue' },
+        { officerId: 'westCavalry', faction: 'enemy', pos: { x: 4, y: 0 }, level: 10, behavior: 'pursue' },
+        { officerId: 'westCavalry', faction: 'enemy', pos: { x: 12, y: 0 }, level: 10, behavior: 'pursue' },
+        { officerId: 'westCavalry', faction: 'enemy', pos: { x: 4, y: 11 }, level: 10, behavior: 'pursue' },
+        { officerId: 'westCavalry', faction: 'enemy', pos: { x: 12, y: 11 }, level: 10, behavior: 'pursue' },
       ],
     },
     // 턴 3 — 동쪽 후방에서 이유가 직접 이끌고 나타나는 본대
@@ -71,9 +72,9 @@ export const STAGE_06: StageDef = {
       trigger: { type: 'turnStart', turn: 3 },
       units: [
         { officerId: 'liRu', faction: 'enemy', pos: { x: 15, y: 5 }, behavior: 'guard' },
-        { officerId: 'westInfantry', faction: 'enemy', pos: { x: 15, y: 4 }, level: 8, behavior: 'pursue' },
-        { officerId: 'westInfantry', faction: 'enemy', pos: { x: 15, y: 6 }, level: 8, behavior: 'pursue' },
-        { officerId: 'westArcher', faction: 'enemy', pos: { x: 15, y: 7 }, level: 8, behavior: 'pursue' },
+        { officerId: 'westInfantry', faction: 'enemy', pos: { x: 15, y: 4 }, level: 10, behavior: 'pursue' },
+        { officerId: 'westInfantry', faction: 'enemy', pos: { x: 15, y: 6 }, level: 10, behavior: 'pursue' },
+        { officerId: 'westArcher', faction: 'enemy', pos: { x: 15, y: 7 }, level: 10, behavior: 'pursue' },
       ],
     },
   ],

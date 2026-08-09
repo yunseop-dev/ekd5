@@ -61,7 +61,7 @@ export const STAGE_03: StageDef = {
   // 1차 = 전멸, 2차 = 장각 격파(협곡을 뚫는 정밀 타격 — 달성 시 보너스 경험치).
   // 순서 주의: 전멸은 보스 격파를 포함하므로 defeatBoss가 앞에 오면 2차 보너스가 영원히 안 뜬다.
   victory: [{ type: 'annihilation' }, { type: 'defeatBoss' }],
-  bonusExp: 50,
+  bonusExp: 150,
   // 전리품 — 장각을 직접 잡아야 나오는 보물 ("특정 적 격파" 분류)
   loot: [{ trigger: 'bossKill', itemId: 'taipingYaoshu' }],
   reinforcements: [

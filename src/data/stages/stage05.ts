@@ -48,19 +48,20 @@ export const STAGE_05: StageDef = {
     // 보스 — 여포. 협로에 서서 기다리지 않고 첫 턴부터 밀고 내려온다
     { officerId: 'lüBu', faction: 'enemy', pos: { x: 7, y: 3 }, isBoss: true, behavior: 'pursue' },
     // 호위 정예 — 여포를 따라 함께 밀고 나온다
-    { officerId: 'westCavalry', faction: 'enemy', pos: { x: 6, y: 3 }, level: 5, behavior: 'pursue' },
-    { officerId: 'westCavalry', faction: 'enemy', pos: { x: 6, y: 4 }, level: 5, behavior: 'pursue' },
-    { officerId: 'westCavalry', faction: 'enemy', pos: { x: 7, y: 4 }, level: 5, behavior: 'pursue' },
+    { officerId: 'westCavalry', faction: 'enemy', pos: { x: 6, y: 3 }, level: 7, behavior: 'pursue' },
+    { officerId: 'westCavalry', faction: 'enemy', pos: { x: 6, y: 4 }, level: 7, behavior: 'pursue' },
+    { officerId: 'westCavalry', faction: 'enemy', pos: { x: 7, y: 4 }, level: 7, behavior: 'pursue' },
     // 관내 수비 — 협로 뒤에서 진지를 지킨다
-    { officerId: 'westInfantry', faction: 'enemy', pos: { x: 5, y: 2 }, level: 5, behavior: 'guard' },
-    { officerId: 'westInfantry', faction: 'enemy', pos: { x: 8, y: 2 }, level: 5, behavior: 'guard' },
-    { officerId: 'westArcher', faction: 'enemy', pos: { x: 5, y: 1 }, level: 5, behavior: 'guard' },
-    { officerId: 'westArcher', faction: 'enemy', pos: { x: 9, y: 1 }, level: 5, behavior: 'guard' },
+    { officerId: 'westInfantry', faction: 'enemy', pos: { x: 5, y: 2 }, level: 7, behavior: 'guard' },
+    { officerId: 'westInfantry', faction: 'enemy', pos: { x: 8, y: 2 }, level: 7, behavior: 'guard' },
+    { officerId: 'westArcher', faction: 'enemy', pos: { x: 5, y: 1 }, level: 7, behavior: 'guard' },
+    { officerId: 'westArcher', faction: 'enemy', pos: { x: 9, y: 1 }, level: 7, behavior: 'guard' },
     // 이유 — 관 안쪽 본진에서 책략만 던진다
     { officerId: 'liRu', faction: 'enemy', pos: { x: 7, y: 0 }, behavior: 'guard' },
   ],
-  // 원작 "여포 퇴각" 재현 — 여포만 무너뜨리면 나머지 서량군은 관으로 물러난다
-  victory: [{ type: 'defeatBoss' }],
+  // 1차 = 여포 격파(원작 "여포 퇴각" 재현), 2차 = 서량군 전멸(여포를 잡기 전에 정리해야 달성 가능)
+  victory: [{ type: 'defeatBoss' }, { type: 'annihilation' }],
+  bonusExp: 150,
   // 전리품 — 적토마는 여포를 직접 잡아야 나온다 (방천화극은 원작대로 여포의 것으로 남는다)
   loot: [{ trigger: 'bossKill', itemId: 'chituma' }],
   reinforcements: [],

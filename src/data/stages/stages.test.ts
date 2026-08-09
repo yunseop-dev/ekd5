@@ -234,13 +234,14 @@ describe('스테이지 4 — 사수관 전투', () => {
 })
 
 describe('스테이지 5 — 호로관 전투', () => {
-  it('여포는 첫 턴부터 밀고 나오는 보스이고 승리조건은 여포 격파뿐이다', () => {
+  it('여포는 첫 턴부터 밀고 나오는 보스이고 1차 승리조건은 여포 격파다', () => {
     const boss = STAGE_05.units.find((u) => u.isBoss)!
     expect(boss.officerId).toBe('lüBu')
     expect(boss.behavior).toBe('pursue')
-    expect(STAGE_05.victory).toEqual([{ type: 'defeatBoss' }])
-    // 전멸시키지 않아도 이긴다 — 원작 "여포 퇴각" 재현
-    expect(STAGE_05.victory.some((v) => v.type === 'annihilation')).toBe(false)
+    // 전멸시키지 않아도 이긴다 — 원작 "여포 퇴각" 재현. 전멸은 2차(보너스) 조건
+    expect(STAGE_05.victory[0]).toEqual({ type: 'defeatBoss' })
+    expect(STAGE_05.victory[1]).toEqual({ type: 'annihilation' })
+    expect(STAGE_05.bonusExp).toBeGreaterThan(0)
   })
 
   it('AI vs AI 시뮬레이션이 크래시 없이 승패를 낸다 (도전적 난이도 — 양쪽 허용)', () => {
