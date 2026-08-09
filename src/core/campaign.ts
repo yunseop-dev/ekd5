@@ -1,11 +1,12 @@
 // 캠페인 진행 상태 — 전투 사이에 남는 유일한 데이터 (docs/research/campaign-ux.md)
 // core/ 규칙: 렌더러/브라우저 의존성 금지. 순수 TS + 데이터 참조만.
 
+import { CLASSES } from '../data/classes'
 import { EQUIPMENT } from '../data/equipment'
 import { FRUIT_ON_SELL, FRUITS } from '../data/fruits'
 import { OFFICERS } from '../data/officers'
 import { STAGES } from '../data/stages'
-// (착용 제한 판정은 OFFICERS.classId만으로 충분 — CLASSES 참조 불필요)
+// 착용 제한 판정은 병과의 lineage(계열 루트) 기준 — 승급해도 계열 무기를 계속 쓴다 (CLASSES 참조 필요)
 import type {
   BattleState,
   EquipInstance,
@@ -22,6 +23,11 @@ export interface RosterEntry {
   officerId: string
   level: number
   exp: number
+  /**
+   * 승급으로 바뀐 병과 id (오버라이드). 없으면 장수 기본 병과(OFFICERS[officerId].classId).
+   * 옵션 필드인 이유: v4 이하 세이브와 승급 전 부대는 이 값을 갖지 않는다.
+   */
+  classId?: string
   /** 장착 장비 인스턴스 — 무구성장(level/exp)이 전투에서 돌아와 여기에 쌓인다 */
   equipment: EquipmentMap
   /** 열매로 영구 상승한 장수 능력치 */
@@ -46,7 +52,15 @@ export function toEquipmentMap(input: EquipmentInput | EquipmentMap | undefined)
 
 export type CampaignNode =
   // rewardGold: 승리 시 지급되는 군자금. 원작은 전투별 보상금이 데이터로 박혀 있다.
-  | { id: string; type: 'battle'; stageId: string; rewardGold: number; next: string | null }
+  // rewardSeal: 승리 시 인수(印綬) 1개 지급 — 원작도 특정 전투에서만 나오는 희소 아이템이다.
+  | {
+      id: string
+      type: 'battle'
+      stageId: string
+      rewardGold: number
+      rewardSeal?: boolean
+      next: string | null
+    }
   | { id: string; type: 'story'; title: string; scriptId: string; next: string | null }
   // 선택지 노드 — 원작 "사실/가상 게이지"를 움직이며 후속 노드를 가른다 (campaign-ux.md 1부 §5).
   // 원작 03 동탁 추격전처럼 "그만둔다"를 고르면 전투 노드를 통째로 건너뛴다.
@@ -83,7 +97,7 @@ export function clampGauge(value: number): number {
 }
 
 export interface CampaignState {
-  version: 4
+  version: 5
   nodeId: string
   roster: RosterEntry[]
   clearedStages: string[]
@@ -98,6 +112,8 @@ export interface CampaignState {
    * 합 100 고정이므로 가상 쪽 값은 100 - gauge로 얻는다.
    */
   gauge: number
+  /** 보유 인수(印綬) 수 — 승급 1회당 1개 소비 (caocao.md §2.1) */
+  seals: number
 }
 
 /** 초기 군자금 — 서장 1단계 상점에서 tier1 장비 1~2점을 살 수 있는 수준 (설계값) */
@@ -120,9 +136,9 @@ export const CAMPAIGN_NODES: CampaignNode[] = [
   { id: 'n03', type: 'battle', stageId: 'stage03', rewardGold: 600, next: 's10' },
   // ---- 제1부 「패왕 탄생」 — 반동탁 연합 ----
   { id: 's10', type: 'story', title: '반동탁 격문', scriptId: 'coalition', next: 'n11' },
-  { id: 'n11', type: 'battle', stageId: 'stage04', rewardGold: 700, next: 's11' },
+  { id: 'n11', type: 'battle', stageId: 'stage04', rewardGold: 700, rewardSeal: true, next: 's11' },
   { id: 's11', type: 'story', title: '호로관으로', scriptId: 'toHulao', next: 'n12' },
-  { id: 'n12', type: 'battle', stageId: 'stage05', rewardGold: 800, next: 'c01' },
+  { id: 'n12', type: 'battle', stageId: 'stage05', rewardGold: 800, rewardSeal: true, next: 'c01' },
   {
     id: 'c01',
     type: 'choice',
@@ -137,7 +153,7 @@ export const CAMPAIGN_NODES: CampaignNode[] = [
       { text: '무리다. 훗날을 기약한다.', gaugeDelta: -10, next: 's12' },
     ],
   },
-  { id: 'n13', type: 'battle', stageId: 'stage06', rewardGold: 1000, next: 's13' },
+  { id: 'n13', type: 'battle', stageId: 'stage06', rewardGold: 1000, rewardSeal: true, next: 's13' },
   { id: 's12', type: 'story', title: '회군', scriptId: 'retreat', next: 's13' },
   { id: 's13', type: 'story', title: '1부 종장', scriptId: 'chapterEnd', next: 'fin' },
   { id: 'fin', type: 'end', title: '제1부 완' },
@@ -148,7 +164,7 @@ export const PLAYER_OFFICER_IDS = ['caocao', 'xiahoudun', 'dianwei', 'xiahouyuan
 
 export function newCampaign(): CampaignState {
   return {
-    version: 4,
+    version: 5,
     nodeId: CAMPAIGN_NODES[0].id,
     roster: PLAYER_OFFICER_IDS.map((officerId) => ({
       officerId,
@@ -163,6 +179,7 @@ export function newCampaign(): CampaignState {
     inventory: [],
     fruits: [],
     gauge: GAUGE_INITIAL,
+    seals: 0,
   }
 }
 
@@ -186,7 +203,7 @@ export function completeStory(campaign: CampaignState): CampaignState {
   const node = currentNode(campaign)
   if (!node || node.type !== 'story' || node.next === null) return campaign
   return {
-    version: 4,
+    version: 5,
     nodeId: node.next,
     roster: campaign.roster.map(cloneEntry),
     clearedStages: [...campaign.clearedStages],
@@ -194,6 +211,7 @@ export function completeStory(campaign: CampaignState): CampaignState {
     inventory: cloneInventory(campaign.inventory),
     fruits: [...campaign.fruits],
     gauge: clampGauge(campaign.gauge),
+    seals: campaign.seals,
   }
 }
 
@@ -208,7 +226,7 @@ export function completeChoice(campaign: CampaignState, optionIndex: number): Ca
   const option = node.options[optionIndex]
   if (!option) return campaign
   return {
-    version: 4,
+    version: 5,
     nodeId: option.next,
     roster: campaign.roster.map(cloneEntry),
     clearedStages: [...campaign.clearedStages],
@@ -216,6 +234,7 @@ export function completeChoice(campaign: CampaignState, optionIndex: number): Ca
     inventory: cloneInventory(campaign.inventory),
     fruits: [...campaign.fruits],
     gauge: clampGauge(campaign.gauge + option.gaugeDelta),
+    seals: campaign.seals,
   }
 }
 
@@ -271,7 +290,7 @@ export function applyVictory(campaign: CampaignState, battleState: BattleState):
     : [...campaign.clearedStages, battleState.stageId]
 
   return {
-    version: 4,
+    version: 5,
     // 막다른 노드(next null)나 전투 아닌 노드에서 불리면 제자리에 머문다
     nodeId: (node?.type === 'battle' || node?.type === 'story' ? node.next : null) ?? campaign.nodeId,
     roster: campaign.roster.map((entry) => {
@@ -286,6 +305,52 @@ export function applyVictory(campaign: CampaignState, battleState: BattleState):
     inventory: [...cloneInventory(campaign.inventory), ...lootFor(battleState).map(toEquipInstance)],
     fruits: [...campaign.fruits],
     gauge: clampGauge(campaign.gauge),
+    // 인수는 노드에 박힌 보상 — 원작대로 특정 전투(사수관/호로관/추격전)에서만 나온다
+    seals: campaign.seals + (node?.type === 'battle' && node.rewardSeal ? 1 : 0),
+  }
+}
+
+// ---------- 승급 (Lv15 + 인수 — caocao.md §2.1~2.2) ----------
+
+/** 승급에 필요한 최소 레벨 (2차). 원작: Lv15↑ 인수 → 2차, Lv30↑ 인수 → 3차 */
+export const PROMOTION_LEVEL = 15
+
+/**
+ * 로스터 항목의 실제 병과 id — 승급 오버라이드가 있으면 그것, 없으면 장수 기본 병과.
+ * 미등록 병과 id(데이터 개편/손상된 세이브)는 기본 병과로 되돌린다.
+ */
+export function classIdOf(entry: Pick<RosterEntry, 'officerId' | 'classId'>): string {
+  if (entry.classId && CLASSES[entry.classId]) return entry.classId
+  return OFFICERS[entry.officerId]?.classId ?? entry.classId ?? ''
+}
+
+/** 승급 가능 여부 — 로스터 소속 + Lv15 이상 + 인수 보유 + 상위 병과 존재 */
+export function canPromote(campaign: CampaignState, officerId: string): boolean {
+  const entry = campaign.roster.find((r) => r.officerId === officerId)
+  if (!entry) return false
+  if (entry.level < PROMOTION_LEVEL) return false
+  if (campaign.seals <= 0) return false
+  return CLASSES[classIdOf(entry)]?.promotesTo !== undefined
+}
+
+/**
+ * 승급 실행 (원본 불변) — 인수 1개를 쓰고 병과를 상위로 바꾼다.
+ * 레벨/경험치/장비/열매 보정은 그대로 유지되고, 클래스업 보너스는 새 병과의 hpBase/성장등급으로 창발한다.
+ * 조건 미충족이면 아무 일도 하지 않고 원본을 그대로 돌려준다.
+ */
+export function promoteOfficer(campaign: CampaignState, officerId: string): CampaignState {
+  if (!canPromote(campaign, officerId)) return campaign
+  const entry = campaign.roster.find((r) => r.officerId === officerId)!
+  const promotesTo = CLASSES[classIdOf(entry)].promotesTo!
+
+  return {
+    ...campaign,
+    roster: campaign.roster.map((r) =>
+      r.officerId === officerId ? { ...cloneEntry(r), classId: promotesTo } : cloneEntry(r),
+    ),
+    inventory: cloneInventory(campaign.inventory),
+    fruits: [...campaign.fruits],
+    seals: campaign.seals - 1,
   }
 }
 
@@ -299,13 +364,25 @@ function removeAt<T>(list: T[], index: number): T[] | null {
 
 /**
  * 병과별 착용 가능 판정 (원작: 무기 카테고리는 병과 1:1 — equipment.md §5).
+ * 판정 기준은 **계열(lineage)** — EQUIPMENT.classes에는 1차 병과 id만 적히고,
+ * 승급한 부대는 그 계열 루트로 환원해서 본다 (중기병도 경기병과 같은 창을 쓴다).
  * classes 미지정 장비는 전 병과 착용 가능.
  */
-export function canEquip(officerId: string, itemId: string): boolean {
+export function canEquipClass(classId: string, itemId: string): boolean {
   const item = EQUIPMENT[itemId]
+  const cls = CLASSES[classId]
+  if (!item || !cls) return false
+  return !item.classes || item.classes.includes(cls.lineage)
+}
+
+/**
+ * 장수 **기본 병과** 기준 착용 판정 — 승급 여부를 모르는 호출부(세이브 정화/목록 표시)용.
+ * 승급을 반영해야 하는 실제 장착은 equipItem(→ canEquipClass)이 로스터 병과로 판정한다.
+ */
+export function canEquip(officerId: string, itemId: string): boolean {
   const officer = OFFICERS[officerId]
-  if (!item || !officer) return false
-  return !item.classes || item.classes.includes(officer.classId)
+  if (!officer) return false
+  return canEquipClass(officer.classId, itemId)
 }
 
 /**
@@ -318,12 +395,14 @@ export function equipItem(campaign: CampaignState, officerId: string, inventoryI
   if (!instance) return campaign
   const item = EQUIPMENT[instance.itemId]
   if (!item) return campaign
-  if (!campaign.roster.some((r) => r.officerId === officerId)) return campaign
-  if (!canEquip(officerId, instance.itemId)) return campaign
+  const target = campaign.roster.find((r) => r.officerId === officerId)
+  if (!target) return campaign
+  // 승급 병과를 반영해 판정한다 (계열 기준이므로 승급해도 결과는 같지만, 정본은 로스터 병과다)
+  if (!canEquipClass(classIdOf(target), instance.itemId)) return campaign
   const rest = removeAt(campaign.inventory, inventoryIndex)
   if (!rest) return campaign
 
-  const previous = campaign.roster.find((r) => r.officerId === officerId)!.equipment[item.slot]
+  const previous = target.equipment[item.slot]
   return {
     ...campaign,
     roster: campaign.roster.map((entry) =>

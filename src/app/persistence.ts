@@ -4,10 +4,12 @@
 
 import { openDB, type IDBPDatabase } from 'idb'
 import type { CampaignState, RosterEntry } from '../core/campaign'
-import { canEquip, clampGauge, currentNode, GAUGE_INITIAL, INITIAL_GOLD } from '../core/campaign'
+import { canEquipClass, clampGauge, currentNode, GAUGE_INITIAL, INITIAL_GOLD } from '../core/campaign'
 import type { EquipInstance, EquipmentMap, EquipSlot, OfficerStats } from '../core/types'
 import { EQUIP_EXP_PER_LEVEL, EQUIP_MAX_LEVEL_NORMAL, EQUIP_MAX_LEVEL_TREASURE } from '../core/types'
+import { CLASSES } from '../data/classes'
 import { EQUIPMENT } from '../data/equipment'
+import { OFFICERS } from '../data/officers'
 import { STAGES } from '../data/stages'
 
 export interface SaveMeta {
@@ -98,16 +100,19 @@ function normalizeStatBonus(value: unknown): Partial<OfficerStats> {
 
 /**
  * 저장된 JSON은 신뢰할 수 없다 (수동 편집/구버전) — 구조 검사 후에만 통과.
- * v1(장비/군자금 이전)·v2(무구성장 이전)·v3(선택지/게이지 이전) 세이브는 거부하지 않고 v4로 **승계 마이그레이션**한다:
+ * v1(장비/군자금 이전)·v2(무구성장 이전)·v3(선택지/게이지 이전)·v4(승급 이전) 세이브는
+ * 거부하지 않고 v5로 **승계 마이그레이션**한다:
  *  - v1 → 군자금 = 초기치, 창고 = 빈 목록, 각 부대의 장비 = 빈 슬롯. 성장치(레벨/경험치)는 살린다.
  *  - v2 → 장비/창고의 문자열 id를 Lv1 인스턴스로, 열매 목록·능력치 보정은 빈 값으로 채운다.
  *  - v3 → 사실-가상 게이지를 중립(50)으로 채운다. 선택지를 한 번도 지나지 않은 세이브와 같은 상태.
- * 병과 착용 제한 정화는 버전과 무관하게 항상 수행한다.
+ *  - v4 → 인수 보유 수를 0으로 채운다. 승급한 부대가 없는 세이브와 같은 상태.
+ * 병과 착용 제한 정화는 버전과 무관하게 항상 수행한다(승급 병과 반영 — 계열 기준).
  */
 export function validateCampaign(data: unknown): CampaignState | null {
   if (typeof data !== 'object' || data === null) return null
   const raw = data as Record<string, unknown>
-  if (raw.version !== 1 && raw.version !== 2 && raw.version !== 3 && raw.version !== 4) return null
+  const KNOWN_VERSIONS = [1, 2, 3, 4, 5]
+  if (typeof raw.version !== 'number' || !KNOWN_VERSIONS.includes(raw.version)) return null
   const legacy = raw.version === 1 // v1 = 장비/경제 도입 이전
   if (typeof raw.nodeId !== 'string') return null
   if (!Array.isArray(raw.roster) || !Array.isArray(raw.clearedStages)) return null
@@ -136,6 +141,10 @@ export function validateCampaign(data: unknown): CampaignState | null {
   // 손상된 값(문자열/NaN)은 세이브를 거부하지 않고 중립으로 되돌린다 — 게이지 하나로 세이브를 버릴 이유가 없다.
   const gauge = typeof raw.gauge === 'number' ? clampGauge(raw.gauge) : GAUGE_INITIAL
 
+  // v5 전용 필드 — 없으면 0(인수 미보유)으로 승계. 음수/소수/비정상 값은 0으로 되돌린다.
+  const seals =
+    typeof raw.seals === 'number' && Number.isFinite(raw.seals) ? Math.max(0, Math.trunc(raw.seals)) : 0
+
   const roster: RosterEntry[] = []
   for (const item of raw.roster) {
     if (typeof item !== 'object' || item === null) return null
@@ -143,27 +152,35 @@ export function validateCampaign(data: unknown): CampaignState | null {
     if (typeof entry.officerId !== 'string') return null
     if (typeof entry.level !== 'number' || !Number.isFinite(entry.level)) return null
     if (typeof entry.exp !== 'number' || !Number.isFinite(entry.exp)) return null
+    // 승급 병과 오버라이드 — 미등록 id(데이터 개편/손상)는 아예 떨어내 기본 병과로 복원한다.
+    const promoted =
+      typeof entry.classId === 'string' && CLASSES[entry.classId] ? entry.classId : undefined
+    const classId = promoted ?? OFFICERS[entry.officerId]?.classId
+
     // 착용 규칙 강화 이전 세이브 정화: 병과 착용 불가 장비(예: 곽가의 목검)는 창고로 되돌린다.
+    // 판정은 계열(lineage) 기준이라 승급한 부대가 무기를 빼앗기지 않는다.
     // 미등록 id는 기존 방침대로 슬롯에 남긴다(읽기 쪽이 조용히 무시).
     const equipment = legacy ? {} : normalizeEquipment(entry.equipment)
     for (const slot of EQUIP_SLOTS) {
       const instance = equipment[slot]
-      if (instance && EQUIPMENT[instance.itemId] && !canEquip(entry.officerId, instance.itemId)) {
-        delete equipment[slot]
-        inventory.push(instance) // 성장분(레벨/경험치)은 잃지 않고 창고로
-      }
+      if (!instance || !EQUIPMENT[instance.itemId]) continue
+      if (classId && canEquipClass(classId, instance.itemId)) continue
+      delete equipment[slot]
+      inventory.push(instance) // 성장분(레벨/경험치)은 잃지 않고 창고로
     }
     roster.push({
       officerId: entry.officerId,
       level: entry.level,
       exp: entry.exp,
+      // 옵션 필드 — 승급하지 않은 부대에는 키 자체를 만들지 않는다 (v4 라운드트립 동일성 유지)
+      ...(promoted ? { classId: promoted } : {}),
       equipment,
       statBonus: normalizeStatBonus(entry.statBonus),
     })
   }
 
   return {
-    version: 4,
+    version: 5,
     nodeId: raw.nodeId,
     roster,
     clearedStages: raw.clearedStages as string[],
@@ -171,6 +188,7 @@ export function validateCampaign(data: unknown): CampaignState | null {
     inventory,
     fruits,
     gauge,
+    seals,
   }
 }
 

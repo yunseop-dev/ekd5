@@ -84,6 +84,11 @@ export interface UnitClassDef {
   name: string
   tier: 1 | 2 | 3
   category: ClassCategory
+  /**
+   * 계열 루트 = 이 병과가 속한 1차 병과 id (1차 병과는 자기 자신).
+   * 승급해도 장비 착용 규칙은 계열 단위로 유지된다 — 중기병도 창을 쓴다 (equipment.md §5).
+   */
+  lineage: string
   mounted: boolean // 기병계 여부 (원거리 추가피해 대상)
   ranged: boolean // 간접 공격 병과 (반격 안 받음/안 함)
   move: number

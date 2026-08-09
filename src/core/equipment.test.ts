@@ -649,7 +649,7 @@ describe('applyVictory — 보상금과 전리품', () => {
 
 // ---------- 세이브 마이그레이션 ----------
 
-describe('validateCampaign — v1/v2/v3 → v4 승계', () => {
+describe('validateCampaign — v1~v4 → v5 승계', () => {
   const v1Save = {
     version: 1,
     nodeId: 'n02',
@@ -660,10 +660,10 @@ describe('validateCampaign — v1/v2/v3 → v4 승계', () => {
     clearedStages: ['stage01'],
   }
 
-  it('v1 세이브를 거부하지 않고 v4로 승계한다', () => {
+  it('v1 세이브를 거부하지 않고 v5로 승계한다', () => {
     const restored = validateCampaign(JSON.parse(JSON.stringify(v1Save)))!
     expect(restored).not.toBeNull()
-    expect(restored.version).toBe(4)
+    expect(restored.version).toBe(5)
     expect(restored.nodeId).toBe('n02')
     expect(restored.clearedStages).toEqual(['stage01'])
     // 성장치는 그대로 살리고, 없던 필드만 초기값으로 채운다
@@ -689,7 +689,7 @@ describe('validateCampaign — v1/v2/v3 → v4 승계', () => {
     expect(unitOf(state, 'caocao').equipment).toEqual({})
   })
 
-  it('v4 라운드트립은 장비 인스턴스/군자금/창고/열매/게이지를 보존한다', () => {
+  it('v5 라운드트립은 장비 인스턴스/군자금/창고/열매/게이지를 보존한다', () => {
     const campaign = buyItem(equipItem(withStock(['ironSword']), 'caocao', 0), 'leatherArmor')
     const grown = {
       ...campaign,
@@ -714,7 +714,7 @@ describe('validateCampaign — v1/v2/v3 → v4 승계', () => {
       inventory: ['woodSword', 'leatherShield'],
     }
     const restored = validateCampaign(v2Save)!
-    expect(restored.version).toBe(4)
+    expect(restored.version).toBe(5)
     expect(restored.roster[0].equipment).toEqual({
       weapon: { itemId: 'ironSword', level: 1, exp: 0 },
       armor: { itemId: 'leatherArmor', level: 1, exp: 0 },
@@ -752,7 +752,7 @@ describe('validateCampaign — v1/v2/v3 → v4 승계', () => {
     expect(validateCampaign({ ...base, inventory: [1] })).toBeNull()
     expect(validateCampaign({ ...base, fruits: [1] })).toBeNull()
     expect(validateCampaign({ ...base, fruits: 'x' })).toBeNull()
-    expect(validateCampaign({ ...base, version: 5 })).toBeNull()
+    expect(validateCampaign({ ...base, version: 6 })).toBeNull()
   })
 
   it('망가진 장비 맵은 세이브를 버리지 않고 해당 슬롯만 떨어낸다', () => {

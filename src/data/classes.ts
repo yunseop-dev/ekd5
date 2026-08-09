@@ -1,4 +1,5 @@
-// 병과 정의 — MVP는 1차 병과 6종 (승급 트리는 캠페인 단계에서 확장).
+// 병과 정의 — 1차 6종 + 2차 6종 (Lv15 + 인수로 승급, docs/research/caocao.md §2.2).
+// lineage = 계열 루트(1차 병과 id) — 장비 착용 판정은 항상 계열 기준이라 승급해도 무기를 잃지 않는다.
 // 성장등급 배치 원칙(docs/research/caocao.md §2):
 //  - 기병: 공격 우수, 기동 6, 평지 강함 / 보병: 방어 S 탱커 / 궁병: 공격 A 원거리
 //  - 책사: 정신 S 공격책략 특화 / 풍수사: 힐러+버퍼 / 군주: 밸런스형 + 사기 S
@@ -9,6 +10,8 @@ import type { UnitClassDef } from '../core/types'
 export const CLASSES: Record<string, UnitClassDef> = {
   lord: {
     id: 'lord',
+    lineage: 'lord',
+    promotesTo: 'chancellor',
     name: '군주',
     tier: 1,
     category: 'lord',
@@ -30,6 +33,8 @@ export const CLASSES: Record<string, UnitClassDef> = {
   },
   lightCavalry: {
     id: 'lightCavalry',
+    lineage: 'lightCavalry',
+    promotesTo: 'heavyCavalry',
     name: '경기병',
     tier: 1,
     category: 'cavalry',
@@ -48,6 +53,8 @@ export const CLASSES: Record<string, UnitClassDef> = {
   },
   heavyInfantry: {
     id: 'heavyInfantry',
+    lineage: 'heavyInfantry',
+    promotesTo: 'guardInfantry',
     name: '중보병',
     tier: 1,
     category: 'infantry',
@@ -66,6 +73,8 @@ export const CLASSES: Record<string, UnitClassDef> = {
   },
   archer: {
     id: 'archer',
+    lineage: 'archer',
+    promotesTo: 'crossbowman',
     name: '궁병',
     tier: 1,
     category: 'archer',
@@ -84,6 +93,8 @@ export const CLASSES: Record<string, UnitClassDef> = {
   },
   strategist: {
     id: 'strategist',
+    lineage: 'strategist',
+    promotesTo: 'counselor',
     name: '책사',
     tier: 1,
     category: 'strategist',
@@ -108,6 +119,8 @@ export const CLASSES: Record<string, UnitClassDef> = {
   },
   geomancer: {
     id: 'geomancer',
+    lineage: 'geomancer',
+    promotesTo: 'seniorGeomancer',
     name: '풍수사',
     tier: 1,
     category: 'support',
@@ -126,6 +139,142 @@ export const CLASSES: Record<string, UnitClassDef> = {
       { strategyId: 'chiryo', learnLevel: 1 },
       { strategyId: 'gyeokryeo', learnLevel: 3 },
       { strategyId: 'yeonbyeong', learnLevel: 6 },
+    ],
+  },
+
+  // ---------- 2차 병과 (Lv15 + 인수 승급 — caocao.md §2.2) ----------
+  // 클래스업 보너스: HP/MP 기본치 상승 + 성장등급 1~2칸 상향 (원작: 승급 없이 상위 클래스로
+  // 참전한 조창은 체력이 낮다는 서술 = 승급 자체에 보너스가 붙는다).
+  // 1차의 책략 목록은 그대로 물려받고, 일부 계열은 상위 책략을 Lv15에 추가로 익힌다.
+  chancellor: {
+    id: 'chancellor',
+    lineage: 'lord',
+    name: '승상',
+    tier: 2,
+    category: 'lord',
+    mounted: false,
+    ranged: false,
+    move: 5,
+    minRange: 1,
+    maxRange: 1,
+    moveProfile: 'foot',
+    // 군주(A/A/A/B/S) → 공격 S 상향
+    growth: { atk: 'S', def: 'A', mind: 'A', agi: 'B', morale: 'S' },
+    hpBase: 150,
+    hpGrowth: 7,
+    mpBase: 30,
+    mpGrowth: 2,
+    strategies: [
+      { strategyId: 'gyeokryeo', learnLevel: 1 },
+      { strategyId: 'seonpung', learnLevel: 8 },
+    ],
+  },
+  heavyCavalry: {
+    id: 'heavyCavalry',
+    lineage: 'lightCavalry',
+    name: '중기병',
+    tier: 2,
+    category: 'cavalry',
+    mounted: true,
+    ranged: false,
+    // 원작 중기병은 둔중하다 — 공방을 얻는 대신 기동을 1 잃는다
+    move: 5,
+    minRange: 1,
+    maxRange: 1,
+    moveProfile: 'horse',
+    growth: { atk: 'S', def: 'A', mind: 'C', agi: 'A', morale: 'B' },
+    hpBase: 140,
+    hpGrowth: 6,
+    mpBase: 10,
+    mpGrowth: 1,
+    strategies: [],
+  },
+  guardInfantry: {
+    id: 'guardInfantry',
+    lineage: 'heavyInfantry',
+    name: '근위병',
+    tier: 2,
+    category: 'infantry',
+    mounted: false,
+    ranged: false,
+    move: 4,
+    minRange: 1,
+    maxRange: 1,
+    moveProfile: 'foot',
+    growth: { atk: 'A', def: 'S', mind: 'C', agi: 'C', morale: 'B' },
+    hpBase: 170,
+    hpGrowth: 7,
+    mpBase: 10,
+    mpGrowth: 1,
+    strategies: [],
+  },
+  crossbowman: {
+    id: 'crossbowman',
+    lineage: 'archer',
+    name: '연노병',
+    tier: 2,
+    category: 'archer',
+    mounted: false,
+    ranged: true,
+    move: 4,
+    minRange: 2,
+    maxRange: 2,
+    moveProfile: 'foot',
+    growth: { atk: 'S', def: 'C', mind: 'B', agi: 'B', morale: 'C' },
+    hpBase: 125,
+    hpGrowth: 5,
+    mpBase: 10,
+    mpGrowth: 1,
+    strategies: [],
+  },
+  counselor: {
+    id: 'counselor',
+    lineage: 'strategist',
+    name: '모사',
+    tier: 2,
+    category: 'strategist',
+    mounted: false,
+    ranged: false,
+    move: 4,
+    minRange: 1,
+    maxRange: 1,
+    moveProfile: 'mage',
+    growth: { atk: 'C', def: 'C', mind: 'S', agi: 'A', morale: 'B' },
+    hpBase: 90,
+    hpGrowth: 4,
+    mpBase: 45,
+    mpGrowth: 3,
+    strategies: [
+      { strategyId: 'choyeol', learnLevel: 1 },
+      { strategyId: 'seonpung', learnLevel: 3 },
+      { strategyId: 'dunbyeong', learnLevel: 5 },
+      { strategyId: 'hwajin', learnLevel: 8 },
+      { strategyId: 'eophwa', learnLevel: 12 },
+      { strategyId: 'hwaryong', learnLevel: 15 }, // 승급 보상 — 광역 화계
+    ],
+  },
+  seniorGeomancer: {
+    id: 'seniorGeomancer',
+    lineage: 'geomancer',
+    name: '대풍수사',
+    tier: 2,
+    category: 'support',
+    mounted: false,
+    ranged: false,
+    move: 4,
+    minRange: 1,
+    maxRange: 1,
+    moveProfile: 'mage',
+    growth: { atk: 'C', def: 'C', mind: 'S', agi: 'B', morale: 'A' },
+    hpBase: 90,
+    hpGrowth: 4,
+    mpBase: 45,
+    mpGrowth: 3,
+    strategies: [
+      { strategyId: 'chiryo', learnLevel: 1 },
+      { strategyId: 'gyeokryeo', learnLevel: 3 },
+      { strategyId: 'yeonbyeong', learnLevel: 6 },
+      { strategyId: 'daechiryo', learnLevel: 15 }, // 승급 보상 — 광역 회복
     ],
   },
 }

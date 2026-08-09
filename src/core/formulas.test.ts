@@ -169,7 +169,7 @@ describe('strategyDamage (책략 데미지)', () => {
 })
 
 const mkClass = (over: Partial<UnitClassDef>): UnitClassDef => ({
-  id: 'x', name: 'x', tier: 1, category: 'infantry', mounted: false, ranged: false,
+  id: 'x', name: 'x', lineage: 'x', tier: 1, category: 'infantry', mounted: false, ranged: false,
   move: 4, minRange: 1, maxRange: 1, moveProfile: 'foot',
   growth: { atk: 'B', def: 'B', mind: 'B', agi: 'B', morale: 'B' },
   hpBase: 100, hpGrowth: 6, mpBase: 10, mpGrowth: 1, strategies: [],

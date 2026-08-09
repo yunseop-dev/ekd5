@@ -42,6 +42,19 @@ export const STRATEGIES: Record<string, StrategyDef> = {
     capHitRate: 90,
     targets: 'enemy',
   },
+  // 화룡 — 2차 병과(모사) 전용 광역 화계. 원작 화룡은 범위기.
+  hwaryong: {
+    id: 'hwaryong',
+    name: '화룡',
+    kind: 'damage',
+    element: 'fire',
+    mpCost: 20,
+    range: 3,
+    area: 'cross',
+    power: 60,
+    capHitRate: 80,
+    targets: 'enemy',
+  },
   // ---- 풍계 (날씨 무관) ----
   seonpung: {
     id: 'seonpung',
@@ -64,6 +77,19 @@ export const STRATEGIES: Record<string, StrategyDef> = {
     mpCost: 4,
     range: 3,
     area: 'single',
+    healAmount: 80,
+    capHitRate: 100,
+    targets: 'ally',
+  },
+  // 대치료 — 2차 병과(대풍수사) 전용 광역 회복
+  daechiryo: {
+    id: 'daechiryo',
+    name: '대치료',
+    kind: 'heal',
+    element: 'holy',
+    mpCost: 12,
+    range: 3,
+    area: 'cross',
     healAmount: 80,
     capHitRate: 100,
     targets: 'ally',

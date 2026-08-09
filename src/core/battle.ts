@@ -7,7 +7,7 @@ import { OFFICERS } from '../data/officers'
 import { STRATEGIES } from '../data/strategies'
 import { TERRAIN } from '../data/terrain'
 import type { RosterEntry } from './campaign'
-import { toEquipmentMap } from './campaign'
+import { classIdOf, toEquipmentMap } from './campaign'
 import type { CombatStats } from './formulas'
 import {
   affinityMultiplier,
@@ -273,14 +273,16 @@ export function createBattle(
 
   const units: UnitState[] = defs.map((def, i) => {
     const officer = OFFICERS[def.officerId]
-    const cls = CLASSES[officer.classId]
     // 캠페인 로스터가 있으면 스테이지/장수 기본 레벨을 덮어쓴다 (전투 간 성장 이월)
     const entry = def.faction === 'player' ? roster?.find((r) => r.officerId === def.officerId) : undefined
+    // 승급한 아군은 로스터의 병과 오버라이드를 쓴다. 적/우군은 언제나 장수 기본 병과.
+    const classId = entry ? classIdOf(entry) : officer.classId
+    const cls = CLASSES[classId]
     const level = entry?.level ?? def.level ?? officer.level
     return {
       id: `u${i}_${def.officerId}`,
       officerId: def.officerId,
-      classId: officer.classId,
+      classId,
       faction: def.faction,
       pos: { ...def.pos },
       level,
