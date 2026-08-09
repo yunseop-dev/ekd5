@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { decideUnit, runAiPhase } from '../../core/ai'
 import { applyAction, livingUnits, startBattle, unitAt } from '../../core/battle'
+import { toEquipmentMap } from '../../core/campaign'
 import type { BattleState } from '../../core/types'
 import { CLASSES } from '../classes'
 import { OFFICERS } from '../officers'
@@ -153,10 +154,17 @@ describe('스테이지 3 — 황건 본진 소탕', () => {
     // 장수 기본 레벨(2~3)로는 협곡에서 밀린다 — 최종 스테이지라 로스터 이월을 전제한다
     expect(['victory', 'defeat']).toContain(simulate(startBattle(STAGE_03, 42), 400).result)
 
-    // 두 전투를 거친 로스터(≈Lv6)면 협곡→성문→성채까지 실제로 진행돼 장각을 잡는다
+    // 두 전투를 거친 로스터(≈Lv6, 초기 장비 유지)면 협곡→성문→성채까지 진행돼 장각을 잡는다.
+    // v0.7에서 적 잡병이 방어구까지 갖추면서 맨몸 로스터로는 밀린다 — 실플레이 조건(장비 보유)으로 검증
     const roster = STAGE_03.units
       .filter((u) => u.faction === 'player')
-      .map((u) => ({ officerId: u.officerId, level: 6, exp: 0, equipment: {}, statBonus: {} }))
+      .map((u) => ({
+        officerId: u.officerId,
+        level: 6,
+        exp: 0,
+        equipment: toEquipmentMap(OFFICERS[u.officerId].initialEquipment),
+        statBonus: {},
+      }))
     const grown = simulate(startBattle(STAGE_03, 42, roster), 400)
     expect(grown.result).toBe('victory')
     expect(grown.units.find((u) => u.isBoss)!.hp).toBe(0)

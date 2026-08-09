@@ -183,11 +183,19 @@ describe('장비 → effectiveStats', () => {
   })
 
   // v0.6: 잡병도 병과 기본 무기를 지닌다 (원작 — 적 부대도 장비를 갖고 나온다)
-  it('적 잡병은 기본 무기 1점만 지닌다 (방어구·보조구 없음)', () => {
+  it('적 잡병도 무기+방어구를 완비한다 (v0.7 — 사용자 요구)', () => {
     const state = startBattle(mkStage(), 1, [entry('caocao', 3, { weapon: 'ironSword' })])
     const enemy = unitOf(state, 'yellowInfantry')
-    expect(slotIds(enemy.equipment)).toEqual({ weapon: 'woodSword' })
+    expect(slotIds(enemy.equipment)).toEqual({ weapon: 'woodSword', armor: 'leatherArmor' })
     expect(enemy.equipment.weapon).toEqual({ itemId: 'woodSword', level: 1, exp: 0 })
+  })
+
+  it('모든 적 장수의 초기 장비는 자기 병과가 착용 가능하다 (정합)', () => {
+    for (const [id, officer] of Object.entries(OFFICERS)) {
+      for (const itemId of Object.values(officer.initialEquipment ?? {})) {
+        expect(canEquip(id, itemId), `${id}: ${itemId}`).toBe(true)
+      }
+    }
   })
 
   it('적 병과별 기본 무기가 착용 가능한 것으로 배정돼 있다', () => {
