@@ -2,29 +2,44 @@
 
 import { describe, expect, it } from 'vitest'
 import { decideUnit, runAiPhase } from '../../core/ai'
-import { applyAction, livingUnits, startBattle, unitAt } from '../../core/battle'
+import { applyAction, livingUnits, movementRangeOf, startBattle, unitAt } from '../../core/battle'
 import { toEquipmentMap } from '../../core/campaign'
-import type { BattleState } from '../../core/types'
+import { autoResolveEvents } from '../../core/events'
+import type { BattleAction, BattleState } from '../../core/types'
 import { CLASSES } from '../classes'
 import { OFFICERS } from '../officers'
 import { STRATEGIES } from '../strategies'
 import { TERRAIN } from '../terrain'
-import { STAGES } from './index'
-import { STAGE_01 } from './stage01'
-import { STAGE_02 } from './stage02'
-import { STAGE_03 } from './stage03'
-import { STAGE_04 } from './stage04'
-import { STAGE_05 } from './stage05'
-import { STAGE_06 } from './stage06'
-import { STAGE_07 } from './stage07'
-import { STAGE_08 } from './stage08'
-import { STAGE_09 } from './stage09'
-import { STAGE_10 } from './stage10'
-import { STAGE_11 } from './stage11'
+import { STAGES, stageById } from './index'
 
-/** 아군도 AI로 조작해 전투를 완주시키는 헬퍼 */
-function simulate(state: BattleState, maxRounds: number, onTurnStart?: (s: BattleState) => void): BattleState {
-  let current = state
+// v1.1: 스테이지 정의가 json/*.json으로 이관되어 named import가 사라졌다.
+// 로더(validateStage)를 통과한 것만 여기 잡히므로 이 상수 자체가 이관 검증기다 — 아래 단정은 무수정.
+const STAGE_01 = stageById('stage01')!
+const STAGE_02 = stageById('stage02')!
+const STAGE_03 = stageById('stage03')!
+const STAGE_04 = stageById('stage04')!
+const STAGE_05 = stageById('stage05')!
+const STAGE_06 = stageById('stage06')!
+const STAGE_07 = stageById('stage07')!
+const STAGE_08 = stageById('stage08')!
+const STAGE_09 = stageById('stage09')!
+const STAGE_10 = stageById('stage10')!
+const STAGE_11 = stageById('stage11')!
+
+/**
+ * 아군도 AI로 조작해 전투를 완주시키는 헬퍼.
+ * v1.1: 모든 액션 뒤에 autoResolveEvents를 물려 이벤트가 시뮬을 막지 않게 한다
+ * (표시 대기 이벤트가 남아 있으면 리듀서가 eventContinue 외 전 액션을 거부한다).
+ * choice는 pick(기본 0 = 밸런스 기준선)을 고른다 — 3책 분기 테스트가 이 인자를 쓴다.
+ */
+function simulate(
+  state: BattleState,
+  maxRounds: number,
+  onTurnStart?: (s: BattleState) => void,
+  pick = 0,
+): BattleState {
+  const go = (s: BattleState, action: BattleAction) => autoResolveEvents(applyAction(s, action), pick)
+  let current = autoResolveEvents(state, pick) // battleStart 이벤트(전략 선택 등) 소화
   let lastTurn = 0
   for (let i = 0; i < maxRounds && current.result === 'ongoing'; i++) {
     if (current.turn !== lastTurn) {
@@ -36,17 +51,34 @@ function simulate(state: BattleState, maxRounds: number, onTurnStart?: (s: Battl
         if (current.result !== 'ongoing') break
         const plan = decideUnit(current, u)
         if (plan.moveTo && !unitAt(current, plan.moveTo)) {
-          current = applyAction(current, { type: 'move', unitId: u.id, to: plan.moveTo })
+          current = go(current, { type: 'move', unitId: u.id, to: plan.moveTo })
         }
-        current = applyAction(current, plan.act)
+        current = go(current, plan.act)
       }
-      if (current.result === 'ongoing') current = applyAction(current, { type: 'endPhase' })
+      if (current.result === 'ongoing') current = go(current, { type: 'endPhase' })
     } else {
-      current = runAiPhase(current, current.phase)
+      current = autoResolveEvents(runAiPhase(current, current.phase), pick)
     }
   }
   return current
 }
+
+/**
+ * 전술 상황을 손으로 만들어 이벤트 발동을 확정 검증하는 헬퍼.
+ * 좌표·HP만 옮겨 놓고 상태 전이는 전부 리듀서에 맡긴다 (이벤트 발동 자체를 위조하지 않는다).
+ */
+function situate(state: BattleState, edit: (s: BattleState) => void): BattleState {
+  const stage = state.__stage
+  const next: BattleState = structuredClone({ ...state, __stage: undefined })
+  next.__stage = stage
+  edit(next)
+  return next
+}
+
+const unitOf = (state: BattleState, officerId: string) =>
+  state.units.find((u) => u.officerId === officerId && u.hp > 0)!
+
+const tileAt = (state: BattleState, x: number, y: number) => state.map.tiles[y][x]
 
 describe('스테이지 데이터 무결성', () => {
   it('모든 스테이지: 장수/병과/책략 참조가 유효하다', () => {
@@ -145,12 +177,13 @@ describe('스테이지 2 — 관문 방어전', () => {
   })
 
   it('아무도 행동하지 않아도 8턴 버티면 게임이 끝난다 (surviveTurns 평가)', () => {
-    let state = startBattle(STAGE_02, 1)
+    // v1.1: 대사 이벤트도 소화해야 페이즈가 넘어간다 (대기 큐가 남으면 리듀서가 전 액션을 거부한다)
+    let state = autoResolveEvents(startBattle(STAGE_02, 1))
     for (let i = 0; i < 60 && state.result === 'ongoing'; i++) {
       if (state.phase === 'player') {
-        state = applyAction(state, { type: 'endPhase' })
+        state = autoResolveEvents(applyAction(state, { type: 'endPhase' }))
       } else {
-        state = runAiPhase(state, state.phase)
+        state = autoResolveEvents(runAiPhase(state, state.phase))
       }
     }
     expect(state.result).not.toBe('ongoing')
@@ -208,10 +241,12 @@ describe('스테이지 4 — 사수관 전투', () => {
     const gates: string[] = []
     for (let y = 0; y < STAGE_04.map.height; y++) {
       for (let x = 0; x < STAGE_04.map.width; x++) {
-        if (STAGE_04.map.tiles[y][x] === 'gate') gates.push(`${x},${y}`)
+        // v1.1: 성문은 닫힌 상태(gateClosed)로 시작하고 이벤트로 열린다 — 위치는 그대로 (11,5)
+        if (STAGE_04.map.tiles[y][x] === 'gateClosed') gates.push(`${x},${y}`)
       }
     }
     expect(gates).toEqual(['11,5'])
+    expect(STAGE_04.map.tiles.flat()).not.toContain('gate') // 열린 문은 처음엔 없다
     const boss = STAGE_04.units.find((u) => u.isBoss)!
     expect(boss.officerId).toBe('huaXiong')
     expect(boss.pos).toEqual({ x: 12, y: 5 }) // 성문 바로 뒤
@@ -475,5 +510,246 @@ describe('스테이지 11 — 하비 여포 포위전', () => {
   it('AI vs AI 시뮬레이션이 크래시 없이 승패를 낸다 (최종전 — 양쪽 허용)', () => {
     expect(['victory', 'defeat']).toContain(simulate(startBattle(STAGE_11, 42, rosterAt(STAGE_11, 18)), 800).result)
     expect(['victory', 'defeat']).toContain(simulate(startBattle(STAGE_11, 7, rosterAt(STAGE_11, 18)), 800).result)
+  })
+})
+
+// ---------- 전투 내 이벤트 (v1.1) ----------
+// 소급 콘텐츠 26건의 발동·효과 회귀. 대사 텍스트는 단정하지 않는다(창작물이라 바뀔 수 있다) —
+// 발동 조건, 상태 변화, 시뮬 완주 가능성만 본다.
+
+/** 지정 턴까지 아군은 아무것도 하지 않고 페이즈만 넘긴다 (턴 트리거 관찰용) */
+function advanceToTurn(state: BattleState, turn: number, pick = 0): BattleState {
+  let current = autoResolveEvents(state, pick)
+  for (let i = 0; i < 40 && current.turn < turn && current.result === 'ongoing'; i++) {
+    if (current.phase === 'player') {
+      current = autoResolveEvents(applyAction(current, { type: 'endPhase' }), pick)
+    } else {
+      current = autoResolveEvents(runAiPhase(current, current.phase), pick)
+    }
+  }
+  return current
+}
+
+describe('이벤트 데이터 — 소급 콘텐츠 26건', () => {
+  it('11스테이지 전부 이벤트를 갖고 id는 스테이지 안에서 유일하다', () => {
+    const counts = STAGES.map((s) => [s.id, (s.events ?? []).length] as const)
+    expect(counts).toEqual([
+      ['stage01', 2], ['stage02', 2], ['stage03', 2], ['stage04', 2], ['stage05', 2], ['stage06', 2],
+      ['stage07', 1], ['stage08', 3], ['stage09', 2], ['stage10', 2], ['stage11', 6],
+    ])
+    expect(counts.reduce((n, [, c]) => n + c, 0)).toBe(26)
+    for (const stage of STAGES) {
+      const ids = (stage.events ?? []).map((e) => e.id)
+      expect(new Set(ids).size, stage.id).toBe(ids.length)
+    }
+  })
+
+  it('이벤트가 AI 시뮬을 막지 않는다 — 11스테이지 전부 승패가 나고 대기 큐가 비어 끝난다', () => {
+    // 리듀서는 pendingEvents가 남아 있으면 전 액션을 거부한다 — 끝까지 소화되는지가 이 테스트의 핵심
+    for (const stage of STAGES) {
+      const result = simulate(startBattle(stage, 42, rosterAt(stage, 18)), 800)
+      expect(result.result, stage.id).not.toBe('ongoing')
+      expect(result.pendingEvents, stage.id).toHaveLength(0)
+    }
+  })
+
+  it('같은 시드는 같은 결과를 낸다 — 일기토는 난수를 쓰지 않는다 (stage11 일기토 4건 경유)', () => {
+    const run = () => simulate(startBattle(STAGE_11, 42, rosterAt(STAGE_11, 18)), 800)
+    const a = run()
+    const b = run()
+    expect(b.result).toBe(a.result)
+    expect(b.firedEvents).toEqual(a.firedEvents)
+    expect(b.log.length).toBe(a.log.length)
+    expect(b.units.map((u) => [u.officerId, u.hp, u.level])).toEqual(a.units.map((u) => [u.officerId, u.hp, u.level]))
+  })
+})
+
+describe('stage01 — 허자장의 제안 (원작 c00 "대화 후 혜택")', () => {
+  it('턴 2에 선택지가 뜨고, 수락하면 경험치 / 거절하면 도구를 준다', () => {
+    const accepted = advanceToTurn(startBattle(STAGE_01, 1), 2, 0)
+    expect(accepted.firedEvents).toContain('s01-xuzijiang')
+    expect(accepted.log.some((l) => l.message.includes('경험치 +100'))).toBe(true)
+    expect(accepted.pendingRewards).toEqual([])
+
+    const declined = advanceToTurn(startBattle(STAGE_01, 1), 2, 1)
+    expect(declined.firedEvents).toContain('s01-xuzijiang')
+    expect(declined.pendingRewards).toEqual([{ itemId: 'hoebokKong', kind: 'consumable' }])
+    expect(declined.log.some((l) => l.message.includes('경험치 +100'))).toBe(false)
+  })
+})
+
+describe('stage02 — 턴 5 사기 진작 (창작 스테이지의 의도적 이탈)', () => {
+  it('턴 5에 아군 전원이 사기 버프를 받는다', () => {
+    const state = advanceToTurn(startBattle(STAGE_02, 1), 5)
+    expect(state.firedEvents).toContain('s02-wave')
+    for (const unit of livingUnits(state, 'player')) {
+      expect(unit.buffs.some((b) => b.stat === 'morale' && b.amount === 20), unit.officerId).toBe(true)
+    }
+  })
+})
+
+describe('stage04 — 성문 개방 (지점 도달 + 맵 가변)', () => {
+  it('닫힌 성문은 통과할 수 없고, 문 앞에 서면 열려서 관 안쪽이 열린다', () => {
+    const state = autoResolveEvents(startBattle(STAGE_04, 1, rosterAt(STAGE_04, 7)))
+    expect(state.pendingEvents).toHaveLength(0) // 개전 대사는 소화됐다
+    expect(tileAt(state, 11, 5)).toBe('gateClosed')
+
+    // 문 앞((10,5))에 세워도 닫힌 문 너머(x≥11)로는 한 칸도 갈 수 없다
+    const atGate = situate(state, (s) => {
+      unitOf(s, 'caocao').pos = { x: 10, y: 5 }
+    })
+    const before = movementRangeOf(atGate, unitOf(atGate, 'caocao'))
+    expect([...before.values()].some((c) => c.pos.x >= 11)).toBe(false)
+
+    // 다음 액션의 공통 후처리에서 reachArea가 평가돼 문이 열린다
+    const after = autoResolveEvents(applyAction(atGate, { type: 'endPhase' }))
+    expect(after.firedEvents).toContain('s04-gate-open')
+    expect(tileAt(after, 11, 5)).toBe('gate')
+    const opened = movementRangeOf(after, unitOf(after, 'caocao'))
+    expect([...opened.values()].some((c) => c.pos.x >= 11)).toBe(true)
+
+    // 스테이지 정의는 오염되지 않는다 (createBattle 딥클론) — 다음 전투도 닫힌 문에서 시작
+    expect(STAGE_04.map.tiles[5][11]).toBe('gateClosed')
+  })
+})
+
+describe('stage05 — 여포 격파 연쇄 (원작 c02)', () => {
+  it('여포가 쓰러지면 관 밖 서량기병이 혼란에 빠진다', () => {
+    const state = autoResolveEvents(startBattle(STAGE_05, 1, rosterAt(STAGE_05, 12)))
+    // 여포를 잔 HP 1로 두고 아군 3기를 인접시켜 실제 공격으로 격파한다 (격파 처리를 위조하지 않는다)
+    const ready = situate(state, (s) => {
+      unitOf(s, 'lüBu').hp = 1
+      unitOf(s, 'dianwei').pos = { x: 7, y: 2 }
+      unitOf(s, 'xiahoudun').pos = { x: 6, y: 2 }
+      unitOf(s, 'caocao').pos = { x: 8, y: 3 }
+    })
+    let after = ready
+    for (const officerId of ['dianwei', 'xiahoudun', 'caocao']) {
+      const lüBu = after.units.find((u) => u.officerId === 'lüBu')!
+      if (lüBu.hp <= 0) break
+      const attacker = unitOf(after, officerId)
+      after = autoResolveEvents(
+        applyAction(after, { type: 'attack', unitId: attacker.id, targetId: lüBu.id }),
+      )
+    }
+    expect(after.units.find((u) => u.officerId === 'lüBu')!.hp).toBe(0)
+    expect(after.firedEvents).toContain('s05-lubu-fall')
+    const cavalry = after.units.filter((u) => u.officerId === 'westCavalry' && u.hp > 0)
+    expect(cavalry.length).toBeGreaterThan(0)
+    for (const unit of cavalry) {
+      expect(unit.statuses.map((s) => s.id), unit.id).toContain('confusion')
+    }
+  })
+})
+
+describe('stage07 — 청주 3책 (원작 c04)', () => {
+  const picked = (pick: number) =>
+    autoResolveEvents(startBattle(STAGE_07, 42, rosterAt(STAGE_07, 14)), pick)
+
+  it('①순욱 권항: 궁병 2 + 요술사 1이 설득으로 물러난다', () => {
+    const state = picked(0)
+    expect(state.firedEvents).toContain('s07-three-plans')
+    expect(livingUnits(state, 'enemy')).toHaveLength(6)
+    expect(state.units.some((u) => u.officerId === 'yellowArcher')).toBe(false)
+    expect(state.units.some((u) => u.officerId === 'yellowShaman')).toBe(false)
+  })
+
+  it('②전위 강행: 소수만 도주하고 잔존 적 전원이 레벨업한다', () => {
+    const state = picked(1)
+    const enemies = livingUnits(state, 'enemy')
+    expect(enemies).toHaveLength(8)
+    expect(state.units.some((u) => u.officerId === 'yellowShaman')).toBe(false)
+    for (const unit of enemies) expect(unit.level, unit.officerId).toBeGreaterThanOrEqual(13)
+    expect(enemies.every((u) => u.hp === u.maxHp)).toBe(true) // 정예화 = 완전회복
+  })
+
+  it('③곽가 유인: 기병 3기가 아군 진 안쪽으로 재배치되고 혼란에 빠진다 (총량 유지 = 최다 경험치)', () => {
+    const state = picked(2)
+    const enemies = livingUnits(state, 'enemy')
+    expect(enemies).toHaveLength(9)
+    const confused = enemies.filter((u) => u.statuses.some((s) => s.id === 'confusion'))
+    expect(confused.map((u) => u.officerId)).toEqual(['yellowCavalry', 'yellowCavalry', 'yellowCavalry'])
+    // 재배치 위치 = 아군 출진 슬롯 안쪽 (남쪽)
+    for (const unit of confused) expect(unit.pos.y).toBeGreaterThanOrEqual(8)
+  })
+
+  it('세 분기 모두 stage06 클리어 로스터로 승리할 수 있다', () => {
+    for (const pick of [0, 1, 2]) {
+      const result = simulate(startBattle(STAGE_07, 42, rosterAt(STAGE_07, 14)), 600, undefined, pick)
+      expect(result.result, `선택 ${pick}`).toBe('victory')
+    }
+  })
+})
+
+describe('stage09 / stage11 — 일기토 (원작 확정 결과)', () => {
+  it('stage09 조조×여포: 인접만으로 자동 발동하고 무승부로 끝난다 (경험치 없음)', () => {
+    const state = autoResolveEvents(startBattle(STAGE_09, 1, rosterAt(STAGE_09, 16)))
+    const meet = situate(state, (s) => {
+      unitOf(s, 'caocao').pos = { x: 5, y: 4 } // 여포 (5,3) 인접
+    })
+    const after = autoResolveEvents(applyAction(meet, { type: 'endPhase' }))
+    expect(after.firedEvents).toContain('s09-lubu-duel')
+    expect(unitOf(after, 'lüBu').hp).toBeGreaterThan(0)
+    expect(unitOf(after, 'caocao').hp).toBeGreaterThan(0)
+    expect(unitOf(after, 'caocao').exp).toBe(0) // 무승부는 무보상
+  })
+
+  it('stage11 위속×하후돈: 아군이 이기고 적장이 죽는다 (배반·투항이 아니다)', () => {
+    const state = autoResolveEvents(startBattle(STAGE_11, 1, rosterAt(STAGE_11, 18)))
+    const meet = situate(state, (s) => {
+      unitOf(s, 'xiahoudun').pos = { x: 10, y: 4 } // 위속 (11,4) 인접
+    })
+    const after = autoResolveEvents(applyAction(meet, { type: 'endPhase' }))
+    expect(after.firedEvents).toContain('s11-duel-weixu')
+    expect(after.units.find((u) => u.officerId === 'weiXu')!.hp).toBe(0)
+    expect(unitOf(after, 'xiahoudun').hp).toBeGreaterThan(0)
+    expect(unitOf(after, 'xiahoudun').exp).toBeGreaterThan(0) // 일기토 승리 = 일반 격파 경험치
+  })
+
+  it('stage11 초선×조조: 무승부 — 아무도 죽지 않는다', () => {
+    const state = autoResolveEvents(startBattle(STAGE_11, 1, rosterAt(STAGE_11, 18)))
+    const meet = situate(state, (s) => {
+      unitOf(s, 'caocao').pos = { x: 7, y: 3 } // 성문 위 — 초선 (8,2) 인접
+    })
+    const after = autoResolveEvents(applyAction(meet, { type: 'endPhase' }))
+    expect(after.firedEvents).toContain('s11-duel-diaochan')
+    expect(unitOf(after, 'diaochan').hp).toBeGreaterThan(0)
+    expect(unitOf(after, 'caocao').hp).toBeGreaterThan(0)
+    expect(unitOf(after, 'caocao').exp).toBe(0)
+  })
+})
+
+describe('stage11 — 여포 기동 (원작 c14 "성내 4부대")', () => {
+  it('아군 4부대가 성내에 들어서면 여포·진궁·고순이 농성을 풀고 나온다', () => {
+    const state = autoResolveEvents(startBattle(STAGE_11, 1, rosterAt(STAGE_11, 18)))
+    for (const officerId of ['lüBu', 'chenGong', 'gaoShun']) {
+      expect(unitOf(state, officerId).behavior, officerId).toBe('guard')
+    }
+    // 성벽 안쪽 맨 위 행에 4부대를 들여놓는다 (3부대로는 발동하지 않아야 한다)
+    const cells = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+      { x: 15, y: 0 },
+    ]
+    const place = (count: number) =>
+      situate(state, (s) => {
+        s.units
+          .filter((u) => u.faction === 'player')
+          .slice(0, count)
+          .forEach((u, i) => {
+            u.pos = cells[i]
+          })
+      })
+
+    const three = autoResolveEvents(applyAction(place(3), { type: 'endPhase' }))
+    expect(three.firedEvents).not.toContain('s11-lubu-sortie')
+    expect(unitOf(three, 'lüBu').behavior).toBe('guard')
+
+    const four = autoResolveEvents(applyAction(place(4), { type: 'endPhase' }))
+    expect(four.firedEvents).toContain('s11-lubu-sortie')
+    for (const officerId of ['lüBu', 'chenGong', 'gaoShun']) {
+      expect(unitOf(four, officerId).behavior, officerId).toBe('pursue')
+    }
   })
 })

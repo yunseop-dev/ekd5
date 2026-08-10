@@ -12,6 +12,7 @@ import { OFFICERS } from '../data/officers'
 import { STAGES } from '../data/stages'
 import { STRATEGIES } from '../data/strategies'
 import { decideUnit, runAiPhase } from './ai'
+import { autoResolveEvents } from './events'
 import { applyAction, effectiveStats, knownStrategies, livingUnits, startBattle, unitAt } from './battle'
 import type { CampaignState, RosterEntry } from './campaign'
 import {
@@ -54,7 +55,8 @@ function readyToPromote(officerId: string, level = PROMOTION_LEVEL): CampaignSta
 
 /** 승급을 마친 로스터 상태 — 전투에서 인수를 쓰고 승리로 회수한 결과 */
 function promotedInBattle(campaign: CampaignState, ...officerIds: string[]): CampaignState {
-  let state = startBattle(stage('stage01'), 1, campaign.roster, undefined, campaign.consumables)
+  // v1.1: 개전 대사 이벤트를 소화해야 useItem이 통과한다 (대기 큐가 남으면 전 액션 거부)
+  let state = autoResolveEvents(startBattle(stage('stage01'), 1, campaign.roster, undefined, campaign.consumables))
   for (const officerId of officerIds) {
     const target = state.units.find((u) => u.officerId === officerId)!
     state = applyAction(state, { type: 'useItem', unitId: target.id, itemId: 'insu', target: target.pos })
@@ -72,7 +74,7 @@ function useInsu(
   campaign: CampaignState,
   officerId: string,
 ): { before: BattleState; after: BattleState } {
-  const before = startBattle(stage('stage01'), 1, campaign.roster, undefined, campaign.consumables)
+  const before = autoResolveEvents(startBattle(stage('stage01'), 1, campaign.roster, undefined, campaign.consumables))
   const target = before.units.find((u) => u.officerId === officerId)
   const after = target
     ? applyAction(before, { type: 'useItem', unitId: target.id, itemId: 'insu', target: target.pos })
@@ -501,7 +503,7 @@ describe('rewardSeal — 인수는 특정 전투 승리에서만 나온다', () 
       } else break
     }
     expect(campaign.clearedStages).not.toContain('stage06')
-    expect(consumableCount(campaign.consumables, 'insu')).toBe(3)
+    expect(consumableCount(campaign.consumables, 'insu')).toBe(4) // n13 스킵으로 전투 보상 3 + 유비 생존 1
   })
 })
 
@@ -552,20 +554,23 @@ describe('validateCampaign — v4~v5 → v6 승계', () => {
 
 /** 아군까지 AI로 굴려 전투를 끝까지 진행시킨다 (stages.test.ts와 같은 방식) */
 function simulate(state: BattleState, maxRounds: number): BattleState {
-  let current = state
+  // v1.1: 모든 액션 뒤에 이벤트 대기 큐를 소화한다 (choice는 0번 = 밸런스 기준선)
+  const go = (s: BattleState, action: Parameters<typeof applyAction>[1]) =>
+    autoResolveEvents(applyAction(s, action))
+  let current = autoResolveEvents(state)
   for (let i = 0; i < maxRounds && current.result === 'ongoing'; i++) {
     if (current.phase === 'player') {
       for (const u of livingUnits(current, 'player')) {
         if (current.result !== 'ongoing') break
         const plan = decideUnit(current, u)
         if (plan.moveTo && !unitAt(current, plan.moveTo)) {
-          current = applyAction(current, { type: 'move', unitId: u.id, to: plan.moveTo })
+          current = go(current, { type: 'move', unitId: u.id, to: plan.moveTo })
         }
-        current = applyAction(current, plan.act)
+        current = go(current, plan.act)
       }
-      if (current.result === 'ongoing') current = applyAction(current, { type: 'endPhase' })
+      if (current.result === 'ongoing') current = go(current, { type: 'endPhase' })
     } else {
-      current = runAiPhase(current, current.phase)
+      current = autoResolveEvents(runAiPhase(current, current.phase))
     }
   }
   return current
@@ -620,7 +625,7 @@ describe('풀 캠페인 레벨 커브 (추격 루트 완주 — 1부 + 2부)', (
       'stage01', 'stage02', 'stage03', 'stage04', 'stage05', 'stage06',
       'stage07', 'stage08', 'stage09', 'stage10', 'stage11',
     ])
-    expect(consumableCount(campaign.consumables, 'insu')).toBe(4)
+    expect(consumableCount(campaign.consumables, 'insu')).toBe(5) // 전투 보상 4 + 유비 생존(allySurvived — 원작 c13) 1
     // 2부 합류 2명이 로스터에 얹힌다 (허저 s23 / 장료 s25)
     expect(campaign.roster.map((r) => r.officerId)).toContain('xuChu')
     expect(campaign.roster.map((r) => r.officerId)).toContain('zhangLiao')

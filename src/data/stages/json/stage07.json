@@ -1,0 +1,358 @@
+{
+  "id": "stage07",
+  "name": "청주 평정",
+  "weather": "clear",
+  "notes": "스테이지 7 \"청주 평정\" — 제2부 「연주에서 서주로」 첫 전투 (원작 1장 후반 청주 황건, 난이도 E)\n검증 목표: 사방이 트인 개활지에서의 물량전(초기 9기 + 턴3 증원 3기 = 총 12기),\n           구릉(산지)을 엄폐물로 쓰는 진형, **적장 없는 전멸 단일 승리조건**\n원작 충실: 원작 c04 청주는 적장이 한 명도 없고 황건 익명 부대만 나온다 (statuses.md §4).\n           관해(管亥)는 원작 512인 명부에 없는 영걸전 인물이라 두목 유닛을 두지 않았고,\n           그래서 defeatBoss 2차 조건도 bonusExp도 없다 — 물량을 끝까지 지워야 이긴다.\n지형 구성: 남쪽 개활지(출진) → 중앙 초원 덤불 → 좌우 구릉 두 덩이 → 북쪽 황건 진채\n밸런스: 적은 Lv12~13(2부 진입 시 아군 예상 Lv13~14에 러버밴딩)이지만 능력치가 낮고\n        유민 무리라 방어구가 없다 — 머릿수로 압박하고 개별 전투력으로는 밀리는 구도.\n        보스 격파 지름길이 사라진 대신 총량을 14 → 12기로 줄여 난이도 E를 유지했다.\n---\nv1.1 이벤트: 원작 c04 3책 선택 1건 (battleStart, 회피 불가 — 원작도 배치 후 개전 직전).\n  ①순욱 권항 = 궁병 2 + 요술사 1 이탈 (옵션 0 = 시뮬 기본 선택 = 밸런스 기준선)\n  ②전위 강행 = 요술사 1 이탈 + 잔존 적 전원 Lv+1 (원작 \"선택 → 적 Lv+1\"의 유일한 정격 사례)\n  ③곽가 유인 = 기병 3기를 아군 진 안쪽((5,8)·(7,8)·(6,9))으로 재배치 + 혼란 → 잔존 최다 = 최다 경험치\n  원작 비율(27부대 중 9퇴각 / 6도주+Lv1 / 9재배치+4혼란)을 우리 12부대 규모로 축약했다.\n[의도적 이탈] 원작 3번째 제안자는 순유(荀攸)지만 우리 명부에 없어 곽가로 치환했다(계략·실리 축 동일).\n  원작 c04는 3책 외 서사 장치가 0이고 적장도 없어 격파 대사 이벤트는 두지 않았다.",
+  "map": {
+    "rows": [
+      "PPPPPPPPPPPPPP",
+      "PPPGGPPPPGGPPP",
+      "PPPGGPPPPGGPPP",
+      "PPPPPPPPPPPPPP",
+      "PPMMPPPPPPMMPP",
+      "PPMMPPPPPPMMPP",
+      "PPPPPPPPPPPPPP",
+      "PPPPPGGPPPPPPP",
+      "PPPPPGGPPPPPPP",
+      "PPPPPPPPPPPPPP",
+      "PPPPPPPPPPPPPP",
+      "PPPPPPPPPPPPPP"
+    ]
+  },
+  "playerSlots": [
+    { "x": 6, "y": 10 },
+    { "x": 5, "y": 10 },
+    { "x": 7, "y": 10 },
+    { "x": 4, "y": 10 },
+    { "x": 8, "y": 10 },
+    { "x": 6, "y": 11 },
+    { "x": 9, "y": 10 }
+  ],
+  "deployMin": 5,
+  "deployMax": 7,
+  "forcedOfficers": [
+    "caocao"
+  ],
+  "units": [
+    {
+      "officerId": "caocao",
+      "faction": "player",
+      "pos": { "x": 6, "y": 10 },
+      "isLeader": true
+    },
+    {
+      "officerId": "xiahoudun",
+      "faction": "player",
+      "pos": { "x": 5, "y": 10 }
+    },
+    {
+      "officerId": "dianwei",
+      "faction": "player",
+      "pos": { "x": 7, "y": 10 }
+    },
+    {
+      "officerId": "xiahouyuan",
+      "faction": "player",
+      "pos": { "x": 4, "y": 10 }
+    },
+    {
+      "officerId": "guojia",
+      "faction": "player",
+      "pos": { "x": 8, "y": 10 }
+    },
+    {
+      "officerId": "xunyu",
+      "faction": "player",
+      "pos": { "x": 6, "y": 11 }
+    },
+    {
+      "officerId": "yellowShaman",
+      "faction": "enemy",
+      "pos": { "x": 6, "y": 0 },
+      "level": 12,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "yellowInfantry",
+      "faction": "enemy",
+      "pos": { "x": 7, "y": 0 },
+      "level": 12,
+      "equipment": {
+        "weapon": "woodSword"
+      },
+      "behavior": "guard"
+    },
+    {
+      "officerId": "yellowInfantry",
+      "faction": "enemy",
+      "pos": { "x": 5, "y": 1 },
+      "level": 12,
+      "equipment": {
+        "weapon": "woodSword"
+      },
+      "behavior": "guard"
+    },
+    {
+      "officerId": "yellowInfantry",
+      "faction": "enemy",
+      "pos": { "x": 7, "y": 1 },
+      "level": 12,
+      "equipment": {
+        "weapon": "woodSword"
+      },
+      "behavior": "guard"
+    },
+    {
+      "officerId": "yellowArcher",
+      "faction": "enemy",
+      "pos": { "x": 3, "y": 0 },
+      "level": 12,
+      "equipment": {
+        "weapon": "woodBow"
+      },
+      "behavior": "guard"
+    },
+    {
+      "officerId": "yellowArcher",
+      "faction": "enemy",
+      "pos": { "x": 9, "y": 0 },
+      "level": 12,
+      "equipment": {
+        "weapon": "woodBow"
+      },
+      "behavior": "guard"
+    },
+    {
+      "officerId": "yellowCavalry",
+      "faction": "enemy",
+      "pos": { "x": 2, "y": 3 },
+      "level": 12,
+      "equipment": {
+        "weapon": "woodSpear"
+      },
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "yellowCavalry",
+      "faction": "enemy",
+      "pos": { "x": 6, "y": 2 },
+      "level": 12,
+      "equipment": {
+        "weapon": "woodSpear"
+      },
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "yellowCavalry",
+      "faction": "enemy",
+      "pos": { "x": 11, "y": 3 },
+      "level": 12,
+      "equipment": {
+        "weapon": "woodSpear"
+      },
+      "behavior": "pursue"
+    }
+  ],
+  "victory": [
+    { "type": "annihilation" }
+  ],
+  "reinforcements": [
+    {
+      "trigger": {
+        "type": "turnStart",
+        "turn": 3
+      },
+      "units": [
+        {
+          "officerId": "yellowInfantry",
+          "faction": "enemy",
+          "pos": { "x": 4, "y": 2 },
+          "level": 12,
+          "equipment": {
+            "weapon": "woodSword"
+          },
+          "behavior": "pursue"
+        },
+        {
+          "officerId": "yellowInfantry",
+          "faction": "enemy",
+          "pos": { "x": 9, "y": 2 },
+          "level": 12,
+          "equipment": {
+            "weapon": "woodSword"
+          },
+          "behavior": "pursue"
+        },
+        {
+          "officerId": "yellowCavalry",
+          "faction": "enemy",
+          "pos": { "x": 0, "y": 6 },
+          "level": 12,
+          "equipment": {
+            "weapon": "woodSpear"
+          },
+          "behavior": "pursue"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "id": "s07-three-plans",
+      "trigger": { "type": "battleStart" },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": null,
+              "text": "청주 황건에는 장수도 깃발도 없다. 굶은 유민이 산과 들을 덮고 있을 뿐이다."
+            },
+            {
+              "speaker": "xunyu",
+              "text": "조조님, 저들은 도적이기 전에 백성입니다. 항복을 권하면 절반은 창을 놓을 것입니다."
+            },
+            {
+              "speaker": "dianwei",
+              "text": "말로 되는 무리가 아니오! 앞을 한 번 세게 치면 뒤는 알아서 흩어집니다."
+            },
+            {
+              "speaker": "guojia",
+              "text": "…….굳이 쫓을 일입니까. 남동의 무리를 우리 진 안으로 끌어들이면 포위는 저절로 됩니다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "셋 다 옳소. 그러나 쓸 수 있는 것은 하나요."
+            }
+          ]
+        },
+        {
+          "type": "choice",
+          "prompt": "어느 계책을 쓰시겠습니까?",
+          "speaker": "caocao",
+          "options": [
+            {
+              "text": "순욱에게 맡긴다 — 권항책",
+              "actions": [
+                {
+                  "type": "dialogue",
+                  "lines": [
+                    {
+                      "speaker": "xunyu",
+                      "text": "조조님의 이름으로 항서를 보냅니다. …….돌아갈 땅이 있는 자는 돌아갈 것입니다."
+                    },
+                    {
+                      "speaker": null,
+                      "text": "산 위의 무리 일부가 창을 버리고 물러났다."
+                    }
+                  ]
+                },
+                {
+                  "type": "removeUnits",
+                  "officerIds": [
+                    "yellowArcher",
+                    "yellowShaman"
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "전위에게 맡긴다 — 강행책",
+              "actions": [
+                {
+                  "type": "dialogue",
+                  "lines": [
+                    {
+                      "speaker": "dianwei",
+                      "text": "갑니다! 겁먹은 놈은 알아서 도망칠 겁니다!"
+                    },
+                    {
+                      "speaker": null,
+                      "text": "선봉의 함성에 무리 일부가 흩어졌다. 남은 자들은 오히려 이를 갈고 뭉쳤다."
+                    }
+                  ]
+                },
+                {
+                  "type": "removeUnits",
+                  "officerIds": [
+                    "yellowShaman"
+                  ]
+                },
+                {
+                  "type": "levelUpEnemies",
+                  "amount": 1
+                }
+              ]
+            },
+            {
+              "text": "곽가에게 맡긴다 — 유인책",
+              "actions": [
+                {
+                  "type": "dialogue",
+                  "lines": [
+                    {
+                      "speaker": "guojia",
+                      "text": "기치를 눕히고 길을 비워 두십시오. …….저들은 빈 길로 들어옵니다."
+                    },
+                    {
+                      "speaker": null,
+                      "text": "남동의 기병 무리가 미끼를 물고 진 안까지 들어왔다 — 사방이 아군이다."
+                    }
+                  ]
+                },
+                {
+                  "type": "removeUnits",
+                  "officerIds": [
+                    "yellowCavalry"
+                  ]
+                },
+                {
+                  "type": "spawnUnits",
+                  "units": [
+                    {
+                      "officerId": "yellowCavalry",
+                      "faction": "enemy",
+                      "pos": { "x": 5, "y": 8 },
+                      "level": 12,
+                      "equipment": {
+                        "weapon": "woodSpear"
+                      },
+                      "behavior": "pursue"
+                    },
+                    {
+                      "officerId": "yellowCavalry",
+                      "faction": "enemy",
+                      "pos": { "x": 7, "y": 8 },
+                      "level": 12,
+                      "equipment": {
+                        "weapon": "woodSpear"
+                      },
+                      "behavior": "pursue"
+                    },
+                    {
+                      "officerId": "yellowCavalry",
+                      "faction": "enemy",
+                      "pos": { "x": 6, "y": 9 },
+                      "level": 12,
+                      "equipment": {
+                        "weapon": "woodSpear"
+                      },
+                      "behavior": "pursue"
+                    }
+                  ]
+                },
+                {
+                  "type": "inflictStatus",
+                  "officerIds": [
+                    "yellowCavalry"
+                  ],
+                  "status": "confusion"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

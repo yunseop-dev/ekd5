@@ -248,6 +248,45 @@ export const OFFICERS: Record<string, OfficerDef> = {
     level: 17,
   },
 
+  // 여포의 양녀 — 하비(c14)에서 조조와 일기토를 벌이고 무승부로 끝난다 (battle-events.md §2)
+  diaochan: {
+    id: 'diaochan',
+    name: '초선',
+    // 원작 Data.e5 실측치. 원작 병과는 무희(舞姫)지만 우리 병과 목록에 없어
+    // 풍수사(geomancer)로 재편성했다 — 보급·고양으로 성 안을 지탱하는 역할 [의도적 이탈]
+    stats: { str: 76, ldr: 64, int: 68, agi: 100, luck: 82 },
+    classId: 'geomancer',
+    initialEquipment: { weapon: 'bronzeGemSword', armor: 'silkRobe' },
+    level: 16,
+  },
+  // 하비의 여포 부장 3인 — 원작 c14에서 아군과의 일기토에 지고 전사한다.
+  // ※ 사서의 투항(배반) 전개는 원작 조조전이 채택하지 않았다 — 여기서도 그냥 죽는다
+  //   (battle-events.md §2 "배반 일기토는 원작에 없다")
+  houCheng: {
+    id: 'houCheng',
+    name: '후성',
+    stats: { str: 76, ldr: 70, int: 54, agi: 52, luck: 54 },
+    classId: 'lightCavalry',
+    initialEquipment: { weapon: 'bronzeSpear', armor: 'bronzeArmor' },
+    level: 18,
+  },
+  weiXu: {
+    id: 'weiXu',
+    name: '위속',
+    stats: { str: 78, ldr: 76, int: 42, agi: 58, luck: 44 },
+    classId: 'lightCavalry',
+    initialEquipment: { weapon: 'bronzeSpear', armor: 'bronzeArmor' },
+    level: 18,
+  },
+  songXian: {
+    id: 'songXian',
+    name: '송헌',
+    stats: { str: 74, ldr: 74, int: 52, agi: 56, luck: 60 },
+    classId: 'lightCavalry',
+    initialEquipment: { weapon: 'bronzeSpear', armor: 'bronzeArmor' },
+    level: 17,
+  },
+
   // ---- 유비군 (stage08 = 적 원군 / stage10 = 우군) ----
   // 원작 인과 재현: c05에서는 적 원군으로 등장하고, c13(구원 선택)에서 우군이 된다.
   liuBei: {

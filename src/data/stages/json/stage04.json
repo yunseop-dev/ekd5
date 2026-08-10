@@ -1,0 +1,213 @@
+{
+  "id": "stage04",
+  "name": "사수관 전투",
+  "weather": "clear",
+  "notes": "스테이지 4 \"사수관 전투\" — 제1부 「패왕 탄생」 첫 전투 (원작 01 사수관, 난이도 C)\n검증 목표: 서→동 진격, 관문(성벽+성문 단일 진입로) 돌파, 성문 뒤 보스(화웅) 방어,\n           정규군(서량병 Lv4, 방어구 보유) 다수 + 턴 3 관문 안쪽 증원\n지형 구성: 서쪽 개활지(출진) → 숲 두 곳을 낀 접근로 → x=11 관문 벽 + (11,5) 성문 → 동쪽 관내(성채 2)\n---\nv1.1 이벤트: 개전 대사 / 성문 개방 — 초기 맵의 (11,5)를 gateClosed(문자 E)로 두고,\n  성문 앞 3칸((10,4)·(10,5)·(10,6))에 아군이 서면 setTile로 gate가 된다 (지점 도달 + 맵 가변 기믹).\n[의도적 이탈] 원작 c01은 \"관내 8부대가 관에서 나오지 않는다\"는 부동 규칙이고 닫힌 성문 기믹은 없다.\n  AI가 최근접 적(관 안 화웅) 방향으로 붙으면서 자연히 문 앞을 잡는 구조라 시뮬도 통과한다.",
+  "map": {
+    "rows": [
+      "MMMMMMMMMMMXCCCM",
+      "MMPPPPPPPPMXCTCM",
+      "PPPPPFFPPPPXCCCM",
+      "PPPPPPPPPPPXCCCM",
+      "PPPPPPPPPPPXCTCM",
+      "PPPPPPPPPPPECCCM",
+      "PPPPPPPPPPPXCCCM",
+      "PPPPPFFPPPPXCCCM",
+      "MMPPPPPPPPMXCCCM",
+      "MMMMMMMMMMMXXXXM"
+    ]
+  },
+  "playerSlots": [
+    { "x": 0, "y": 4 },
+    { "x": 0, "y": 5 },
+    { "x": 1, "y": 3 },
+    { "x": 1, "y": 6 },
+    { "x": 0, "y": 3 },
+    { "x": 0, "y": 6 }
+  ],
+  "deployMin": 4,
+  "deployMax": 6,
+  "forcedOfficers": [
+    "caocao",
+    "xiahoudun"
+  ],
+  "units": [
+    {
+      "officerId": "caocao",
+      "faction": "player",
+      "pos": { "x": 0, "y": 4 },
+      "isLeader": true
+    },
+    {
+      "officerId": "xiahoudun",
+      "faction": "player",
+      "pos": { "x": 0, "y": 5 }
+    },
+    {
+      "officerId": "dianwei",
+      "faction": "player",
+      "pos": { "x": 1, "y": 3 }
+    },
+    {
+      "officerId": "xiahouyuan",
+      "faction": "player",
+      "pos": { "x": 1, "y": 6 }
+    },
+    {
+      "officerId": "guojia",
+      "faction": "player",
+      "pos": { "x": 0, "y": 3 }
+    },
+    {
+      "officerId": "xunyu",
+      "faction": "player",
+      "pos": { "x": 0, "y": 6 }
+    },
+    {
+      "officerId": "westCavalry",
+      "faction": "enemy",
+      "pos": { "x": 9, "y": 3 },
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "westCavalry",
+      "faction": "enemy",
+      "pos": { "x": 9, "y": 7 },
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": { "x": 10, "y": 4 },
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": { "x": 10, "y": 6 },
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": { "x": 9, "y": 5 },
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westArcher",
+      "faction": "enemy",
+      "pos": { "x": 10, "y": 3 },
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westArcher",
+      "faction": "enemy",
+      "pos": { "x": 10, "y": 7 },
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westArcher",
+      "faction": "enemy",
+      "pos": { "x": 13, "y": 1 },
+      "behavior": "guard"
+    },
+    {
+      "officerId": "huaXiong",
+      "faction": "enemy",
+      "pos": { "x": 12, "y": 5 },
+      "isBoss": true,
+      "behavior": "guard"
+    }
+  ],
+  "victory": [
+    { "type": "annihilation" },
+    { "type": "defeatBoss" }
+  ],
+  "bonusExp": 150,
+  "reinforcements": [
+    {
+      "trigger": {
+        "type": "turnStart",
+        "turn": 3
+      },
+      "units": [
+        {
+          "officerId": "westInfantry",
+          "faction": "enemy",
+          "pos": { "x": 13, "y": 4 },
+          "behavior": "pursue"
+        },
+        {
+          "officerId": "westCavalry",
+          "faction": "enemy",
+          "pos": { "x": 13, "y": 6 },
+          "behavior": "pursue"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "id": "s04-open",
+      "trigger": { "type": "battleStart" },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "caocao",
+              "text": "사수관이오. 성벽은 높고 문은 하나뿐 — 게다가 닫혀 있소."
+            },
+            {
+              "speaker": "huaXiong",
+              "text": "제후의 애송이들이 또 왔군. 관 앞에 목을 늘어놓아 주지."
+            },
+            {
+              "speaker": "caocao",
+              "text": "…….화웅이오. 문 앞을 먼저 잡으시오. 문은 그 뒤에 생각하오."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s04-gate-open",
+      "trigger": {
+        "type": "reachArea",
+        "area": [
+          { "x": 10, "y": 4 },
+          { "x": 10, "y": 5 },
+          { "x": 10, "y": 6 }
+        ],
+        "faction": "player",
+        "count": 1
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": null,
+              "text": "성문 앞에 아군 부대가 붙었다. 빗장은 안에서 질러 놓았다."
+            },
+            {
+              "speaker": "dianwei",
+              "text": "조조님, 물러서 주십시오. …….부숩니다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "전위, 열어 놓으시오. 문이 열리면 관 안쪽까지가 전장이오."
+            }
+          ]
+        },
+        {
+          "type": "setTile",
+          "cells": [
+            { "x": 11, "y": 5 }
+          ],
+          "terrain": "gate"
+        }
+      ]
+    }
+  ]
+}

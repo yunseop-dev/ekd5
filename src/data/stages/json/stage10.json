@@ -1,0 +1,356 @@
+{
+  "id": "stage10",
+  "name": "서주 구원",
+  "weather": "clear",
+  "notes": "스테이지 10 \"서주 구원\" — 제2부 네 번째 전투 (원작 1장 후반 유비 구원, 난이도 B)\n검증 목표: 우군(ally) 진영 3기(유비·관우·장비)가 북쪽 마을에 고립된 구도 —\n           아군은 남쪽에서 진입해 고순의 함진영(Lv16~17 정예, 방어 특화 2차 병과)을 뚫는다.\n           우군은 조작 대상이 아니라 자기 페이즈에 AI로 움직인다.\n지형 구성: 남쪽 개활지(출진) → 초원 덤불 → 중앙 숲 두 덩이 → 북쪽 마을 3칸(매턴 회복 = 우군 생존 장치)\n밸런스: ally 생존은 우리 VictoryCondition에 없다 — 1차는 고순 격파, 2차는 전멸이고\n        유비군의 생존 자체는 연출이다. 마을 회복(20%/턴)이 우군을 오래 버티게 한다.\n---\nv1.1 이벤트: 개전 대사 + 조성×하후돈 스크립트 일기토(무승부 — 원작 c13에서 하후돈이 왼눈을 잃는 장면) /\n  조조×유비 인접 대화. 일기토 상대를 두기 위해 (10,3) 서량궁병 1기를 실존 적장 조성으로 치환했다\n  (병과 동일 = 궁병, Lv16 — 부대 수·좌표·behavior 불변).\n[미구현] 원작 c13의 인수 보상(「조조와 유비를 인접시키거나, 유비가 생존한 채 승리」 OR 2조건)은\n  loot allySurvived / giveItem 어느 경로든 core 테스트(equipment.test \"전리품 itemId는 모두 실제 장비\",\n  promotion.test 인수 총량 4)와 충돌해 보류했다 — W4-B 보고의 블로커 항목 참조.",
+  "map": {
+    "rows": [
+      "MMMPPPPPPPPPPMMM",
+      "MMPPPPVVVPPPPPMM",
+      "MPPPPPVVVPPPPPPM",
+      "PPPPPPPPPPPPPPPP",
+      "PPPFFPPPPPPFFPPP",
+      "PPPFFPPPPPPFFPPP",
+      "PPPPPPPPPPPPPPPP",
+      "PPPPPPPPPPPPPPPP",
+      "PPPGGPPPPPPGGPPP",
+      "PPPPPPPPPPPPPPPP",
+      "MPPPPPPPPPPPPPPM",
+      "MMMPPPPPPPPPPMMM"
+    ]
+  },
+  "playerSlots": [
+    {
+      "x": 7,
+      "y": 10
+    },
+    {
+      "x": 6,
+      "y": 10
+    },
+    {
+      "x": 8,
+      "y": 10
+    },
+    {
+      "x": 5,
+      "y": 10
+    },
+    {
+      "x": 9,
+      "y": 10
+    },
+    {
+      "x": 7,
+      "y": 11
+    },
+    {
+      "x": 4,
+      "y": 10
+    }
+  ],
+  "deployMin": 5,
+  "deployMax": 7,
+  "forcedOfficers": [
+    "caocao"
+  ],
+  "units": [
+    {
+      "officerId": "caocao",
+      "faction": "player",
+      "pos": {
+        "x": 7,
+        "y": 10
+      },
+      "isLeader": true
+    },
+    {
+      "officerId": "xiahoudun",
+      "faction": "player",
+      "pos": {
+        "x": 6,
+        "y": 10
+      }
+    },
+    {
+      "officerId": "dianwei",
+      "faction": "player",
+      "pos": {
+        "x": 8,
+        "y": 10
+      }
+    },
+    {
+      "officerId": "xiahouyuan",
+      "faction": "player",
+      "pos": {
+        "x": 5,
+        "y": 10
+      }
+    },
+    {
+      "officerId": "guojia",
+      "faction": "player",
+      "pos": {
+        "x": 9,
+        "y": 10
+      }
+    },
+    {
+      "officerId": "xunyu",
+      "faction": "player",
+      "pos": {
+        "x": 7,
+        "y": 11
+      }
+    },
+    {
+      "officerId": "xuChu",
+      "faction": "player",
+      "pos": {
+        "x": 4,
+        "y": 10
+      }
+    },
+    {
+      "officerId": "liuBei",
+      "faction": "ally",
+      "pos": {
+        "x": 7,
+        "y": 1
+      }
+    },
+    {
+      "officerId": "guanYu",
+      "faction": "ally",
+      "pos": {
+        "x": 6,
+        "y": 1
+      }
+    },
+    {
+      "officerId": "zhangFei",
+      "faction": "ally",
+      "pos": {
+        "x": 8,
+        "y": 1
+      }
+    },
+    {
+      "officerId": "gaoShun",
+      "faction": "enemy",
+      "pos": {
+        "x": 7,
+        "y": 3
+      },
+      "isBoss": true,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": {
+        "x": 6,
+        "y": 3
+      },
+      "level": 16,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": {
+        "x": 8,
+        "y": 3
+      },
+      "level": 16,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": {
+        "x": 5,
+        "y": 2
+      },
+      "level": 16,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": {
+        "x": 9,
+        "y": 2
+      },
+      "level": 16,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westArcher",
+      "faction": "enemy",
+      "pos": {
+        "x": 4,
+        "y": 3
+      },
+      "level": 16,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "caoXing",
+      "faction": "enemy",
+      "pos": {
+        "x": 10,
+        "y": 3
+      },
+      "level": 16,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westCavalry",
+      "faction": "enemy",
+      "pos": {
+        "x": 3,
+        "y": 6
+      },
+      "level": 17,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "westCavalry",
+      "faction": "enemy",
+      "pos": {
+        "x": 12,
+        "y": 6
+      },
+      "level": 17,
+      "behavior": "pursue"
+    }
+  ],
+  "victory": [
+    {
+      "type": "defeatBoss"
+    },
+    {
+      "type": "annihilation"
+    }
+  ],
+  "bonusExp": 150,
+  "reinforcements": [
+    {
+      "trigger": {
+        "type": "turnStart",
+        "turn": 3
+      },
+      "units": [
+        {
+          "officerId": "westCavalry",
+          "faction": "enemy",
+          "pos": {
+            "x": 3,
+            "y": 0
+          },
+          "level": 17,
+          "behavior": "pursue"
+        },
+        {
+          "officerId": "westCavalry",
+          "faction": "enemy",
+          "pos": {
+            "x": 12,
+            "y": 0
+          },
+          "level": 17,
+          "behavior": "pursue"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "id": "s10-open",
+      "trigger": {
+        "type": "battleStart"
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": null,
+              "text": "북쪽 마을에 유비군 셋이 갇혀 있다. 고순의 함진영이 마을을 에워쌌다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "유비를 잃으면 서주가 여포의 것이 되오. 남에서 곧장 밀어 올리시오."
+            }
+          ]
+        },
+        {
+          "type": "duel",
+          "a": "xiahoudun",
+          "b": "caoXing",
+          "lines": [
+            {
+              "speaker": "xiahoudun",
+              "text": "맹덕! 저 궁병은 내가 끊겠소!"
+            },
+            {
+              "speaker": "caoXing",
+              "text": "……하후돈. 그 눈으로 화살이 보이느냐."
+            },
+            {
+              "speaker": null,
+              "text": "활시위 소리와 함께 하후돈이 안장 위에서 크게 휘청였다. 왼눈이 붉게 젖었다."
+            },
+            {
+              "speaker": "xiahoudun",
+              "text": "……눈 하나요. 팔은 둘 다 붙어 있소."
+            },
+            {
+              "speaker": null,
+              "text": "하후돈은 화살을 뽑아 던지고 다시 고삐를 잡았다. 승부는 가려지지 않았다."
+            }
+          ],
+          "outcome": {
+            "draw": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "s10-liubei-meet",
+      "trigger": {
+        "type": "unitsMeet",
+        "a": "caocao",
+        "b": "liuBei"
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "liuBei",
+              "text": "조공, 늦지 않게 와 주셨소."
+            },
+            {
+              "speaker": "caocao",
+              "text": "…….유비. 이 성은 그대의 것이오. 지키고 싶으면 살아서 나가시오."
+            },
+            {
+              "speaker": "liuBei",
+              "text": "…….그 말, 잊지 않겠습니다."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "loot": [
+    {
+      "trigger": "allySurvived",
+      "officerId": "liuBei",
+      "itemId": "insu"
+    }
+  ]
+}

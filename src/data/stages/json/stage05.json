@@ -1,0 +1,200 @@
+{
+  "id": "stage05",
+  "name": "호로관 전투",
+  "weather": "clear",
+  "notes": "스테이지 5 \"호로관 전투\" — 제1부 두 번째 전투 (원작 02 호로관, 난이도 B)\n검증 목표: 협로(산지에 낀 2칸 목) 병목, 초반부터 돌진하는 최강 보스(여포),\n           보스 격파 단일 승리조건(= 원작 \"여포 퇴각\"), 보스 전용 전리품(적토마)\n지형 구성: 남쪽 개활지(출진) → 숲을 낀 어귀 → 중앙 협로 2칸 → 북쪽 관내(이유 본진)\n---\nv1.1 이벤트: 개전 여포 위협 대사 / 여포 격파 → 관 밖 서량기병 전원 혼란.\n  원작 c02 확정: \"여포 격파 → 관내 부대 퇴각 + 관외 부대 혼란\" (battle-events.md §4).\n[의도적 이탈] 우리 맵은 관내·관외가 협로 하나로 이어져 구분이 없다 — 퇴각 처리는 생략하고\n  협로로 나와 있던 기병(westCavalry 3기)에 혼란만 적용한다.",
+  "map": {
+    "rows": [
+      "MMMMPPPPPPMMMM",
+      "MMMMPPPPPPMMMM",
+      "MMMMMPPPPMMMMM",
+      "MMMMMMPPMMMMMM",
+      "MMMMMMPPMMMMMM",
+      "MMMMMPPPPMMMMM",
+      "MMMFFPPPPFFMMM",
+      "MMPPPPPPPPPPMM",
+      "MPPPPPPPPPPPPM",
+      "PPPPPPPPPPPPPP",
+      "PPPPPPPPPPPPPP",
+      "MPPPPPPPPPPPPM"
+    ]
+  },
+  "playerSlots": [
+    { "x": 7, "y": 10 },
+    { "x": 6, "y": 10 },
+    { "x": 8, "y": 10 },
+    { "x": 5, "y": 10 },
+    { "x": 9, "y": 10 },
+    { "x": 7, "y": 11 }
+  ],
+  "deployMin": 5,
+  "deployMax": 6,
+  "forcedOfficers": [
+    "caocao"
+  ],
+  "units": [
+    {
+      "officerId": "caocao",
+      "faction": "player",
+      "pos": { "x": 7, "y": 10 },
+      "isLeader": true
+    },
+    {
+      "officerId": "xiahoudun",
+      "faction": "player",
+      "pos": { "x": 6, "y": 10 }
+    },
+    {
+      "officerId": "dianwei",
+      "faction": "player",
+      "pos": { "x": 8, "y": 10 }
+    },
+    {
+      "officerId": "xiahouyuan",
+      "faction": "player",
+      "pos": { "x": 5, "y": 10 }
+    },
+    {
+      "officerId": "guojia",
+      "faction": "player",
+      "pos": { "x": 9, "y": 10 }
+    },
+    {
+      "officerId": "xunyu",
+      "faction": "player",
+      "pos": { "x": 7, "y": 11 }
+    },
+    {
+      "officerId": "lüBu",
+      "faction": "enemy",
+      "pos": { "x": 7, "y": 3 },
+      "isBoss": true,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "westCavalry",
+      "faction": "enemy",
+      "pos": { "x": 6, "y": 3 },
+      "level": 7,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "westCavalry",
+      "faction": "enemy",
+      "pos": { "x": 6, "y": 4 },
+      "level": 7,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "westCavalry",
+      "faction": "enemy",
+      "pos": { "x": 7, "y": 4 },
+      "level": 7,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": { "x": 5, "y": 2 },
+      "level": 7,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": { "x": 8, "y": 2 },
+      "level": 7,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westArcher",
+      "faction": "enemy",
+      "pos": { "x": 5, "y": 1 },
+      "level": 7,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westArcher",
+      "faction": "enemy",
+      "pos": { "x": 9, "y": 1 },
+      "level": 7,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "liRu",
+      "faction": "enemy",
+      "pos": { "x": 7, "y": 0 },
+      "behavior": "guard"
+    }
+  ],
+  "victory": [
+    { "type": "defeatBoss" },
+    { "type": "annihilation" }
+  ],
+  "bonusExp": 150,
+  "reinforcements": [],
+  "loot": [
+    {
+      "trigger": "bossKill",
+      "itemId": "chituma"
+    }
+  ],
+  "events": [
+    {
+      "id": "s05-open",
+      "trigger": { "type": "battleStart" },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "caocao",
+              "text": "호로관 협로요. 두 칸 목을 지나야 관 안에 든다."
+            },
+            {
+              "speaker": "lüBu",
+              "text": "겨우 그 머릿수로 여길 지나겠다고? 웃기는군."
+            },
+            {
+              "speaker": "caocao",
+              "text": "…….여포요. 정면으로 받지 마시오. 목에서 에워싸시오."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s05-lubu-fall",
+      "trigger": {
+        "type": "unitDefeated",
+        "officerId": "lüBu"
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "lüBu",
+              "text": "……이 정도로, 이 여포가……."
+            },
+            {
+              "speaker": null,
+              "text": "여포가 말머리를 돌렸다. 관 밖으로 나와 있던 서량 기병들이 대장을 잃고 흩어진다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "흔들린 저들을 먼저 정리하오. 관 안은 그다음이오."
+            }
+          ]
+        },
+        {
+          "type": "inflictStatus",
+          "officerIds": [
+            "westCavalry"
+          ],
+          "status": "confusion"
+        }
+      ]
+    }
+  ]
+}

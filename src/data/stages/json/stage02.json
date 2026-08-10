@@ -1,0 +1,214 @@
+{
+  "id": "stage02",
+  "name": "관문 방어전",
+  "weather": "clear",
+  "notes": "스테이지 2 \"관문 방어전\"\n검증 목표: 증원 웨이브(턴 트리거), N턴 방어 승리, 보스 격파 2차 조건(보너스 경험치),\n           성벽/성문/성채 지형, guard AI\n---\nv1.1 이벤트: 개전 수성 결의(대사 창작) / 턴5 증원 경고 + 아군 전체 사기 +20(2턴).\n[의도적 이탈] 원작 조조전에 \"대화 후 버프\"는 없다 (강화는 책략 전용 — battle-events.md §6 금지 항목).\n  stage02는 원작 대응이 없는 재편성 창작 스테이지라, 8턴 방어전의 마지막 물결 연출로 예외 채택했다.",
+  "map": {
+    "rows": [
+      "PPPPPPPPPPPPP",
+      "PPPPPPPPPPPPP",
+      "PPFFPPPPPFFPP",
+      "PPPPPPPPPPPPP",
+      "WPPPPPPPPPPPW",
+      "WWPPPPPPPPPWW",
+      "PPPPPPPPPPPPP",
+      "PPPPPPPPPPPPP",
+      "XXXXXXDXXXXXX",
+      "PPPPPTPTPPPPP",
+      "PPPPPPPPPPPPP",
+      "PPPPPPPPPPPPP"
+    ]
+  },
+  "playerSlots": [
+    { "x": 6, "y": 10 },
+    { "x": 6, "y": 8 },
+    { "x": 5, "y": 9 },
+    { "x": 7, "y": 9 },
+    { "x": 6, "y": 9 },
+    { "x": 4, "y": 10 }
+  ],
+  "deployMin": 4,
+  "deployMax": 6,
+  "forcedOfficers": [
+    "caocao",
+    "dianwei"
+  ],
+  "units": [
+    {
+      "officerId": "caocao",
+      "faction": "player",
+      "pos": { "x": 6, "y": 10 },
+      "isLeader": true
+    },
+    {
+      "officerId": "dianwei",
+      "faction": "player",
+      "pos": { "x": 6, "y": 8 }
+    },
+    {
+      "officerId": "xiahouyuan",
+      "faction": "player",
+      "pos": { "x": 5, "y": 9 }
+    },
+    {
+      "officerId": "guojia",
+      "faction": "player",
+      "pos": { "x": 7, "y": 9 }
+    },
+    {
+      "officerId": "xunyu",
+      "faction": "player",
+      "pos": { "x": 6, "y": 9 }
+    },
+    {
+      "officerId": "xiahoudun",
+      "faction": "player",
+      "pos": { "x": 4, "y": 10 }
+    },
+    {
+      "officerId": "yellowInfantry",
+      "faction": "enemy",
+      "pos": { "x": 5, "y": 1 },
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "yellowInfantry",
+      "faction": "enemy",
+      "pos": { "x": 7, "y": 1 },
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "yellowCavalry",
+      "faction": "enemy",
+      "pos": { "x": 6, "y": 2 },
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "yellowArcher",
+      "faction": "enemy",
+      "pos": { "x": 6, "y": 1 },
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "chengYuanzhi",
+      "faction": "enemy",
+      "pos": { "x": 6, "y": 0 },
+      "isBoss": true,
+      "behavior": "guard"
+    }
+  ],
+  "victory": [
+    {
+      "type": "surviveTurns",
+      "turns": 8
+    },
+    { "type": "defeatBoss" }
+  ],
+  "bonusExp": 150,
+  "reinforcements": [
+    {
+      "trigger": {
+        "type": "turnStart",
+        "turn": 3
+      },
+      "units": [
+        {
+          "officerId": "yellowCavalry",
+          "faction": "enemy",
+          "pos": { "x": 0, "y": 0 },
+          "behavior": "pursue"
+        },
+        {
+          "officerId": "yellowCavalry",
+          "faction": "enemy",
+          "pos": { "x": 12, "y": 0 },
+          "behavior": "pursue"
+        }
+      ]
+    },
+    {
+      "trigger": {
+        "type": "turnStart",
+        "turn": 5
+      },
+      "units": [
+        {
+          "officerId": "dengMao",
+          "faction": "enemy",
+          "pos": { "x": 5, "y": 0 },
+          "behavior": "pursue"
+        },
+        {
+          "officerId": "yellowShaman",
+          "faction": "enemy",
+          "pos": { "x": 7, "y": 0 },
+          "behavior": "pursue"
+        }
+      ]
+    }
+  ],
+  "loot": [
+    {
+      "trigger": "victory",
+      "itemId": "leatherShield"
+    }
+  ],
+  "events": [
+    {
+      "id": "s02-open",
+      "trigger": { "type": "battleStart" },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "caocao",
+              "text": "관문 하나로 길이 막히오. 여드레만 버티면 되는 싸움이오."
+            },
+            {
+              "speaker": "dianwei",
+              "text": "조조님, 성문 앞은 제가 막습니다. 한 놈도 들이지 않습니다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "전위, 앞에 서지 말고 문에 붙어 서시오. 버티는 것이 이기는 것이오."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s02-wave",
+      "trigger": {
+        "type": "turnStart",
+        "turn": 5
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": null,
+              "text": "관 밖에서 다시 함성이 올랐다. 아까보다 크다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "셋째 물결이오. …….여기서 물러나면 관문도 뒤도 없소."
+            },
+            {
+              "speaker": "caocao",
+              "text": "버티시오! 버티기만 하면 이기는 싸움이오!"
+            }
+          ]
+        },
+        {
+          "type": "buff",
+          "target": "playerAll",
+          "stat": "morale",
+          "amount": 20,
+          "duration": 2
+        }
+      ]
+    }
+  ]
+}

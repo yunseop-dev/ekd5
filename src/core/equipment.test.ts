@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { validateCampaign } from '../app/persistence'
+import { CONSUMABLES } from '../data/consumables'
 import { EQUIPMENT } from '../data/equipment'
 import { FRUIT_ON_SELL, FRUITS } from '../data/fruits'
 import { OFFICERS } from '../data/officers'
@@ -143,10 +144,11 @@ describe('EQUIPMENT 데이터', () => {
     }
   })
 
-  it('스테이지 전리품 itemId는 모두 실제 장비를 가리킨다', () => {
+  it('스테이지 전리품 itemId는 모두 실제 장비 또는 도구를 가리킨다', () => {
+    // v1.1: allySurvived 보상(원작 c13 유비 생존 → 인수)처럼 도구도 전리품이 될 수 있다
     for (const stage of STAGES) {
       for (const loot of stage.loot ?? []) {
-        expect(EQUIPMENT[loot.itemId], `${stage.id}: ${loot.itemId}`).toBeDefined()
+        expect(EQUIPMENT[loot.itemId] ?? CONSUMABLES[loot.itemId], `${stage.id}: ${loot.itemId}`).toBeDefined()
       }
     }
     expect(STAGES.find((s) => s.id === 'stage02')!.loot).toEqual([

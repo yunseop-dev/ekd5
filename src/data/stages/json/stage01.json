@@ -1,0 +1,196 @@
+{
+  "id": "stage01",
+  "name": "연습전 — 강가의 황건적",
+  "weather": "clear",
+  "notes": "스테이지 1 \"연습전 — 강가의 황건적\"\n검증 목표: 이동/지형 코스트(숲·산·강·다리), 상성, 책략, 마을 회복, 기본 AI(추격/경계)\n---\nv1.1 이벤트: 개전 훈시(대사 창작) / 턴2 허자장 부대 레벨업 제안 — 원작 c00의 \"대화 후 혜택\" 정격 사례.\n수락 = 조조 경험치 +100 [설계값: 원작은 3~6레벨이지만 우리 커브에서는 과해 1레벨분으로 축약],\n거절 = 회복콩 1개 [설계값: 원작 소지금 증가의 대체 — 전투 중 획득은 승리 시 회수된다].\n옵션 0(수락)이 시뮬/연출 생략의 기본 선택 = 밸런스 기준선.",
+  "map": {
+    "rows": [
+      "GGPPPPPPPPPPFFM",
+      "GPPPPPPPPPPPFFM",
+      "PPPPPPPPPPPPFFM",
+      "PPPPPPPPPPPPPFM",
+      "RRRRRBBRRRRRRRR",
+      "RRRRRBBRRRRRRRR",
+      "PPPPPPPPPPPPWWW",
+      "PPPPVPPPPPPPWWW",
+      "PPPPPPPPPPPPPWW",
+      "PPFFPPPPPPPPPPW",
+      "PFFFPPPPPPPPPPP",
+      "PFFPPPPPPPPPPPP"
+    ]
+  },
+  "playerSlots": [
+    { "x": 7, "y": 10 },
+    { "x": 5, "y": 9 },
+    { "x": 6, "y": 9 },
+    { "x": 7, "y": 9 },
+    { "x": 8, "y": 9 }
+  ],
+  "deployMin": 3,
+  "deployMax": 5,
+  "forcedOfficers": [
+    "caocao"
+  ],
+  "units": [
+    {
+      "officerId": "caocao",
+      "faction": "player",
+      "pos": { "x": 7, "y": 10 },
+      "isLeader": true
+    },
+    {
+      "officerId": "xiahoudun",
+      "faction": "player",
+      "pos": { "x": 5, "y": 9 }
+    },
+    {
+      "officerId": "dianwei",
+      "faction": "player",
+      "pos": { "x": 6, "y": 9 }
+    },
+    {
+      "officerId": "xiahouyuan",
+      "faction": "player",
+      "pos": { "x": 7, "y": 9 }
+    },
+    {
+      "officerId": "guojia",
+      "faction": "player",
+      "pos": { "x": 8, "y": 9 }
+    },
+    {
+      "officerId": "yellowInfantry",
+      "faction": "enemy",
+      "pos": { "x": 5, "y": 3 },
+      "behavior": "guard"
+    },
+    {
+      "officerId": "yellowInfantry",
+      "faction": "enemy",
+      "pos": { "x": 8, "y": 2 },
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "yellowArcher",
+      "faction": "enemy",
+      "pos": { "x": 6, "y": 1 },
+      "behavior": "guard"
+    },
+    {
+      "officerId": "yellowCavalry",
+      "faction": "enemy",
+      "pos": { "x": 9, "y": 2 },
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "yellowShaman",
+      "faction": "enemy",
+      "pos": { "x": 6, "y": 0 },
+      "behavior": "guard"
+    }
+  ],
+  "victory": [
+    { "type": "annihilation" }
+  ],
+  "reinforcements": [],
+  "events": [
+    {
+      "id": "s01-open",
+      "trigger": { "type": "battleStart" },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "caocao",
+              "text": "강을 등진 무리요. 건널 곳은 다리 둘뿐 — 서두를 이유가 없소."
+            },
+            {
+              "speaker": "xiahoudun",
+              "text": "맹덕, 선봉은 내가 맡겠소."
+            },
+            {
+              "speaker": "caocao",
+              "text": "하후돈, 다리 하나를 막으시오. …….나머지는 내가 맡소."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s01-xuzijiang",
+      "trigger": {
+        "type": "turnStart",
+        "turn": 2
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": null,
+              "text": "진 밖에 낯선 노인이 서 있었다. 허자장(許子將) — 조조를 「난세의 간웅」이라 평한 그 사람이다."
+            },
+            {
+              "speaker": null,
+              "text": "「자네 부대를 하루만 맡겨 보게. 사람을 보는 눈은, 사람을 기르는 눈과 다르지 않네.」"
+            }
+          ]
+        },
+        {
+          "type": "choice",
+          "prompt": "허자장의 제안을 받아들이시겠습니까?",
+          "speaker": null,
+          "options": [
+            {
+              "text": "제안을 받는다",
+              "actions": [
+                {
+                  "type": "dialogue",
+                  "lines": [
+                    {
+                      "speaker": "caocao",
+                      "text": "…….가르침을 받겠습니다."
+                    },
+                    {
+                      "speaker": null,
+                      "text": "노인은 진법 몇 가지를 고쳐 주고 떠났다. 조조의 부대가 눈에 띄게 다듬어졌다."
+                    }
+                  ]
+                },
+                {
+                  "type": "giveExp",
+                  "target": "caocao",
+                  "amount": 100
+                }
+              ]
+            },
+            {
+              "text": "정중히 거절한다",
+              "actions": [
+                {
+                  "type": "dialogue",
+                  "lines": [
+                    {
+                      "speaker": "caocao",
+                      "text": "고마운 말씀이오나, 지금은 눈앞의 적이 먼저입니다."
+                    },
+                    {
+                      "speaker": null,
+                      "text": "노인은 웃으며 군량 한 짐을 남기고 돌아갔다."
+                    }
+                  ]
+                },
+                {
+                  "type": "giveItem",
+                  "itemId": "hoebokKong",
+                  "kind": "consumable"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

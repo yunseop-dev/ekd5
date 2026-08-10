@@ -1,0 +1,226 @@
+{
+  "id": "stage06",
+  "name": "동탁 추격전",
+  "weather": "clear",
+  "notes": "스테이지 6 \"동탁 추격전\" — 제1부 선택지 분기 전투 (원작 03 동탁 추격전, 난이도 A · 스킵 가능)\n검증 목표: 미끼 소부대를 쫓다 숲에 걸리는 매복 구조, 턴 2 측면 + 턴 3 후방의 2단 증원,\n           전멸 단일 승리조건(도망칠 곳이 없다), 제1부 최고 난이도\n지형 구성: 사방이 트인 개활지 + 남북/좌우 숲 덤불 — 시야는 좋으나 측면이 전부 열려 있다\n밸런스: 미끼는 Lv8이지만 매복 본대는 Lv10이다(원작 러버밴딩 — 종반 적은 아군 평균에 연동).\n        기본 장비 시뮬 20판 기준 Lv12 로스터 승률 45%지만 무구성장을 거친 캠페인 로스터는 뚫는다.\n        선택지에서 \"그만둔다\"로 통째로 건너뛸 수 있는 전투라 의도적으로 벽을 높게 뒀다.\n---\nv1.1 이벤트: 개전 매복 경고(곽가 — 미끼임을 먼저 읽는다) / 턴2 측면 증원과 동기한 매복 발동 대사.\n  원작 c03의 복병 등장 조건(3중 OR: 잠복지 접근/성 동쪽 4부대/강 부근)은 기존 턴 증원으로 유지한다.",
+  "map": {
+    "rows": [
+      "GGPPPPPPPPPPPPGG",
+      "GPPPFFPPPPFFPPPG",
+      "PPPFFPPPPPPFFPPP",
+      "PPPPPPPPPPPPPPPP",
+      "PPPPPPPPPPPPPPPP",
+      "PFFPPPPPPPPPPFFP",
+      "PFFPPPPPPPPPPFFP",
+      "PPPPPPPPPPPPPPPP",
+      "PPPPPPPPPPPPPPPP",
+      "PPPFFPPPPPPFFPPP",
+      "GPPPFFPPPPFFPPPG",
+      "GGPPPPPPPPPPPPGG"
+    ]
+  },
+  "playerSlots": [
+    { "x": 1, "y": 4 },
+    { "x": 1, "y": 3 },
+    { "x": 1, "y": 7 },
+    { "x": 1, "y": 8 },
+    { "x": 0, "y": 4 },
+    { "x": 0, "y": 7 }
+  ],
+  "deployMin": 4,
+  "deployMax": 6,
+  "forcedOfficers": [
+    "caocao"
+  ],
+  "units": [
+    {
+      "officerId": "caocao",
+      "faction": "player",
+      "pos": { "x": 1, "y": 4 },
+      "isLeader": true
+    },
+    {
+      "officerId": "xiahoudun",
+      "faction": "player",
+      "pos": { "x": 1, "y": 3 }
+    },
+    {
+      "officerId": "dianwei",
+      "faction": "player",
+      "pos": { "x": 1, "y": 7 }
+    },
+    {
+      "officerId": "xiahouyuan",
+      "faction": "player",
+      "pos": { "x": 1, "y": 8 }
+    },
+    {
+      "officerId": "guojia",
+      "faction": "player",
+      "pos": { "x": 0, "y": 4 }
+    },
+    {
+      "officerId": "xunyu",
+      "faction": "player",
+      "pos": { "x": 0, "y": 7 }
+    },
+    {
+      "officerId": "westCavalry",
+      "faction": "enemy",
+      "pos": { "x": 9, "y": 5 },
+      "level": 8,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "westCavalry",
+      "faction": "enemy",
+      "pos": { "x": 9, "y": 6 },
+      "level": 8,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": { "x": 10, "y": 4 },
+      "level": 8,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": { "x": 11, "y": 5 },
+      "level": 8,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westArcher",
+      "faction": "enemy",
+      "pos": { "x": 10, "y": 7 },
+      "level": 8,
+      "behavior": "guard"
+    }
+  ],
+  "victory": [
+    { "type": "annihilation" }
+  ],
+  "reinforcements": [
+    {
+      "trigger": {
+        "type": "turnStart",
+        "turn": 2
+      },
+      "units": [
+        {
+          "officerId": "westCavalry",
+          "faction": "enemy",
+          "pos": { "x": 4, "y": 0 },
+          "level": 10,
+          "behavior": "pursue"
+        },
+        {
+          "officerId": "westCavalry",
+          "faction": "enemy",
+          "pos": { "x": 12, "y": 0 },
+          "level": 10,
+          "behavior": "pursue"
+        },
+        {
+          "officerId": "westCavalry",
+          "faction": "enemy",
+          "pos": { "x": 4, "y": 11 },
+          "level": 10,
+          "behavior": "pursue"
+        },
+        {
+          "officerId": "westCavalry",
+          "faction": "enemy",
+          "pos": { "x": 12, "y": 11 },
+          "level": 10,
+          "behavior": "pursue"
+        }
+      ]
+    },
+    {
+      "trigger": {
+        "type": "turnStart",
+        "turn": 3
+      },
+      "units": [
+        {
+          "officerId": "liRu",
+          "faction": "enemy",
+          "pos": { "x": 15, "y": 5 },
+          "behavior": "guard"
+        },
+        {
+          "officerId": "westInfantry",
+          "faction": "enemy",
+          "pos": { "x": 15, "y": 4 },
+          "level": 10,
+          "behavior": "pursue"
+        },
+        {
+          "officerId": "westInfantry",
+          "faction": "enemy",
+          "pos": { "x": 15, "y": 6 },
+          "level": 10,
+          "behavior": "pursue"
+        },
+        {
+          "officerId": "westArcher",
+          "faction": "enemy",
+          "pos": { "x": 15, "y": 7 },
+          "level": 10,
+          "behavior": "pursue"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "id": "s06-open",
+      "trigger": { "type": "battleStart" },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "guojia",
+              "text": "조조님, 적이 너무 적습니다. 이 개활지에 다섯 부대라니 — 미끼입니다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "알고 있소. …….그래도 동탁을 놓치면 여기까지 온 뜻이 없소."
+            },
+            {
+              "speaker": "caocao",
+              "text": "숲을 등지고 가시오. 곽가, 그대는 뒤를 보시오."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s06-ambush",
+      "trigger": {
+        "type": "turnStart",
+        "turn": 2
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": null,
+              "text": "좌우 숲에서 흙먼지가 일었다. 서량 기병이 측면을 물고 들어온다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "왔군. …….미끼를 문 것은 저쪽이오. 진을 좁히시오!"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,218 @@
+{
+  "id": "stage03",
+  "name": "황건 본진 소탕",
+  "weather": "clear",
+  "notes": "스테이지 3 \"황건 본진 소탕\" — 서장 마지막 결전\n검증 목표: 보스 격파 1차 승리 + 전멸 2차 조건, 협곡 병목(산지 이동 코스트), 성문 단일 진입로,\n           성채 위 보스(매턴 회복)와 요술사 사거리, 측면 증원 기병\n지형 구성: 남쪽 진입로(초원/평지) → 중앙 산길 협곡(가운데 4칸 + 좌우 1칸 우회로) → 북쪽 성채 본진\n---\nv1.1 이벤트: 조조×장각 인접 설전 / 장각 격파 대사 (둘 다 대사 창작).\n[의도적 이탈] 원작 c00의 인접 대화 쌍은 조조×장보·장량이다 — 우리 스테이지의 보스가 장각이라\n  설전 상대를 장각으로 치환했다 (장보는 우리 명부에 없다).",
+  "map": {
+    "rows": [
+      "MMMXXXXXXXXXMMMM",
+      "MMMXCCCTCCCXMMMM",
+      "MMMXCCCCCCCXMMMM",
+      "MMPPXXXDXXXPPPMM",
+      "PPPPPPPPPPPPPPPP",
+      "PPFFMMPPPPMMFFPP",
+      "PMMMMMPPPPMMMMMP",
+      "PPFFMMPPPPMMFFPP",
+      "PPPPPPPPPPPPPPPP",
+      "PPGGPPPPPPPPGGPP",
+      "PGGVPPPPPPPPPGGP",
+      "GGPPPPPPPPPPPPGG",
+      "GGGPPPPPPPPPPGGG"
+    ]
+  },
+  "playerSlots": [
+    { "x": 7, "y": 11 },
+    { "x": 6, "y": 11 },
+    { "x": 8, "y": 11 },
+    { "x": 5, "y": 11 },
+    { "x": 9, "y": 11 }
+  ],
+  "deployMin": 4,
+  "deployMax": 5,
+  "forcedOfficers": [
+    "caocao"
+  ],
+  "units": [
+    {
+      "officerId": "caocao",
+      "faction": "player",
+      "pos": { "x": 7, "y": 11 },
+      "isLeader": true
+    },
+    {
+      "officerId": "xiahoudun",
+      "faction": "player",
+      "pos": { "x": 6, "y": 11 }
+    },
+    {
+      "officerId": "dianwei",
+      "faction": "player",
+      "pos": { "x": 8, "y": 11 }
+    },
+    {
+      "officerId": "xiahouyuan",
+      "faction": "player",
+      "pos": { "x": 5, "y": 11 }
+    },
+    {
+      "officerId": "guojia",
+      "faction": "player",
+      "pos": { "x": 9, "y": 11 }
+    },
+    {
+      "officerId": "yellowCavalry",
+      "faction": "enemy",
+      "pos": { "x": 7, "y": 6 },
+      "level": 4,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "yellowCavalry",
+      "faction": "enemy",
+      "pos": { "x": 8, "y": 6 },
+      "level": 3,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "yellowArcher",
+      "faction": "enemy",
+      "pos": { "x": 6, "y": 5 },
+      "level": 3,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "yellowInfantry",
+      "faction": "enemy",
+      "pos": { "x": 9, "y": 5 },
+      "level": 3,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "zhangLiang",
+      "faction": "enemy",
+      "pos": { "x": 7, "y": 4 },
+      "behavior": "guard"
+    },
+    {
+      "officerId": "yellowInfantry",
+      "faction": "enemy",
+      "pos": { "x": 6, "y": 4 },
+      "level": 4,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "yellowInfantry",
+      "faction": "enemy",
+      "pos": { "x": 8, "y": 4 },
+      "level": 4,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "yellowArcher",
+      "faction": "enemy",
+      "pos": { "x": 5, "y": 2 },
+      "level": 4,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "yellowShaman",
+      "faction": "enemy",
+      "pos": { "x": 9, "y": 2 },
+      "level": 4,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "zhangJiao",
+      "faction": "enemy",
+      "pos": { "x": 7, "y": 1 },
+      "isBoss": true,
+      "behavior": "guard"
+    }
+  ],
+  "victory": [
+    { "type": "annihilation" },
+    { "type": "defeatBoss" }
+  ],
+  "bonusExp": 150,
+  "reinforcements": [
+    {
+      "trigger": {
+        "type": "turnStart",
+        "turn": 4
+      },
+      "units": [
+        {
+          "officerId": "yellowCavalry",
+          "faction": "enemy",
+          "pos": { "x": 0, "y": 6 },
+          "level": 4,
+          "behavior": "pursue"
+        },
+        {
+          "officerId": "yellowCavalry",
+          "faction": "enemy",
+          "pos": { "x": 15, "y": 6 },
+          "level": 4,
+          "behavior": "pursue"
+        }
+      ]
+    }
+  ],
+  "loot": [
+    {
+      "trigger": "bossKill",
+      "itemId": "taipingYaoshu"
+    }
+  ],
+  "events": [
+    {
+      "id": "s03-zhangjiao-parley",
+      "trigger": {
+        "type": "unitsMeet",
+        "a": "caocao",
+        "b": "zhangJiao"
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "zhangJiao",
+              "text": "황천은 이미 죽었고, 창천은 아직 서지 않았다. 자네는 어느 하늘 밑에 서겠나?"
+            },
+            {
+              "speaker": "caocao",
+              "text": "하늘을 팔아 굶은 사람을 모으는 자와는 나눌 말이 없소."
+            },
+            {
+              "speaker": "zhangJiao",
+              "text": "…….말이 통하지 않는 아이로군."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s03-zhangjiao-fall",
+      "trigger": {
+        "type": "unitDefeated",
+        "officerId": "zhangJiao"
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "zhangJiao",
+              "text": "창천도…… 황천도…… 결국 사람의 손에……."
+            },
+            {
+              "speaker": "caocao",
+              "text": "대현량사가 쓰러졌소. 남은 무리는 곧 흩어질 것이오."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
