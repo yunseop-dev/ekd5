@@ -353,6 +353,8 @@ export function stepAiUnit(state: BattleState, faction: Faction): AiStep {
   if (state.phase !== faction || state.result !== 'ongoing') {
     return { state, actedUnitId: null, done: true }
   }
+  // 표시 대기 이벤트가 있으면 전 액션이 거부된다 — 진행 없이 즉시 반환 (무한루프 방지, v1.1)
+  if (state.pendingEvents.length > 0) return { state, actedUnitId: null, done: false }
 
   const unit = livingUnits(state, faction).find((u) => !u.acted)
   if (!unit) {
@@ -363,22 +365,30 @@ export function stepAiUnit(state: BattleState, faction: Faction): AiStep {
   const plan = decideUnit(current, unit)
   if (plan.moveTo && !unitAt(current, plan.moveTo)) {
     current = applyAction(current, { type: 'move', unitId: unit.id, to: plan.moveTo })
+    // 이동으로 이벤트(인접 일기토 등)가 발동하면 즉시 정지한다 — wait 폴백보다 먼저 검사해야
+    // 이벤트 가드에 막힌 wait가 무한루프를 만들지 않는다 (v1.1)
+    if (current.pendingEvents.length > 0) return { state: current, actedUnitId: unit.id, done: false }
   }
   current = applyAction(current, plan.act)
+  if (current.pendingEvents.length > 0) return { state: current, actedUnitId: unit.id, done: false }
   // 계획이 거부됐다면(상태 변화로 무효화) 안전하게 대기 처리해 무한 루프 방지
   const after = current.units.find((u) => u.id === unit.id)
   if (current.result === 'ongoing' && after && after.hp > 0 && !after.acted) {
     current = applyAction(current, { type: 'wait', unitId: unit.id })
+    if (current.pendingEvents.length > 0) return { state: current, actedUnitId: unit.id, done: false }
   }
   return { state: current, actedUnitId: unit.id, done: current.result !== 'ongoing' }
 }
 
-/** 해당 진영 전 유닛의 AI 턴 실행 후 페이즈 종료까지 진행 (stepAiUnit 루프) */
+/**
+ * 해당 진영 전 유닛의 AI 턴 실행 후 페이즈 종료까지 진행 (stepAiUnit 루프).
+ * 표시 대기 이벤트가 생기면 **그대로 반환**한다 — 자동 소화(autoResolveEvents)는 호출자 정책이다.
+ */
 export function runAiPhase(state: BattleState, faction: Faction): BattleState {
   let current = state
   for (;;) {
     const step = stepAiUnit(current, faction)
     current = step.state
-    if (step.done) return current
+    if (step.done || current.pendingEvents.length > 0) return current
   }
 }

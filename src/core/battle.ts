@@ -10,6 +10,8 @@ import { STRATEGIES } from '../data/strategies'
 import { TERRAIN } from '../data/terrain'
 import type { RosterEntry } from './campaign'
 import { canPromoteUnit, classIdOf, consumableCount, removeConsumable, toEquipmentMap } from './campaign'
+import type { OccurredEvent } from './events'
+import { executeQueue, livingByOfficer, runEvents, spawnStageUnit } from './events'
 import type { CombatStats } from './formulas'
 import {
   affinityMultiplier,
@@ -37,6 +39,7 @@ import type {
   EquipInstance,
   EquipmentDef,
   EquipSlot,
+  EventAction,
   OfficerDef,
   OfficerStats,
   StageDef,
@@ -458,11 +461,21 @@ function growEquipment(state: BattleState, unit: UnitState, slot: EquipSlot, amo
   if (instance.level >= max) instance.exp = 0 // 만렙 도달 시 경험치 고정 (applyExp와 같은 처리)
 }
 
-function dealDamage(state: BattleState, target: UnitState, amount: number): void {
+/**
+ * 데미지 적용 + 격파 처리. 격파 시 증원을 즉시 트리거하고, 전투 내 이벤트용 사건은
+ * occurred에 적재해 공통 후처리(runEvents)에서 일괄 평가한다 (v1.1 — 액션 도중 이벤트가 끼어들지 않게).
+ */
+function dealDamage(
+  state: BattleState,
+  target: UnitState,
+  amount: number,
+  occurred: OccurredEvent[],
+): void {
   target.hp = Math.max(0, target.hp - amount)
   if (target.hp === 0) {
     log(state, 'defeat', `${nameOf(target)} 부대 괴멸!`)
     triggerReinforcements(state, { type: 'unitDefeated', unitId: target.id })
+    occurred.push({ type: 'unitDefeated', officerId: target.officerId })
   }
 }
 
@@ -471,6 +484,7 @@ function resolveStrike(
   state: BattleState,
   attacker: UnitState,
   defender: UnitState,
+  occurred: OccurredEvent[],
   damageScale = 1,
 ): boolean {
   const aStats = effectiveStats(attacker)
@@ -513,7 +527,7 @@ function resolveStrike(
     `${nameOf(attacker)} → ${nameOf(defender)}: ${dmg} 데미지${critRoll.value ? ' (회심의 일격!)' : ''}`,
     { targetId: defender.id, amount: -dmg },
   )
-  dealDamage(state, defender, dmg)
+  dealDamage(state, defender, dmg, occurred)
   grantExp(state, attacker, defender.level, defender.hp === 0)
   // 무구성장은 데미지 확정 후 — 이번 타격의 데미지는 성장 전 보정치로 계산된다.
   // 획득량은 상대 레벨 비교로 등급 (원작 확정 비율, equipment.md 증보)
@@ -595,32 +609,9 @@ function triggerReinforcements(
     if (!matched) return
 
     state.spawnedReinforcements.push(idx)
+    // 스폰 로직은 이벤트 spawnUnits와 공용 (events.spawnStageUnit) — 자리가 막히면 개별 취소
     r.units.forEach((def, j) => {
-      if (unitAt(state, def.pos)) return // 자리가 막혀 있으면 등장 취소 (단순화)
-      const officer = OFFICERS[def.officerId]
-      const cls = CLASSES[officer.classId]
-      const level = def.level ?? officer.level
-      state.units.push({
-        id: `r${idx}_${j}_${def.officerId}`,
-        officerId: def.officerId,
-        classId: officer.classId,
-        faction: def.faction,
-        pos: { ...def.pos },
-        level,
-        exp: 0,
-        hp: maxHp(cls, level),
-        maxHp: maxHp(cls, level),
-        mp: maxMp(cls, level),
-        maxMp: maxMp(cls, level),
-        moved: false,
-        acted: false,
-        statuses: [],
-        buffs: [],
-        equipment: toEquipmentMap(def.equipment ?? officer.initialEquipment),
-        isLeader: def.isLeader,
-        isBoss: def.isBoss,
-        behavior: def.behavior,
-      })
+      spawnStageUnit(state, def, `r${idx}_${j}_${def.officerId}`)
     })
     log(state, 'reinforcement', '적 증원 부대 등장!')
   })
@@ -647,14 +638,57 @@ export function startBattle(
   deployment?: string[],
   consumables?: ConsumableStack[],
 ): BattleState {
-  return attachStage(createBattle(stage, seed, roster, deployment, consumables), stage)
+  const state = attachStage(createBattle(stage, seed, roster, deployment, consumables), stage)
+  // battleStart 이벤트 — 초기 상태가 pendingEvents를 갖고 반환될 수 있다 (전략 선택이 이 경로).
+  // 승패 판정은 하지 않는다 (기존 동작 유지 — 첫 액션의 공통 후처리에서 평가된다).
+  runEvents(state, stage, [{ type: 'battleStart' }])
+  return state
+}
+
+/**
+ * 일기토/설전 결과 적용 (eventContinue의 duel 소비). 결과는 데이터 고정 — 난수를 쓰지 않는다.
+ * 승자가 아군이면 일반 격파와 동일한 경험치(grantExp)를 받고, 패자는 사망(격파 처리) 또는 퇴각(무경험치 제거).
+ */
+function resolveDuel(
+  state: BattleState,
+  duel: Extract<EventAction, { type: 'duel' }>,
+  occurred: OccurredEvent[],
+): void {
+  const a = livingByOfficer(state, duel.a)
+  const b = livingByOfficer(state, duel.b)
+  if ('draw' in duel.outcome) {
+    const names = [a, b].filter((u): u is UnitState => u !== undefined).map(nameOf)
+    log(state, 'event', `${names.join(' vs ')} — 승부를 가리지 못했다`)
+    return
+  }
+  const winner = duel.outcome.winner === 'a' ? a : b
+  const loser = duel.outcome.winner === 'a' ? b : a
+  if (!winner || !loser) return // 데이터 불일치(이미 격파/이탈) — 조용히 무시
+
+  log(state, 'event', `${nameOf(winner)}${subjectParticle(nameOf(winner))} ${nameOf(loser)}에게 승리했다!`)
+  // 원작 확정: 일기토 승리 경험치는 일반 격파와 동일하다
+  if (winner.faction === 'player') grantExp(state, winner, loser.level, true)
+
+  if (duel.outcome.loserFate === 'die') {
+    loser.hp = 0
+    log(state, 'defeat', `${nameOf(loser)} 부대 괴멸!`)
+    triggerReinforcements(state, { type: 'unitDefeated', unitId: loser.id })
+    occurred.push({ type: 'unitDefeated', officerId: loser.officerId })
+  } else {
+    log(state, 'event', `${nameOf(loser)} 부대 퇴각`)
+    state.units = state.units.filter((u) => u.id !== loser.id)
+  }
 }
 
 export function applyAction(prev: BattleState, action: BattleAction): BattleState {
   if (prev.result !== 'ongoing') return prev
+  // 표시 대기 이벤트가 있으면 eventContinue 외 전 액션을 봉쇄한다 (AI 포함 — v1.1)
+  if (prev.pendingEvents.length > 0 && action.type !== 'eventContinue') return prev
   const stage = prev.__stage
   const state: BattleState = structuredClone({ ...prev, __stage: undefined })
   state.__stage = stage
+  // 이 액션 처리 중 발생한 이산 사건 — 공통 후처리에서 runEvents가 소화한다 (state 오염 없음)
+  const occurred: OccurredEvent[] = []
 
   switch (action.type) {
     case 'move': {
@@ -682,7 +716,7 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
       if (dist < aCls.minRange || dist > aCls.maxRange) return prev
 
       // 1타
-      resolveStrike(state, attacker, defender)
+      resolveStrike(state, attacker, defender, occurred)
 
       // 2회 공격 판정
       if (defender.hp > 0) {
@@ -692,7 +726,7 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
         state.rngState = dbl.nextState
         if (dbl.value) {
           log(state, 'double', `${nameOf(attacker)}의 2회 공격!`)
-          resolveStrike(state, attacker, defender)
+          resolveStrike(state, attacker, defender, occurred)
         }
       }
 
@@ -700,7 +734,7 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
       const forecast = forecastAttack(state, attacker, defender)
       if (defender.hp > 0 && forecast.willCounter) {
         log(state, 'counter', `${nameOf(defender)}의 반격!`)
-        resolveStrike(state, defender, attacker, COUNTER_DAMAGE_SCALE)
+        resolveStrike(state, defender, attacker, occurred, COUNTER_DAMAGE_SCALE)
       }
 
       attacker.acted = true
@@ -765,7 +799,7 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
                 targetId: target.id,
                 amount: -dmg,
               })
-              dealDamage(state, target, dmg)
+              dealDamage(state, target, dmg, occurred)
               grantExp(state, caster, target.level, target.hp === 0)
             }
           }
@@ -812,7 +846,7 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
               targetId: target.id,
               amount: -dmg,
             })
-            dealDamage(state, target, dmg)
+            dealDamage(state, target, dmg, occurred)
             grantExp(state, caster, target.level, target.hp === 0)
             // 원작 확정: 책략 명중도 무기(부채·보검) exp, 책략 피격도 방어구 exp (equipment.md 증보)
             growEquipment(
@@ -957,6 +991,7 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
         state.turn += 1
         state.phase = 'player'
         triggerReinforcements(state, { type: 'turnStart', turn: state.turn })
+        occurred.push({ type: 'turnStart', turn: state.turn })
       }
 
       // 새 페이즈 진영: 행동 초기화 + 버프 턴 감소 + 상태이상 처리 + 지형 회복
@@ -1027,8 +1062,53 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
       }
       break
     }
+
+    // 이벤트 큐 헤드(표시형) 소비 — UI/시뮬이 대사·선택·일기토를 확인했다는 신호 (v1.1)
+    case 'eventContinue': {
+      const pending = state.pendingEvents[0]
+      if (!pending) return prev
+      const head = pending.queue[0]
+      if (!head) return prev // 헤드는 항상 표시형이어야 한다 (executeQueue 계약)
+
+      switch (head.type) {
+        case 'dialogue':
+          pending.queue.shift() // 상태 무변경 — UI가 이미 재생 완료
+          break
+
+        case 'choice': {
+          // 범위 밖/미지정 선택은 0번(밸런스 기준선)으로 떨어진다
+          const raw = action.choice ?? 0
+          const idx = Number.isInteger(raw) && raw >= 0 && raw < head.options.length ? raw : 0
+          const chosen = head.options[idx]
+          pending.queue.shift()
+          if (chosen) {
+            log(state, 'event', `▶ ${chosen.text}`)
+            pending.queue.unshift(...chosen.actions) // 선택한 분기를 잔여 큐 앞에 삽입
+          }
+          break
+        }
+
+        case 'duel':
+          resolveDuel(state, head, occurred)
+          pending.queue.shift()
+          break
+
+        default:
+          return prev // 즉시형이 헤드에 남아 있으면 안 된다 (방어)
+      }
+
+      // 잔여 즉시형 소화 → 큐 소진 시 pendingEvents에서 스스로 빠진다
+      executeQueue(state, pending)
+      break
+    }
   }
 
-  if (stage) checkVictory(state, stage)
+  // 공통 후처리 — 이벤트 평가가 승패 판정보다 먼저다.
+  // 표시 대기 이벤트가 남아 있으면 승패 판정을 보류한다 (오버레이 중 승패 배너 충돌 방지 +
+  // 이벤트 액션이 승패 조건을 바꿀 수 있으므로 큐가 비었을 때 한 번에 판정).
+  if (stage) {
+    runEvents(state, stage, occurred)
+    if (state.pendingEvents.length === 0) checkVictory(state, stage)
+  }
   return state
 }

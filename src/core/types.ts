@@ -333,6 +333,9 @@ export type EventAction =
   | { type: 'buff'; target: string | 'playerAll'; stat: BuffStat; amount: number; duration: number }
   | { type: 'spawnUnits'; units: StageUnitDef[] } // 증원과 동일 시맨틱 (자리 막히면 개별 취소)
   | { type: 'removeUnits'; officerIds: string[] } // 조용한 이탈 — 격파 로그/경험치/승패 트리거 없음
+  // 스크립트 상태이상 부여 — **명중 판정 없이 확정**(원작: 순유안 "적 4부대 혼란", c02 여포 격파 → 관외 부대 혼란).
+  // removeUnits처럼 몹 일괄 지정이 정상 용례라 officerId 유일성을 강제하지 않는다.
+  | { type: 'inflictStatus'; officerIds: string[]; status: StatusId }
   | { type: 'setBehavior'; officerIds: string[]; behavior: 'guard' | 'pursue' } // 여포 기동 등
   | { type: 'setTile'; cells: Vec2[]; terrain: TerrainId } // 성문 개방/폐쇄
   | { type: 'levelUpEnemies'; amount: number; officerIds?: string[] } // 생략 = 생존 적 전원. HP/MP 재계산·완전회복

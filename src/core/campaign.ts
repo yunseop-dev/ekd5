@@ -374,20 +374,40 @@ function stageOfBattle(battleState: BattleState): StageDef | undefined {
   return battleState.__stage ?? STAGES.find((s) => s.id === battleState.stageId)
 }
 
+/** 아이템 id가 장비인지 도구인지 — 오타/삭제된 id는 null (조용히 무시된다) */
+type RewardKind = 'equipment' | 'consumable'
+
+function itemKindOf(itemId: string): RewardKind | null {
+  if (EQUIPMENT[itemId]) return 'equipment'
+  if (CONSUMABLES[itemId]) return 'consumable'
+  return null
+}
+
 /**
  * 전리품 판정 — 원작 "승리 후 지급" 단계에 대응 (docs/research/campaign-ux.md 1부 §3).
- * victory  = 승리했으면 무조건 (applyVictory가 곧 승리 시점)
- * bossKill = isBoss 유닛이 존재하고 전부 격파됐을 때 (N턴 방어로 이긴 경우엔 안 나온다)
+ * victory      = 승리했으면 무조건 (applyVictory가 곧 승리 시점)
+ * bossKill     = isBoss 유닛이 존재하고 전부 격파됐을 때 (N턴 방어로 이긴 경우엔 안 나온다)
+ * allySurvived = 지정 우군(officerId)이 승리 시점에 생존 (원작 c13 유비 → 인수, v1.1)
+ * 장비/도구 양쪽을 지급한다 — 도구는 addConsumable 경로로 간다.
  */
-function lootFor(battleState: BattleState): string[] {
+function lootFor(battleState: BattleState): { itemId: string; kind: RewardKind }[] {
   const stage = stageOfBattle(battleState)
   if (!stage?.loot) return []
   const bosses = battleState.units.filter((u) => u.isBoss)
   const bossKilled = bosses.length > 0 && bosses.every((u) => u.hp <= 0)
-  return stage.loot
-    .filter((entry) => (entry.trigger === 'bossKill' ? bossKilled : true))
-    .filter((entry) => EQUIPMENT[entry.itemId] !== undefined) // 오타/삭제된 id는 무시
-    .map((entry) => entry.itemId)
+  const rewards: { itemId: string; kind: RewardKind }[] = []
+  for (const entry of stage.loot) {
+    if (entry.trigger === 'bossKill' && !bossKilled) continue
+    if (entry.trigger === 'allySurvived') {
+      const survived = battleState.units.some(
+        (u) => u.officerId === entry.officerId && u.faction === 'ally' && u.hp > 0,
+      )
+      if (!survived) continue
+    }
+    const kind = itemKindOf(entry.itemId)
+    if (kind) rewards.push({ itemId: entry.itemId, kind }) // 오타/삭제된 id는 무시
+  }
+  return rewards
 }
 
 /**
@@ -409,6 +429,25 @@ export function applyVictory(campaign: CampaignState, battleState: BattleState):
   }
 
   const node = currentNode(campaign)
+
+  // 전리품(스테이지 loot) + 전투 중 이벤트 획득분(pendingRewards) — 패배 시에는 이 함수가 불리지 않는다
+  const rewards = [
+    ...lootFor(battleState),
+    ...battleState.pendingRewards.flatMap((r) => {
+      const kind = itemKindOf(r.itemId) // 실제 데이터를 기준으로 경로를 정한다 (선언 kind 오기 내성)
+      return kind ? [{ itemId: r.itemId, kind }] : []
+    }),
+  ]
+  // 도구는 전투 로컬 사본의 잔량이 정본 → 인수 보상 → 이벤트/전리품 도구 순으로 얹는다
+  let consumables = addConsumable(
+    battleState.consumables,
+    'insu',
+    node?.type === 'battle' && node.rewardSeal ? 1 : 0,
+  )
+  for (const reward of rewards) {
+    if (reward.kind === 'consumable') consumables = addConsumable(consumables, reward.itemId, 1)
+  }
+
   const clearedStages = campaign.clearedStages.includes(battleState.stageId)
     ? [...campaign.clearedStages]
     : [...campaign.clearedStages, battleState.stageId]
@@ -429,16 +468,15 @@ export function applyVictory(campaign: CampaignState, battleState: BattleState):
     }),
     clearedStages,
     gold: campaign.gold + (node?.type === 'battle' ? node.rewardGold : 0),
-    inventory: [...cloneInventory(campaign.inventory), ...lootFor(battleState).map(toEquipInstance)],
+    inventory: [
+      ...cloneInventory(campaign.inventory),
+      ...rewards.filter((r) => r.kind === 'equipment').map((r) => toEquipInstance(r.itemId)),
+    ],
     fruits: [...campaign.fruits],
     gauge: clampGauge(campaign.gauge),
     // 도구는 전투 로컬 사본의 잔량이 정본이 된다 (전투 중 소비 반영).
     // 인수는 노드에 박힌 보상 — 원작대로 특정 전투(사수관/호로관/추격전)에서만 나온다
-    consumables: addConsumable(
-      battleState.consumables,
-      'insu',
-      node?.type === 'battle' && node.rewardSeal ? 1 : 0,
-    ),
+    consumables,
   }
 
   // 전투 승리 합류 — 노드의 join을 소화한다 (joinOfficers는 멱등이라 재호출에 안전하다)
