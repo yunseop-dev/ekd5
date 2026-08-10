@@ -459,6 +459,8 @@
 .battle-log .log-poison { color: #b07ae0; }
 .battle-log .log-statusCured { color: #8ad9c0; }
 .battle-log .log-statusHold { color: #e6cf5a; }
+/* 이벤트 즉시형 액션 — targetId/amount가 없어 플로터는 뜨지 않고 로그 패널에만 남는다 */
+.battle-log .log-event { color: #d8b96a; }
 
 /* 결과 오버레이 */
 .result-overlay {
@@ -625,3 +627,37 @@
 }
 .stage-card:hover { border-color: #d8b96a; }
 .stage-card .stage-desc { font-size: 13px; color: #bfb39c; margin-top: 4px; }
+
+/* ---------- 전투 내 이벤트 오버레이 (v1.1) ---------- */
+/* DialogueScreen/ChoiceScreen을 그대로 재사용하고, 전장이 보이도록 배경만 반투명으로 덮는다. */
+
+.event-overlay {
+  position: fixed;
+  inset: 0;
+  /* 결과 오버레이(10)·배너(9) 위 — 이벤트 중에는 전장 조작을 막는 최상단 레이어 */
+  z-index: 12;
+}
+
+.event-overlay .dialogue-screen {
+  position: absolute;
+  inset: 0;
+  z-index: auto; /* 래퍼가 층위를 결정한다 */
+  background: linear-gradient(
+    to bottom,
+    rgba(8, 6, 4, 0.15) 0%,
+    rgba(8, 6, 4, 0.45) 55%,
+    rgba(8, 6, 4, 0.88) 100%
+  );
+}
+
+.event-overlay .dialogue-top {
+  background: rgba(13, 11, 8, 0.72);
+  border-bottom: 1px solid #4a4132;
+}
+
+.event-overlay .dialogue-box {
+  min-height: 132px;
+  background: rgba(30, 26, 19, 0.97);
+}
+
+.event-overlay .dialogue-text { font-size: 16px; }

@@ -46,6 +46,7 @@ import { TERRAIN } from '../data/terrain'
 import { Banner, type BannerProps } from './Banner'
 import { BattleBoard, CLASS_ICON } from './BattleBoard'
 import { BattleLog } from './BattleLog'
+import { EventOverlay } from './EventOverlay'
 import { ForecastPanel } from './ForecastPanel'
 import { TerrainInfoPanel } from './TerrainInfoPanel'
 import { UnitInfoPanel } from './UnitInfoPanel'
@@ -295,6 +296,9 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
   // 속도 0(연출 생략)에서는 배너를 아예 띄우지 않는다 (즉시 처리 경로 유지)
   useEffect(() => {
     if (state.result !== 'ongoing') return
+    // 이벤트 오버레이 중에는 배너를 미룬다 — key를 소비하지 않으므로 큐가 비는 순간 이 effect가
+    // 다시 돌아 배너가 뜬다 (battleStart 이벤트 + 턴1 배너가 겹치는 경우가 이 경로다)
+    if (state.pendingEvents.length > 0) return
     const key = `${state.phase}:${state.turn}`
     if (prevPhaseKey.current === key) return
     prevPhaseKey.current = key
@@ -304,13 +308,16 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
       color: state.phase,
       direction: state.phase === 'enemy' ? 'right' : 'left',
     })
-  }, [state.phase, state.turn, state.result, speed])
+  }, [state.phase, state.turn, state.result, state.pendingEvents.length, speed])
 
   // 페이즈가 바뀌면 들여다보기는 해제한다 (지난 페이즈의 사거리는 정보가 아니라 노이즈다)
   useEffect(() => setInspectId(null), [state.phase, state.turn])
 
   useEffect(() => {
     if (state.result === 'ongoing') return
+    // 코어는 pendingEvents가 빈 순간에만 checkVictory를 돌리므로 보통 여기 걸리지 않지만,
+    // 승패 배너/결과창이 이벤트 오버레이와 겹치는 일은 계약상 금지다 (방어적 이중 가드)
+    if (state.pendingEvents.length > 0) return
     if (speed === 0) {
       setResultShown(true)
       return
@@ -320,7 +327,26 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
         ? { text: '승리!', color: 'gold', direction: 'left' }
         : { text: '패배...', color: 'enemy', direction: 'right' },
     )
-  }, [state.result, speed])
+  }, [state.result, state.pendingEvents.length, speed])
+
+  // ---------- 이벤트 오버레이 ----------
+
+  /** 큐 헤드 소비 — 대사 재생 완료 / 선택 확정 시 호출 */
+  function continueEvent(choice?: number) {
+    setState((prev) =>
+      applyAction(prev, choice === undefined ? { type: 'eventContinue' } : { type: 'eventContinue', choice }),
+    )
+  }
+
+  // 이벤트가 발동하면 진행 중이던 선택·확인창을 걷어낸다 (대상 지정 중 발동 시 잔상 방지).
+  // sel.undo로 되돌리지 않는다 — 이벤트를 일으킨 행동은 이미 확정된 것이다.
+  useEffect(() => {
+    if (state.pendingEvents.length === 0) return
+    setSel(null)
+    setPromoteConfirm(null)
+    setConfirmEnd(false)
+    setInspectId(null)
+  }, [state.pendingEvents.length])
 
   // 승급 확인 오버레이 — Escape 로 닫기
   useEffect(() => {
@@ -346,14 +372,31 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
     }
     if (banner) return // 배너 연출 중에는 적 유닛을 움직이지 않는다
     if (speed === 0) {
-      // 연출 생략: 즉시 전부 처리
+      // 연출 생략: 적/우군 페이즈를 즉시 전부 처리한다.
+      // 이벤트 정책 — 대사/일기토는 자동 소화(내용은 로그에 남는다), 선택지는 생략 불가라
+      // 루프를 탈출해 오버레이를 띄운다. 아군 페이즈 이벤트는 이 effect가 아예 돌지 않으므로
+      // (위 early return) speed와 무관하게 항상 오버레이로 표시된다.
       setState((prev) => {
         let cur = prev
-        while (cur.result === 'ongoing' && cur.phase !== 'player') cur = runAiPhase(cur, cur.phase)
+        while (cur.result === 'ongoing' && cur.phase !== 'player') {
+          if (cur.pendingEvents.length > 0) {
+            if (cur.pendingEvents[0].queue[0]?.type === 'choice') break
+            const consumed = applyAction(cur, { type: 'eventContinue' })
+            if (consumed === cur) break // 소비 불가(데이터 오류) — 무한루프 금지
+            cur = consumed
+            continue
+          }
+          const advanced = runAiPhase(cur, cur.phase)
+          if (advanced === cur) break // 진행 없음 — 방어
+          cur = advanced
+        }
         return cur
       })
       return
     }
+    // 표시 대기 이벤트가 있으면 AI 타이머를 세운다 — 코어가 전 액션을 봉쇄하므로 진행이 불가능하고,
+    // 오버레이 소비(eventContinue)로 state가 바뀌면 이 effect가 다시 돌아 이어받는다
+    if (state.pendingEvents.length > 0) return
     const timer = setTimeout(() => {
       setState((prev) => {
         if (prev.result !== 'ongoing' || prev.phase === 'player') return prev
@@ -517,7 +560,9 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
 
   // ---------- 조작 ----------
 
-  const isPlayerTurn = state.phase === 'player' && state.result === 'ongoing'
+  // 이벤트 오버레이 중에는 조작을 막는다 (코어도 전 액션을 거부하지만 UI가 먼저 잠근다)
+  const isPlayerTurn =
+    state.phase === 'player' && state.result === 'ongoing' && state.pendingEvents.length === 0
 
   function selectUnit(unit: UnitState) {
     setInspectId(null) // 아군을 조작하기 시작하면 들여다보기는 끝난다
@@ -1024,7 +1069,10 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
         />
       )}
 
-      {state.result !== 'ongoing' && resultShown && (
+      {/* 전투 내 이벤트 — 대사/선택지/일기토. 결과창·배너보다 위에 온다 (계약상 동시 표시는 없다) */}
+      <EventOverlay state={state} title={stage.name} onContinue={continueEvent} />
+
+      {state.result !== 'ongoing' && resultShown && state.pendingEvents.length === 0 && (
         <div className="result-overlay">
           <div className="result-box">
             <h2>{state.result === 'victory' ? '승리!' : '패배...'}</h2>

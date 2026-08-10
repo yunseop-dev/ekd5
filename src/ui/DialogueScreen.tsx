@@ -12,9 +12,11 @@ interface Props {
   title: string
   script: DialogueLine[]
   onDone: () => void
+  /** 전투 위 이벤트 오버레이 모드 (EventOverlay) — 우클릭도 대사 진행에 쓴다 (전장 우클릭 = 취소와 충돌 방지) */
+  overlay?: boolean
 }
 
-export function DialogueScreen({ title, script, onDone }: Props) {
+export function DialogueScreen({ title, script, onDone, overlay }: Props) {
   const [index, setIndex] = useState(0)
 
   // 스크립트가 교체되면 처음부터
@@ -45,7 +47,18 @@ export function DialogueScreen({ title, script, onDone }: Props) {
   const icon = officer ? (CLASS_ICON[officer.classId] ?? '?') : (speakerName?.[0] ?? '?')
 
   return (
-    <div className="dialogue-screen" onClick={advance}>
+    <div
+      className="dialogue-screen"
+      onClick={advance}
+      onContextMenu={
+        overlay
+          ? (e) => {
+              e.preventDefault()
+              advance()
+            }
+          : undefined
+      }
+    >
       <div className="dialogue-top">
         <span className="dialogue-title">{title}</span>
         <span className="dialogue-progress">
