@@ -124,15 +124,18 @@ describe('EQUIPMENT 데이터', () => {
     for (const item of Object.values(EQUIPMENT)) {
       expect(item.price === null, item.id).toBe(item.isTreasure === true)
     }
-    // 의천검/청강검/적로/맹덕신서/태평요술서 + v0.7 방천화극/적토마
-    expect(Object.values(EQUIPMENT).filter((i) => i.isTreasure).length).toBe(7)
+    // 의천검/청강검/적로/맹덕신서/태평요술서 + v0.7 방천화극/적토마 + v1.2 1부 보물 16종
+    expect(Object.values(EQUIPMENT).filter((i) => i.isTreasure).length).toBe(23)
   })
 
   it('상점 장비 가격이 단계별 설계 구간 안에 있다', () => {
+    // 무기·방어구는 본체 장비라 단계별 구간이 좁다.
+    // 보조구(방패·장갑·투구)는 원작에서도 값싼 소품 계열이라 아래쪽으로 넓은 구간을 쓴다 (v1.2)
     const band: Record<1 | 2 | 3, [number, number]> = { 1: [300, 500], 2: [800, 1200], 3: [2000, 2600] }
+    const accessoryBand: Record<1 | 2 | 3, [number, number]> = { 1: [200, 500], 2: [500, 1200], 3: [2000, 2600] }
     for (const item of Object.values(EQUIPMENT)) {
       if (item.price === null) continue
-      const [lo, hi] = band[item.tier]
+      const [lo, hi] = (item.slot === 'accessory' ? accessoryBand : band)[item.tier]
       expect(item.price, item.id).toBeGreaterThanOrEqual(lo)
       expect(item.price, item.id).toBeLessThanOrEqual(hi)
     }

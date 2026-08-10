@@ -45,6 +45,9 @@ export const STRATEGIES: Record<string, StrategyDef> = {
     power: 50,
     capHitRate: 90,
     targets: 'enemy',
+    // 화염 잔존 — 원작 화공은 불길이 지형에 남아 계속 태운다. 지속 3턴은 [설계값].
+    // 광역(십자) 화계만 부여한다 — 단일 화계(초열·업화)는 원작에서도 잔존 연출이 없다
+    hazard: { duration: 2 }, // 잔불 2턴 [설계값 — 지속 3턴은 시가전(복양) 진격로를 완전히 봉쇄해 밸런스 붕괴]
   }, // 원작 ルＢ 50%/90% — 일치 확인
   // 화룡 — 2차 병과(참모) 전용 광역 화계. 원작 チＢ 위력 70 확정 (v0.9에서 60→70 교정)
   hwaryong: {
@@ -58,6 +61,7 @@ export const STRATEGIES: Record<string, StrategyDef> = {
     power: 70,
     capHitRate: 80,
     targets: 'enemy',
+    hazard: { duration: 2 }, // 잔불 2턴 [설계값 — 지속 3턴은 시가전(복양) 진격로를 완전히 봉쇄해 밸런스 붕괴] // 화진과 동일 — 광역 화계의 화염 잔존 [설계값]
   },
 
   // ---- 풍계 (날씨 무관) — 원작에서 바람 계열만 ㅁ자 범위를 갖는다 ----

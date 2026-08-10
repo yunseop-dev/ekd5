@@ -10,6 +10,9 @@
 // v0.6: 무구성장 도입 — bonus는 Lv1 기준값이고, growthStat에 레벨당 +10(보물 +9)이 얹힌다.
 //   성장 대상은 원작대로 무기/방어구뿐이다(보조구는 growthStat 없음 = 성장하지 않음).
 //   3단계 일반 장비는 Lv3에 팔면 능력치 열매가 나온다 → data/fruits.ts FRUIT_ON_SELL.
+//
+// v1.2: 보조구 소품 4종(장갑·투구·구리방패) + **1부 보물 16종** 추가 — 아래 보물 블록 주석 참조.
+//   보물의 tier는 상점 해금과 무관한 강도 등급 표기다(의천검 tier1 선례).
 
 import type { EquipmentDef } from '../core/types'
 
@@ -279,6 +282,45 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     tier: 2,
     description: '잘 달리는 말. 한 걸음 더 나아간다.',
   },
+  // v1.2: 보조구 소품 4종 — 원작 보조구는 방패·장갑·투구 같은 값싼 소품이 층층이 깔린다
+  // (caocao.md §6 "보조구는 방패·장갑·기마갑옷·서적·보석·관 등"). 가격은 무기/방어구 동급보다
+  // 싸게 잡았다 [설계값 — 원작 구매가 절대 수치는 전 언어권 미확보, equipment.md §1].
+  namelessGauntlet: {
+    id: 'namelessGauntlet',
+    name: '무명장갑',
+    slot: 'accessory',
+    bonus: { atk: 3 }, // [설계값]
+    price: 200,
+    tier: 1,
+    description: '이름 없는 장인이 지은 가죽 장갑. 손아귀에 힘이 들어간다.',
+  },
+  leatherHelm: {
+    id: 'leatherHelm',
+    name: '가죽투구',
+    slot: 'accessory',
+    bonus: { def: 3 }, // [설계값]
+    price: 250,
+    tier: 1,
+    description: '가죽을 겹쳐 만든 투구. 머리부터 지키는 것이 병법이다.',
+  },
+  bronzeHelm: {
+    id: 'bronzeHelm',
+    name: '구리투구',
+    slot: 'accessory',
+    bonus: { def: 6 }, // [설계값]
+    price: 500,
+    tier: 2,
+    description: '구리를 두드려 만든 투구. 화살을 비껴낸다.',
+  },
+  bronzeShield: {
+    id: 'bronzeShield',
+    name: '구리방패',
+    slot: 'accessory',
+    bonus: { def: 8 }, // [설계값]
+    price: 600,
+    tier: 2,
+    description: '구리를 덧댄 방패. 한 몸을 가리기에 넉넉하다.',
+  },
 
   // ---------- 보물 (비매품 · 판매 불가) ----------
   yitianSword: {
@@ -362,5 +404,225 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     tier: 3,
     isTreasure: true,
     description: '장각이 남긴 요술서. 매 턴 책략치가 10 회복된다.',
+  },
+
+  // ==========================================================================
+  // v1.2: 1부 보물 16종 — 원작 보물 50종 중 제1부(c00~c15) 등장분 (caocao.md §6)
+  // --------------------------------------------------------------------------
+  // 밸런스 원칙: **같은 계열 3단계 상점템 기본치를 넘지 않는다** (원작 "초반 강력,
+  // 만렙 상점템에 소폭 밀림" 구도 — equipment.md §2). 참고 상한: 검 55 / 창 58 /
+  // 활 47 / 부채 52 / 갑옷 55 / 옷 24+정신25.
+  //   ※ 알려진 계통 편차: 우리 무구성장은 보물이 Lv9(+9/Lv)까지 자라 만렙에서는
+  //     상점템(Lv3, +10/Lv)을 앞선다. 이는 v0.6 성장 상수(core)의 기존 성질이고
+  //     청강검에서도 이미 나타난다 — 데이터 쪽에서는 기본치만 억제했다.
+  // 수치는 원작 절대치 미확보분이 많아 대부분 [설계값]이며, 특수효과만 원작 확정이다.
+  //
+  // 방어구: 도복·깃옷 계열(문관) / 갑옷 계열(무관) / 기마갑옷(기병 전용, 원작 §5
+  //   "기병계 보조구는 사실상 기마갑옷 강제" — 우리는 방어구 슬롯으로 단순화)
+  blackRobe: {
+    id: 'blackRobe',
+    name: '칠흑도복',
+    slot: 'armor',
+    classes: ['strategist', 'geomancer'],
+    bonus: { def: 28 }, // [설계값]
+    price: null,
+    tier: 2,
+    isTreasure: true,
+    growthStat: 'def',
+    description: '먹을 들인 검은 도복. 문관의 몸을 화살로부터 가린다.',
+  },
+  flyingDragonRobe: {
+    id: 'flyingDragonRobe',
+    name: '비룡도복',
+    slot: 'armor',
+    classes: ['strategist', 'geomancer'],
+    bonus: { def: 32, mind: 8 }, // [설계값]
+    price: null,
+    tier: 3,
+    isTreasure: true,
+    growthStat: 'def',
+    description: '나는 용을 수놓은 도복. 걸치면 기가 맑아진다.',
+  },
+  phoenixRobe: {
+    id: 'phoenixRobe',
+    name: '봉황깃옷',
+    slot: 'armor',
+    classes: ['strategist', 'geomancer'],
+    bonus: { def: 36 }, // [설계값]
+    price: null,
+    tier: 3,
+    isTreasure: true,
+    growthStat: 'def',
+    description: '봉황의 깃을 엮어 지은 옷. 문관이 걸치는 최상의 방어구다.',
+  },
+  silverArmor: {
+    id: 'silverArmor',
+    name: '백은갑옷',
+    slot: 'armor',
+    classes: ['lord', 'heavyInfantry'],
+    bonus: { def: 42 }, // [설계값]
+    price: null,
+    tier: 3,
+    isTreasure: true,
+    growthStat: 'def',
+    description: '흰 은으로 벼린 갑옷. 진중에서 멀리서도 눈에 띈다.',
+  },
+  chainArmor: {
+    id: 'chainArmor',
+    name: '연환갑옷',
+    slot: 'armor',
+    classes: ['lord', 'heavyInfantry'],
+    // 원작 복양 3연전의 보물 3종 분기 중 하나 (statuses.md §복양 — 이광궁/연환갑/여포궁)
+    bonus: { def: 46 }, // [설계값]
+    price: null,
+    tier: 3,
+    isTreasure: true,
+    growthStat: 'def',
+    description: '고리를 이어 붙인 갑옷. 창날이 고리 사이에서 멎는다.',
+  },
+  leatherHorseArmor: {
+    id: 'leatherHorseArmor',
+    name: '가죽기마갑옷',
+    slot: 'armor',
+    classes: ['lightCavalry'],
+    // 원작 기마갑옷은 간접 피해 -50%가 본질이나 우리에겐 해당 필드가 없어 방어치로 환산 [의도적 단순화]
+    bonus: { def: 30 }, // [설계값]
+    price: null,
+    tier: 2,
+    isTreasure: true,
+    growthStat: 'def',
+    description: '말까지 감싸는 가죽 갑옷. 화살이 말을 노려도 견딘다.',
+  },
+  goldenArmor: {
+    id: 'goldenArmor',
+    name: '황금갑옷',
+    slot: 'armor',
+    bonus: { def: 50 }, // [설계값] — 병과 무관 최상급 갑옷
+    price: null,
+    tier: 3,
+    isTreasure: true,
+    growthStat: 'def',
+    description: '황금을 입힌 갑옷. 값으로 매길 수 없는 물건이다.',
+  },
+
+  // 무기
+  holySword: {
+    id: 'holySword',
+    name: '성자보검',
+    slot: 'weapon',
+    classes: ['lord', 'heavyInfantry'],
+    // 원작 확정: 공격력 + **정신 강화**를 함께 주는 보검
+    bonus: { atk: 48, mind: 10 }, // atk [설계값] / mind 원작 확정
+    price: null,
+    tier: 3,
+    isTreasure: true,
+    growthStat: 'atk',
+    description: '성인의 손을 거쳤다는 보검. 쥔 자의 마음까지 벼려 준다.',
+  },
+  serpentSpear: {
+    id: 'serpentSpear',
+    name: '사모',
+    slot: 'weapon',
+    classes: ['lightCavalry'],
+    bonus: { atk: 52 }, // [설계값]
+    price: null,
+    tier: 3,
+    isTreasure: true,
+    growthStat: 'atk',
+    // 원작 확정: 장팔사모 = "찔러 공격" — 대상 뒤편 1칸까지 관통한다 (caocao.md §6)
+    pierceBack: true,
+    description: '뱀처럼 굽은 창날의 장창. 찌르면 뒤에 선 자까지 꿰뚫는다.',
+  },
+  lüBuBow: {
+    id: 'lüBuBow',
+    name: '여포궁',
+    slot: 'weapon',
+    classes: ['archer'],
+    // 원작 확정: 보물의 일반공격 부가 상태이상은 100% 발동 (statuses.md §5 — 목인·토우·여포궁·이광궁)
+    // 부가효과가 강력해 기본치는 3단계 철궁(47)보다 낮게 잡았다 [설계값 — 하향 조정]
+    bonus: { atk: 44 },
+    price: null,
+    tier: 3,
+    isTreasure: true,
+    growthStat: 'atk',
+    onHitStatus: 'immobile', // 포박(부동) 확정 부여 — 원작 확정
+    description: '여포가 쓰던 활. 시위 소리에 사람이 못 박힌 듯 멈춘다.',
+  },
+  gudingDao: {
+    id: 'gudingDao',
+    name: '고정도',
+    slot: 'weapon',
+    classes: ['lord', 'heavyInfantry'],
+    // 원작 확정: 공18(+9) · **순발 +10** (equipment.md §2). 공격치만 우리 곡선으로 환산 [설계값]
+    bonus: { atk: 40, agi: 10 },
+    price: null,
+    tier: 3,
+    isTreasure: true,
+    growthStat: 'atk',
+    description: '옛 주인의 이름이 새겨진 큰 칼. 무겁지만 손이 빠르게 움직인다.',
+  },
+  bashoFan: {
+    id: 'bashoFan',
+    name: '파초선',
+    slot: 'weapon',
+    classes: ['geomancer'],
+    // 원작 설명은 "풍계 강화"인데 한국 정발판은 버그로 지계가 강화된다 (caocao.md §5).
+    // 우리는 지계 책략이 없어 설명문만 원작을 인용하고 효과는 정신력으로 환산했다 [의도적 단순화]
+    bonus: { mind: 45 }, // [설계값]
+    price: null,
+    tier: 3,
+    isTreasure: true,
+    growthStat: 'mind',
+    description: '파초 잎을 본뜬 큰 부채. 부치면 바람의 기운이 거세진다.',
+  },
+
+  // 보조구
+  moYuJian: {
+    id: 'moYuJian',
+    name: '몰우전',
+    slot: 'accessory',
+    bonus: {},
+    price: null,
+    tier: 2,
+    isTreasure: true,
+    // 원작 확정: 근접 병과에 원거리 공격을 부여한다.
+    // ※ 엔진 미반영 — 현재 코어는 이 플래그를 읽지 않는다 (사거리 계산은 병과 기준, 후속 과제)
+    rangedAttack: true,
+    description: '깃 없이도 날아가는 화살. 창칼밖에 모르던 손이 멀리 닿는다.',
+  },
+  fuJin: {
+    id: 'fuJin',
+    name: '복건',
+    slot: 'accessory',
+    bonus: { mind: 8 }, // [설계값]
+    price: null,
+    tier: 2,
+    isTreasure: true,
+    description: '문사가 머리에 두르는 두건. 생각이 흐트러지지 않는다.',
+  },
+  jueYing: {
+    id: 'jueYing',
+    name: '절영',
+    slot: 'accessory',
+    bonus: {},
+    // 원작 c03 전멸 클리어 보상이자 c10 전위 구출의 필수템 — 조조의 이동력 확보가 존재 이유다
+    // (battle-events.md §4). ※ equipment.md §2 표는 절영 +1 / 바람바퀴 +2로 적고 있어 상충 —
+    // 여기서는 "전위 구출 핵심"이라는 용도 근거를 채택해 +2로 둔다 (v1.2 결정, R 실측 시 재교정)
+    moveBonus: 2,
+    price: null,
+    tier: 2,
+    isTreasure: true,
+    description: '조조가 아끼던 준마. 그림자조차 끊고 달린다.',
+  },
+  windWheel: {
+    id: 'windWheel',
+    name: '바람바퀴',
+    slot: 'accessory',
+    bonus: {},
+    moveBonus: 1, // [설계값] — 절영과의 상하 관계는 위 주석 참조
+    price: null,
+    tier: 2,
+    isTreasure: true,
+    description: '바람을 타고 도는 바퀴. 발걸음이 한결 가벼워진다.',
   },
 }

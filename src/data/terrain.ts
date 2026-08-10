@@ -1,9 +1,14 @@
 // 지형 정의. 조조전 원칙(docs/research/caocao.md §2.4)을 따르는 설계값:
 //  - 지형효과(%)는 물리 공방에만 적용
-//  - 기병(horse): 평지 110 / 악지(숲·산·황무지) 80 — 지형만으로 30% 성능 차
+//  - 기병(horse): 평지 110 / 악지(대하·산지) 80 — 지형만으로 30% 성능 차
 //  - 보병(foot): 전 지형 100 이상
 //  - 기병도 숲/산 통과 가능하되 이동 코스트가 큼 (조조전에서 도입된 규칙)
 // 개별 % 수치는 원작 전체 표가 미확보라 위 원칙에 맞춘 설계값이다.
+//
+// v1.2 교정 — 한국어판 공략 확정치 반영 (docs/research 지형표 재확인):
+//   기병 성능은 **숲 90 / 가옥(마을) 90 / 여울 80**이다. 숲은 "통과 가능하되 불리"(80 → 90)로,
+//   마을은 시설 보정(110)이 아니라 가옥 특유의 기병 불리(90)가 적용된다.
+//   마을의 매턴 회복(healPerTurn 20)은 그대로 유지한다.
 
 import type { TerrainDef, TerrainId } from '../core/types'
 
@@ -24,7 +29,8 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     id: 'forest',
     name: '숲',
     cost: { foot: 2, horse: 3, wheel: 3, mage: 2 },
-    effect: { foot: 105, horse: 80, wheel: 90, mage: 100 },
+    // 기병 90 — 원작 확정 (v1.2 교정: 80 → 90)
+    effect: { foot: 105, horse: 90, wheel: 90, mage: 100 },
   },
   mountain: {
     id: 'mountain',
@@ -51,7 +57,7 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     effect: { foot: 100, horse: 100, wheel: 100, mage: 100 },
   },
   // 원작 확정치: 성·관문·요새 = 120%(★), 마을·병영 = 110%(◎) + 매턴 최대 HP 20% 회복
-  // (docs/research/ux.md §4)
+  // (docs/research/ux.md §4). ※ 마을의 기병만 예외로 90 — 가옥 기병 불리 (v1.2)
   fort: {
     id: 'fort',
     name: '성채',
@@ -63,7 +69,9 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     id: 'village',
     name: '마을',
     cost: { foot: 1, horse: 1, wheel: 1, mage: 1 },
-    effect: { foot: 110, horse: 110, wheel: 110, mage: 110 },
+    // 기병만 90 — 원작 확정: 가옥은 기병에게 불리하다 (v1.2 교정: 110 → 90).
+    // 회복(healPerTurn)은 유지 — 시설 점유 보정과 기병 불리는 별개 규칙이다.
+    effect: { foot: 110, horse: 90, wheel: 110, mage: 110 },
     healPerTurn: 20,
   },
   castle: {

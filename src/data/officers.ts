@@ -314,4 +314,208 @@ export const OFFICERS: Record<string, OfficerDef> = {
     initialEquipment: { weapon: 'bronzeSpear', armor: 'bronzeArmor' },
     level: 15,
   },
+
+  // ==========================================================================
+  // v1.2: 1부 서사 인물 확장 — 정의만 하고 배치는 스테이지 쪽(Wave 2) 소유다.
+  // 능력치는 전부 **원작 급 감각에 맞춘 [설계값]**(짝수 관례 유지)이며,
+  // R 조사가 Data.e5 실측을 가져오면 통합 단계에서 교정한다.
+  // ==========================================================================
+
+  // ---- 한 황실 ----
+  xianDi: {
+    id: 'xianDi',
+    name: '헌제',
+    // 비무장 천자 — 초기 장비 없음(원작에서도 싸우는 인물이 아니다). 전 능력 40~50대 [설계값]
+    stats: { str: 40, ldr: 46, int: 50, agi: 44, luck: 42 },
+    classId: 'lord',
+    level: 6,
+  },
+
+  // ---- 동탁 잔당 (이각·곽사·서영) ----
+  liJue: {
+    id: 'liJue',
+    name: '이각',
+    // 동탁 사후 장안을 장악한 서량 무장. 무력은 화웅급, 지력은 낮다 [설계값]
+    stats: { str: 80, ldr: 70, int: 44, agi: 66, luck: 48 },
+    classId: 'lightCavalry',
+    initialEquipment: { weapon: 'bronzeSpear', armor: 'leatherArmor' },
+    level: 9,
+  },
+  guoSi: {
+    id: 'guoSi',
+    name: '곽사',
+    // 이각과 한 쌍. 반 급 아래로 잡았다 [설계값]
+    stats: { str: 76, ldr: 66, int: 42, agi: 64, luck: 46 },
+    classId: 'lightCavalry',
+    initialEquipment: { weapon: 'bronzeSpear', armor: 'leatherArmor' },
+    level: 9,
+  },
+  xuRong: {
+    id: 'xuRong',
+    name: '서영',
+    // 동탁군 부장 — 조조를 한 번 패퇴시킨 실적이 있어 화웅 바로 아래로 잡았다 [설계값]
+    stats: { str: 82, ldr: 76, int: 62, agi: 68, luck: 52 },
+    classId: 'lightCavalry',
+    initialEquipment: { weapon: 'bronzeSpear', armor: 'leatherArmor' },
+    level: 8,
+  },
+
+  // ---- 조조군 (후에 합류하거나 이미 막하에 있는 인물) ----
+  xuHuang: {
+    id: 'xuHuang',
+    name: '서황',
+    // 원작 궁병 에이스 — 무력 90급 [설계값]. 1부에서는 적으로 나오고 뒤에 아군이 된다
+    stats: { str: 90, ldr: 86, int: 72, agi: 70, luck: 78 },
+    classId: 'archer',
+    initialEquipment: { weapon: 'bronzeBow', armor: 'bronzeArmor' },
+    level: 12,
+  },
+  manChong: {
+    id: 'manChong',
+    name: '만총',
+    // 조조 막하의 문관. 책사 계열 중견 [설계값]
+    stats: { str: 40, ldr: 62, int: 84, agi: 58, luck: 66 },
+    classId: 'strategist',
+    initialEquipment: { weapon: 'bambooFan', armor: 'clothRobe' },
+    level: 11,
+  },
+
+  // ---- 장수(張繡)군 — 완성 전투 ----
+  zhangXiu: {
+    id: 'zhangXiu',
+    name: '장수',
+    // 완성의 주인. 보스급 기병 [설계값]
+    stats: { str: 84, ldr: 82, int: 60, agi: 74, luck: 56 },
+    classId: 'lightCavalry',
+    initialEquipment: { weapon: 'bronzeSpear', armor: 'bronzeArmor' },
+    level: 12,
+  },
+  jiaXu: {
+    id: 'jiaXu',
+    name: '가후',
+    // 지력 96급의 독사 [설계값]. 진궁과 같은 이유로 **참모(2차)** — 방해 책략(허보·봉책)의
+    // 적측 실사용을 확보한다 (statuses.md §3 [의도적 이탈]).
+    // ※ 독연은 방술사 계열 책략이라 이 병과로는 쓰지 못한다 — 허보·봉책으로 대체된다
+    stats: { str: 44, ldr: 74, int: 96, agi: 64, luck: 80 },
+    classId: 'counselor',
+    initialEquipment: { weapon: 'whiteFeatherFan', armor: 'silkRobe' },
+    level: 12,
+  },
+  huCheEr: {
+    id: 'huCheEr',
+    name: '호거아',
+    // 장수의 호위. 원작에서 전위의 무기를 훔쳐낸 괴력·민첩형 — 전위의 일기토 상대 [설계값]
+    stats: { str: 88, ldr: 66, int: 34, agi: 78, luck: 50 },
+    classId: 'heavyInfantry',
+    initialEquipment: { weapon: 'bronzeSword', armor: 'leatherArmor' },
+    level: 11,
+  },
+
+  // ---- 원술군 (회남) ----
+  yuanShu: {
+    id: 'yuanShu',
+    name: '원술',
+    // 참칭 황제. 무력·통솔이 모두 낮은 "그릇이 안 되는 군주" 보스 [설계값]
+    stats: { str: 60, ldr: 44, int: 66, agi: 50, luck: 40 },
+    classId: 'lord',
+    initialEquipment: { weapon: 'bronzeSword', armor: 'bronzeArmor' },
+    level: 13,
+  },
+
+  // ---- 손씨 (우군) ----
+  sunJian: {
+    id: 'sunJian',
+    name: '손견',
+    // 사수관에서 함께 싸우는 우군 군주 — 생존 시 보물 보상 분기의 주인공 [설계값]
+    stats: { str: 88, ldr: 82, int: 70, agi: 74, luck: 66 },
+    classId: 'lord',
+    initialEquipment: { weapon: 'bronzeSword', armor: 'leatherArmor' },
+    level: 10,
+  },
+  sunCe: {
+    id: 'sunCe',
+    name: '손책',
+    // 소패왕. 아버지보다 무력·순발이 위인 우군 기병 [설계값]
+    stats: { str: 92, ldr: 84, int: 72, agi: 86, luck: 78 },
+    classId: 'lightCavalry',
+    initialEquipment: { weapon: 'bronzeSpear', armor: 'bronzeArmor' },
+    level: 14,
+  },
+
+  // ---- 대사 전용 (화자로만 쓰인다 — 스테이지 배치 대상이 아니다) ----
+  // 전투 능력치는 의미가 없어 최소치로 둔다. 초기 장비도 주지 않는다.
+  caoAnMin: {
+    id: 'caoAnMin',
+    name: '조안민',
+    stats: { str: 40, ldr: 36, int: 40, agi: 38, luck: 30 }, // 대사 전용 — 최소 스탯 [설계값]
+    classId: 'heavyInfantry',
+    level: 1,
+  },
+  zouShi: {
+    id: 'zouShi',
+    name: '추씨',
+    stats: { str: 20, ldr: 20, int: 46, agi: 40, luck: 44 }, // 대사 전용 — 최소 스탯 [설계값]
+    classId: 'geomancer',
+    level: 1,
+  },
+  fuHao: {
+    id: 'fuHao',
+    name: '부호',
+    stats: { str: 24, ldr: 30, int: 52, agi: 36, luck: 38 }, // 대사 전용 — 최소 스탯 [설계값]
+    classId: 'strategist',
+    level: 1,
+  },
+
+  // ---- 제네릭 잡병 (스테이지에서 level 오버라이드해 재사용 — west*·yellow* 패턴) ----
+  // 조조군 구원대: 아군 진영 잡병이라 서량병과 같은 정규군 수준
+  weiInfantry: {
+    id: 'weiInfantry',
+    name: '조조군보병',
+    stats: { str: 66, ldr: 58, int: 26, agi: 52, luck: 46 },
+    classId: 'heavyInfantry',
+    initialEquipment: { weapon: 'woodSword', armor: 'leatherArmor' },
+    level: 4,
+  },
+  weiCavalry: {
+    id: 'weiCavalry',
+    name: '조조군기병',
+    stats: { str: 70, ldr: 56, int: 26, agi: 64, luck: 48 },
+    classId: 'lightCavalry',
+    initialEquipment: { weapon: 'woodSpear', armor: 'leatherArmor' },
+    level: 4,
+  },
+  // 회남군(원술) — 오합지졸에 가까워 서량병보다 반 급 아래
+  huaiInfantry: {
+    id: 'huaiInfantry',
+    name: '회남보병',
+    stats: { str: 62, ldr: 52, int: 24, agi: 50, luck: 42 },
+    classId: 'heavyInfantry',
+    initialEquipment: { weapon: 'woodSword', armor: 'leatherArmor' },
+    level: 4,
+  },
+  huaiArcher: {
+    id: 'huaiArcher',
+    name: '회남궁병',
+    stats: { str: 60, ldr: 46, int: 26, agi: 58, luck: 42 },
+    classId: 'archer',
+    initialEquipment: { weapon: 'woodBow', armor: 'leatherArmor' },
+    level: 4,
+  },
+  // 형주군(장수·유표) — 정규군 수준
+  jingInfantry: {
+    id: 'jingInfantry',
+    name: '형주보병',
+    stats: { str: 64, ldr: 56, int: 24, agi: 52, luck: 44 },
+    classId: 'heavyInfantry',
+    initialEquipment: { weapon: 'woodSword', armor: 'leatherArmor' },
+    level: 4,
+  },
+  jingCavalry: {
+    id: 'jingCavalry',
+    name: '형주기병',
+    stats: { str: 68, ldr: 54, int: 24, agi: 62, luck: 46 },
+    classId: 'lightCavalry',
+    initialEquipment: { weapon: 'woodSpear', armor: 'leatherArmor' },
+    level: 4,
+  },
 }
