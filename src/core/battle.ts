@@ -26,7 +26,7 @@ import {
   strategyHitRate,
 } from './formulas'
 import type { MoveContext, MovementRange, Occupancy } from './movement'
-import { keyOf, manhattan, movementRange, strategyAreaCells } from './movement'
+import { chebyshev, keyOf, manhattan, movementRange, strategyAreaCells } from './movement'
 import { nextInt, roll } from './rng'
 import type {
   BattleAction,
@@ -664,23 +664,15 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
       }
 
       const targetCells: Vec2[] = strategyAreaCells(strategy.area, action.target)
-      // 진영 필터 — per-cell 판정과 같은 규칙 (오사 없음)
-      const isValidTarget = (u: UnitState): boolean =>
-        strategy.targets === 'enemy' ? isHostile(caster, u) : !isHostile(caster, u)
 
-      if (strategy.area === 'single') {
-        // 단일 대상 책략은 원작대로 중심 칸에 유효 대상이 서 있어야 한다
-        const primaryTarget = unitAt(state, action.target)
-        if (!primaryTarget || !isValidTarget(primaryTarget)) return prev
-      } else {
-        // 범위 책략은 빈 칸을 중심으로 지정할 수 있다 (조준 완화 — 십자/ㅁ자 걸치기).
-        // 다만 범위 안에 유효 대상이 하나도 없으면 MP만 날아가므로 거부한다.
-        const anyTarget = targetCells.some((cell) => {
-          const u = unitAt(state, cell)
-          return u !== undefined && isValidTarget(u)
-        })
-        if (!anyTarget) return prev
-      }
+      // 원작 확정(ccz-compat-engine 대조): 범위 책략도 **유닛이 서 있는 칸**만 중심으로 지정할 수 있다.
+      // 커서 후보 열거·실행 모두 유닛 레코드 기준이라 빈 칸 중심은 존재하지 않는다.
+      // 이득 0인 캐스팅으로 MP를 낭비하는 것은 플레이어의 자유이며, 그 방지는 AI 쪽 판단이다.
+      const primaryTarget = unitAt(state, action.target)
+      if (!primaryTarget) return prev
+      const validTarget =
+        strategy.targets === 'enemy' ? isHostile(caster, primaryTarget) : !isHostile(caster, primaryTarget)
+      if (!validTarget) return prev
 
       caster.mp -= strategy.mpCost
       const cStats = effectiveStats(caster)
@@ -760,18 +752,13 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
       const def = CONSUMABLES[action.itemId]
       if (!def) return prev
       if (consumableCount(state.consumables, action.itemId) <= 0) return prev
-      if (manhattan(unit.pos, action.target) > def.range) return prev
+      // 원작 확정: 도구 대상 게이트는 **진영 일치 + 체비쇼프 거리 ≤ range**
+      // (range 1 = 자기 자신 + 인접 8방). 인수도 자기 전용 특례가 없다.
+      if (chebyshev(unit.pos, action.target) > def.range) return prev
 
-      // range 0 도구는 자기 자신 전용(target = 자기 위치). 사거리가 있으면 대상 칸에
-      // 비적대 생존 유닛이 서 있어야 한다 — 도구는 적에게 쓸 수 없다.
-      let target: UnitState
-      if (def.range === 0) {
-        target = unit
-      } else {
-        const at = unitAt(state, action.target)
-        if (!at || isHostile(unit, at)) return prev
-        target = at
-      }
+      // 대상 칸에는 살아 있는 비적대 유닛이 서 있어야 한다 — 자기 위치를 찍으면 거리 0으로 자연 통과.
+      const target = unitAt(state, action.target)
+      if (!target || isHostile(unit, target)) return prev
 
       switch (def.effect.kind) {
         case 'heal': {

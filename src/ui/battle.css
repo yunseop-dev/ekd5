@@ -300,6 +300,19 @@
 .action-menu .menu-back:hover:not(:disabled) { background: #3d3527; }
 .action-menu .dim { margin: 2px 0; color: #857a66; font-size: 12px; }
 
+/* 대상 지정 안내 — 유효한 칸만 반응하므로 무엇을 찍어야 하는지 명시한다 */
+.target-hint p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #bfb39c;
+}
+.target-hint .target-hint-cancel {
+  margin-top: 4px;
+  color: #857a66;
+  font-size: 11px;
+}
+
 /* ---------- 인수 승급 확인 오버레이 (v0.9: 캠프 → 전투 이식) ---------- */
 /* .result-overlay/.result-box 위에 얹힌다 */
 

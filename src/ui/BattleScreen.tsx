@@ -14,7 +14,14 @@ import {
 import type { RosterEntry } from '../core/campaign'
 import { PROMOTION_LEVEL, canPromoteUnit, consumableCount, growthSummary } from '../core/campaign'
 import { maxHp, maxMp } from '../core/formulas'
-import { attackableCells, attackRangeUnion, keyOf, manhattan, strategyAreaCells } from '../core/movement'
+import {
+  attackableCells,
+  attackRangeUnion,
+  chebyshev,
+  keyOf,
+  manhattan,
+  strategyAreaCells,
+} from '../core/movement'
 import type {
   BattleState,
   ConsumableDef,
@@ -60,6 +67,13 @@ interface Selection {
   /** 도구 대상 지정 중인 소모품 id */
   itemId?: string
   undo: BattleState // 취소 시 복원 지점 (이동 전 상태)
+}
+
+/** 승급 확인 오버레이 — 도구를 쓰는 유닛과 승급할 대상이 다를 수 있다 (인수는 인접 아군에게도 쓴다) */
+interface PromoteConfirm {
+  itemId: string
+  userId: string
+  targetId: string
 }
 
 export interface Floater {
@@ -172,6 +186,18 @@ function promotionChanges(from: UnitClassDef, to: UnitClassDef, level: number): 
   return out
 }
 
+/** 도구가 이 대상에게 실제 효과가 있는가 — 효과 0이면 도구만 사라지므로 UI가 먼저 막는다 */
+function itemEffective(def: ConsumableDef, target: UnitState): boolean {
+  switch (def.effect.kind) {
+    case 'heal':
+      return target.hp < target.maxHp
+    case 'mpRestore':
+      return target.mp < target.maxMp
+    case 'promotion':
+      return canPromoteUnit(target)
+  }
+}
+
 interface PromotionInfo {
   from: UnitClassDef
   target: UnitClassDef | null
@@ -213,8 +239,8 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
   const [hover, setHover] = useState<Vec2 | null>(null)
   const [speed, setSpeed] = useState<PlaySpeed>(1)
   const [confirmEnd, setConfirmEnd] = useState(false)
-  /** 인수 승급 확인 오버레이 (도구 메뉴에서 인수 선택 시) */
-  const [promoteItemId, setPromoteItemId] = useState<string | null>(null)
+  /** 인수 승급 확인 오버레이 (도구 대상 지정에서 승급 가능한 유닛을 찍었을 때) */
+  const [promoteConfirm, setPromoteConfirm] = useState<PromoteConfirm | null>(null)
   /** 이동/위협 범위를 들여다보는 유닛 — 선택(sel)과 독립. 적·우군·행동 완료 아군에 쓴다 */
   const [inspectId, setInspectId] = useState<string | null>(null)
   const [aiActiveId, setAiActiveId] = useState<string | null>(null)
@@ -264,13 +290,13 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
 
   // 승급 확인 오버레이 — Escape 로 닫기
   useEffect(() => {
-    if (!promoteItemId) return
+    if (!promoteConfirm) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPromoteItemId(null)
+      if (e.key === 'Escape') setPromoteConfirm(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [promoteItemId])
+  }, [promoteConfirm])
 
   function handleBannerDone() {
     setBanner(null)
@@ -372,38 +398,60 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
     return set
   }, [sel?.mode, selectedUnit, moveRange, moveCells, state])
 
-  /** 책략/도구 대상 지정 사거리 (보라 오버레이) — 도구는 range>0 인 것만 대상 지정이 필요하다 */
-  const strategyCells = useMemo(() => {
+  const selStrategy =
+    sel?.mode === 'strategyTarget' && selectedUnit && sel.strategyId
+      ? knownStrategies(selectedUnit).find((s) => s.id === sel.strategyId)
+      : undefined
+  const selItem = sel?.mode === 'itemTarget' && sel.itemId ? CONSUMABLES[sel.itemId] : undefined
+
+  /**
+   * 도구 유효 대상 — 원작 확정: **체비쇼프 거리 ≤ range** (range 1 = 자기 자신 + 인접 8방, 대각 포함)
+   * 이면서 살아 있는 비적대 유닛. 효과가 0인 대상(만피에 환약 등)은 도구만 날리므로 제외한다.
+   */
+  const itemTargetsOf = (user: UnitState, def: ConsumableDef): UnitState[] =>
+    livingUnits(state).filter(
+      (u) => !isHostile(user, u) && chebyshev(user.pos, u.pos) <= def.range && itemEffective(def, u),
+    )
+
+  /** 책략 대상 판정 — 원작 확정: AoE도 **유닛이 서 있는 칸**만 지정 가능(빈 칸 거부) */
+  const strategyTargetOk = (s: StrategyDef, user: UnitState, at: UnitState | undefined): boolean => {
+    if (!at || at.hp <= 0) return false
+    if (manhattan(user.pos, at.pos) > s.range) return false
+    // 진영 판정은 코어 리듀서와 같은 기준(enemy = 적대 / 그 외 = 비적대)을 쓴다 —
+    // UI가 더 좁게 막아 합법 수를 못 두게 되는 일을 피한다. ('self' 책략은 현재 데이터에 없다)
+    return s.targets === 'enemy' ? isHostile(user, at) : !isHostile(user, at)
+  }
+
+  /** 대상 지정 하이라이트 — 책략은 사거리 전체(보라), 도구는 실제로 쓸 수 있는 대상 칸만 */
+  const targetCells = useMemo(() => {
     const set = new Set<string>()
     if (!selectedUnit) return set
-    let range: number | null = null
-    if (sel?.mode === 'strategyTarget' && sel.strategyId) {
-      range = knownStrategies(selectedUnit).find((s) => s.id === sel.strategyId)?.range ?? null
-    } else if (sel?.mode === 'itemTarget' && sel.itemId) {
-      range = CONSUMABLES[sel.itemId]?.range ?? null
-    }
-    if (range === null) return set
-    for (let y = 0; y < state.map.height; y++) {
-      for (let x = 0; x < state.map.width; x++) {
-        if (manhattan(selectedUnit.pos, { x, y }) <= range) set.add(keyOf({ x, y }))
+    if (selStrategy) {
+      for (let y = 0; y < state.map.height; y++) {
+        for (let x = 0; x < state.map.width; x++) {
+          if (manhattan(selectedUnit.pos, { x, y }) <= selStrategy.range) set.add(keyOf({ x, y }))
+        }
       }
+    } else if (selItem) {
+      for (const u of itemTargetsOf(selectedUnit, selItem)) set.add(keyOf(u.pos))
     }
     return set
-  }, [sel, selectedUnit, state])
+  }, [selStrategy, selItem, selectedUnit, state])
 
-  /** 책략 착탄 범위 프리뷰 — 커서가 사거리 안에 있을 때만, 맵 경계로 클립해서 보여준다 */
+  /**
+   * 착탄 범위 프리뷰 (원작에 없는 우리 개선 기능) — 커서가 **지정 가능한 대상 칸**일 때만 보여준다.
+   * 빈 칸은 코어가 거부하므로 프리뷰도 뜨지 않아 클릭 규칙이 그대로 드러난다.
+   */
   const aoeCells = useMemo(() => {
     const set = new Set<string>()
-    if (sel?.mode !== 'strategyTarget' || !selectedUnit || !sel.strategyId || !hover) return set
-    if (!strategyCells.has(keyOf(hover))) return set
-    const strategy = knownStrategies(selectedUnit).find((s) => s.id === sel.strategyId)
-    if (!strategy) return set
-    for (const p of strategyAreaCells(strategy.area, hover)) {
+    if (!selStrategy || !selectedUnit || !hover) return set
+    if (!strategyTargetOk(selStrategy, selectedUnit, unitAt(state, hover))) return set
+    for (const p of strategyAreaCells(selStrategy.area, hover)) {
       if (p.x < 0 || p.y < 0 || p.x >= state.map.width || p.y >= state.map.height) continue
       set.add(keyOf(p))
     }
     return set
-  }, [sel, selectedUnit, hover, strategyCells, state.map.width, state.map.height])
+  }, [selStrategy, selectedUnit, hover, state])
 
   /** 들여다보는 유닛의 이동 가능 칸 (자기 위치 포함) */
   const inspectMoveCells = useMemo(() => {
@@ -444,13 +492,13 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
   function cancelSelection() {
     if (sel) setState(sel.undo)
     setSel(null)
-    setPromoteItemId(null)
+    setPromoteConfirm(null)
   }
 
   function finishAction(next: BattleState) {
     setState(next)
     setSel(null)
-    setPromoteItemId(null)
+    setPromoteConfirm(null)
     // 원작(GBA 영걸전) 동작: 전원 행동 완료 시 턴 종료 확인창 자동 표시
     if (
       next.result === 'ongoing' &&
@@ -470,7 +518,7 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
     setState(applyAction(state, { type: 'endPhase' }))
   }
 
-  /** 도구 사용 — range 0 은 자기 위치를 대상으로 즉시, range>0 은 대상 지정 모드로 */
+  /** 도구 사용 — 대상 칸(자기 자신 포함)을 찍어서 쓴다 */
   function useItemAt(itemId: string, target: Vec2) {
     if (!selectedUnit) return
     const next = applyAction(state, { type: 'useItem', unitId: selectedUnit.id, itemId, target })
@@ -478,25 +526,17 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
     finishAction(next)
   }
 
-  /** 도구 메뉴에서 항목 선택 */
+  /** 도구 메뉴에서 항목 선택 — 도구는 전부 대상 지정형이다 (인수 포함) */
   function chooseItem(def: ConsumableDef) {
     if (!sel || !selectedUnit) return
-    if (def.effect.kind === 'promotion') {
-      setPromoteItemId(def.id) // 승급은 되돌릴 수 없다 — 확인 오버레이를 거친다
-      return
-    }
-    if (def.range > 0) {
-      setSel({ ...sel, mode: 'itemTarget', itemId: def.id })
-      return
-    }
-    useItemAt(def.id, selectedUnit.pos)
+    setSel({ ...sel, mode: 'itemTarget', itemId: def.id })
   }
 
   /** 우클릭 = 원작 취소 버튼: 단계별 뒤로가기, 선택 없음 상태에서는 턴 종료 확인 */
   function handleRightClick() {
     if (!isPlayerTurn) return
-    if (promoteItemId) {
-      setPromoteItemId(null)
+    if (promoteConfirm) {
+      setPromoteConfirm(null)
       return
     }
     if (!sel) {
@@ -586,27 +626,26 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
         return
       }
       case 'strategyTarget': {
-        if (sel.strategyId && strategyCells.has(keyOf(pos))) {
-          const next = applyAction(state, {
-            type: 'strategy',
-            unitId: unit.id,
-            strategyId: sel.strategyId,
-            target: pos,
-          })
-          if (next !== state) {
-            finishAction(next)
-            return
-          }
-        }
-        setSel({ ...sel, mode: 'strategyMenu', strategyId: undefined })
+        // 유닛이 서 있고 진영이 맞는 칸만 통과 — 빈 칸을 찍어도 조용히 실패하지 않는다(우클릭으로 취소)
+        if (!selStrategy || !strategyTargetOk(selStrategy, unit, clicked)) return
+        const next = applyAction(state, {
+          type: 'strategy',
+          unitId: unit.id,
+          strategyId: selStrategy.id,
+          target: pos,
+        })
+        if (next !== state) finishAction(next)
         return
       }
       case 'itemTarget': {
-        if (sel.itemId && strategyCells.has(keyOf(pos))) {
-          useItemAt(sel.itemId, pos)
+        // 유효 대상 칸(체비쇼프 사거리 + 비적대 + 효과 있음)만 통과
+        if (!selItem || !clicked || !targetCells.has(keyOf(pos))) return
+        if (selItem.effect.kind === 'promotion') {
+          // 승급은 되돌릴 수 없다 — 대상을 확정한 뒤 확인 오버레이를 거친다
+          setPromoteConfirm({ itemId: selItem.id, userId: unit.id, targetId: clicked.id })
           return
         }
-        setSel({ ...sel, mode: 'itemMenu', itemId: undefined })
+        useItemAt(selItem.id, pos)
         return
       }
     }
@@ -653,19 +692,48 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
   )
   const itemTotal = itemStock.reduce((n, s) => n + s.count, 0)
 
-  const promo = selectedUnit ? promotionInfoOf(selectedUnit) : null
-  const promoteDef = promoteItemId ? CONSUMABLES[promoteItemId] : undefined
+  const promoteDef = promoteConfirm ? CONSUMABLES[promoteConfirm.itemId] : undefined
+  const promoteUser = promoteConfirm ? state.units.find((u) => u.id === promoteConfirm.userId) : undefined
+  const promoteTargetUnit = promoteConfirm
+    ? state.units.find((u) => u.id === promoteConfirm.targetId)
+    : undefined
+  const promo = promoteTargetUnit ? promotionInfoOf(promoteTargetUnit) : null
 
-  /** 도구 1개의 사용 가능 여부 + 사유 (인수는 승급 조건, 회복류는 낭비 방지 — 코어는 거부하지 않는다) */
+  /**
+   * 도구 1개의 사용 가능 여부 + 사유 — 사거리(자기 + 인접 8방) 안에 **효과가 있는 대상**이
+   * 1명이라도 있으면 활성. 자기가 만피여도 옆의 아군이 다쳤으면 환약을 쓸 수 있다.
+   */
   const itemBlockReason = (def: ConsumableDef): string | null => {
     if (!selectedUnit) return '선택된 부대가 없다'
-    if (def.effect.kind === 'promotion') return promo?.ok ? null : (promo?.reason ?? '승급할 수 없다')
-    if (def.effect.kind === 'heal' && def.range === 0 && selectedUnit.hp >= selectedUnit.maxHp)
-      return 'HP가 이미 가득하다'
-    if (def.effect.kind === 'mpRestore' && def.range === 0 && selectedUnit.mp >= selectedUnit.maxMp)
-      return 'MP가 이미 가득하다'
-    return null
+    if (itemTargetsOf(selectedUnit, def).length > 0) return null
+    switch (def.effect.kind) {
+      case 'heal':
+        return 'HP가 줄어든 부대가 사거리 안에 없다'
+      case 'mpRestore':
+        return 'MP가 줄어든 부대가 사거리 안에 없다'
+      case 'promotion': {
+        // 사거리 안에 자기 혼자면 자기 사유를 그대로 보여준다 (Lv15 필요 / 최종 병과)
+        const near = livingUnits(state).filter(
+          (u) => !isHostile(selectedUnit, u) && chebyshev(selectedUnit.pos, u.pos) <= def.range,
+        )
+        if (near.length === 1 && near[0].id === selectedUnit.id) return promotionInfoOf(selectedUnit).reason
+        return `승급할 수 있는 부대가 사거리 안에 없다 (Lv${PROMOTION_LEVEL} 이상 · 상위 병과 필요)`
+      }
+    }
   }
+
+  /** 대상 지정 중 안내 — 무엇의 대상을 고르는 중인지 + 취소 방법 (빈 칸 클릭은 무반응이다) */
+  const targetHint =
+    sel?.mode === 'attackTarget'
+      ? { title: '공격 대상', body: '적 부대를 클릭하세요.' }
+      : selStrategy
+        ? {
+            title: `책략 · ${selStrategy.name}`,
+            body: `${selStrategy.targets === 'enemy' ? '적' : selStrategy.targets === 'self' ? '자신' : '아군'} 부대를 클릭하세요${selStrategy.area === 'single' ? '' : ' (그 부대가 범위의 중심)'}.`,
+          }
+        : selItem
+          ? { title: `도구 · ${selItem.name}`, body: '자신 또는 인접한 아군을 클릭하세요.' }
+          : null
 
   return (
     <div className="battle-screen">
@@ -692,7 +760,7 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
         state={state}
         moveCells={moveCells}
         attackCells={attackCells}
-        strategyCells={strategyCells}
+        strategyCells={targetCells}
         aoeCells={aoeCells}
         inspectMoveCells={inspectMoveCells}
         inspectThreatCells={inspectThreatCells}
@@ -706,6 +774,15 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
       />
 
       <aside className="side-panel">
+        {/* ⓞ 대상 지정 안내 — 유효한 칸만 반응하므로 무엇을 찍어야 하는지 알려준다 */}
+        {targetHint && selectedUnit && (
+          <div className="panel-box target-hint">
+            <h3>{targetHint.title}</h3>
+            <p>{targetHint.body}</p>
+            <p className="target-hint-cancel">우클릭으로 취소</p>
+          </div>
+        )}
+
         {/* ① 행동 메뉴 (1단) */}
         {sel?.mode === 'menu' && selectedUnit && (
           <div className="panel-box">
@@ -811,14 +888,14 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
         <BattleLog log={state.log} />
       </aside>
 
-      {/* 인수 승급 확인 — 되돌릴 수 없는 조작이라 확인 후 확정 */}
-      {promoteItemId && promoteDef && selectedUnit && promo?.ok && promo.target && (
+      {/* 인수 승급 확인 — 되돌릴 수 없는 조작이라 확인 후 확정. 대상은 사용자와 다를 수 있다 */}
+      {promoteConfirm && promoteDef && promoteUser && promoteTargetUnit && promo?.ok && promo.target && (
         <div
           className="result-overlay"
-          onClick={() => setPromoteItemId(null)}
+          onClick={() => setPromoteConfirm(null)}
           onContextMenu={(e) => {
             e.preventDefault()
-            setPromoteItemId(null)
+            setPromoteConfirm(null)
           }}
           role="dialog"
           aria-modal="true"
@@ -827,7 +904,7 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
           <div className="result-box promote-box" onClick={(e) => e.stopPropagation()}>
             <h2>승급</h2>
             <div className="promote-line">
-              <span className="promote-officer">{officerOf(selectedUnit).name}</span>
+              <span className="promote-officer">{officerOf(promoteTargetUnit).name}</span>
               <span className="promote-from">
                 <em className="promote-icon">{classIcon(promo.from)}</em>
                 {promo.from.name}
@@ -848,18 +925,21 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
               <li className="flat">사용하면 HP/MP가 모두 회복된다</li>
             </ul>
             <p className="promote-cost">
-              {promoteDef.name} 1 소모 (보유 {consumableCount(state.consumables, promoteDef.id)} →{' '}
+              {promoteUser.id === promoteTargetUnit.id
+                ? `${promoteDef.name} 1 소모`
+                : `${officerOf(promoteUser).name}이(가) ${promoteDef.name} 1 소모`}{' '}
+              (보유 {consumableCount(state.consumables, promoteDef.id)} →{' '}
               {consumableCount(state.consumables, promoteDef.id) - 1})
             </p>
             <div className="promote-actions">
               <button
                 className="promote-confirm"
-                onClick={() => useItemAt(promoteDef.id, selectedUnit.pos)}
+                onClick={() => useItemAt(promoteDef.id, promoteTargetUnit.pos)}
                 autoFocus
               >
                 {euroRo(promo.target.name)} 승급한다
               </button>
-              <button onClick={() => setPromoteItemId(null)}>취소</button>
+              <button onClick={() => setPromoteConfirm(null)}>취소</button>
             </div>
           </div>
         </div>

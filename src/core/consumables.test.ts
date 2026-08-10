@@ -15,7 +15,7 @@ import {
   sellConsumable,
 } from './campaign'
 import { maxHp, maxMp } from './formulas'
-import { strategyAreaCells } from './movement'
+import { chebyshev, manhattan, strategyAreaCells } from './movement'
 import type { BattleState, ConsumableStack, StageDef, TerrainId, UnitState } from './types'
 
 // ---------- 헬퍼 ----------
@@ -181,7 +181,7 @@ describe('useItem — 무효 액션은 원본 참조를 그대로 돌려준다',
     ).toBe(after)
   })
 
-  it('사거리 밖 대상은 거부 (range 0 도구는 자기 위치만)', () => {
+  it('빈 칸은 대상이 되지 않는다 (인접이어도 유닛이 없으면 거부)', () => {
     const state = mkBattle([{ itemId: 'hwanyak', count: 1 }])
     const caocao = unit(state, 'caocao')
     caocao.hp = 10
@@ -196,16 +196,104 @@ describe('useItem — 무효 액션은 원본 참조를 그대로 돌려준다',
   })
 })
 
-// ---------- useItem: 사거리 있는 도구 (데이터에 아직 없어 임시 정의로 검증) ----------
+// ---------- useItem: 대상 게이트 (원작 = 진영 일치 + 체비쇼프 ≤ range) ----------
 
-describe('useItem — 사거리 있는 도구', () => {
+describe('useItem — 대상 게이트는 진영 일치 + 체비쇼프 거리', () => {
+  /** 조조(2,2) 주변에 아군을 흩뿌린 배치 — 직선 인접 / 대각 인접 / 거리 2 */
+  const neighborStage = (): Partial<StageDef> => ({
+    units: [
+      { officerId: 'caocao', faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
+      { officerId: 'dianwei', faction: 'player', pos: { x: 3, y: 2 } }, // 직선 인접
+      { officerId: 'xiahoudun', faction: 'player', pos: { x: 3, y: 3 } }, // 대각 인접 (맨해튼 2 / 체비쇼프 1)
+      { officerId: 'xiahouyuan', faction: 'player', pos: { x: 4, y: 2 } }, // 거리 2
+      { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 2, y: 3 } }, // 인접한 적
+    ],
+  })
+
+  const woundedBattle = (): BattleState => {
+    const state = mkBattle([{ itemId: 'hwanyak', count: 4 }], neighborStage())
+    for (const officerId of ['dianwei', 'xiahoudun', 'xiahouyuan']) unit(state, officerId).hp = 20
+    return state
+  }
+
+  it('직선으로 인접한 아군에게 쓸 수 있다', () => {
+    const state = woundedBattle()
+    const target = unit(state, 'dianwei')
+    const next = applyAction(state, {
+      type: 'useItem',
+      unitId: unit(state, 'caocao').id,
+      itemId: 'hwanyak',
+      target: target.pos,
+    })
+    expect(unit(next, 'dianwei').hp).toBe(70)
+  })
+
+  it('대각선으로 인접한 아군에게도 쓸 수 있다 (체비쇼프 1 — 맨해튼이면 2라 막혔을 자리)', () => {
+    const state = woundedBattle()
+    const diagonal = unit(state, 'xiahoudun')
+    expect(chebyshev(unit(state, 'caocao').pos, diagonal.pos)).toBe(1)
+    expect(manhattan(unit(state, 'caocao').pos, diagonal.pos)).toBe(2)
+    const next = applyAction(state, {
+      type: 'useItem',
+      unitId: unit(state, 'caocao').id,
+      itemId: 'hwanyak',
+      target: diagonal.pos,
+    })
+    expect(unit(next, 'xiahoudun').hp).toBe(70)
+  })
+
+  it('거리 2 아군은 거부', () => {
+    const state = woundedBattle()
+    const far = unit(state, 'xiahouyuan')
+    expect(chebyshev(unit(state, 'caocao').pos, far.pos)).toBe(2)
+    expect(
+      applyAction(state, { type: 'useItem', unitId: unit(state, 'caocao').id, itemId: 'hwanyak', target: far.pos }),
+    ).toBe(state)
+  })
+
+  it('인접한 적에게는 쓸 수 없다', () => {
+    const state = woundedBattle()
+    const foe = unit(state, 'yellowInfantry')
+    foe.hp = 10
+    expect(
+      applyAction(state, { type: 'useItem', unitId: unit(state, 'caocao').id, itemId: 'hwanyak', target: foe.pos }),
+    ).toBe(state)
+  })
+
+  it('자기 자신은 거리 0으로 자연 통과한다 (자기 전용 특례 없음)', () => {
+    const state = woundedBattle()
+    const caocao = unit(state, 'caocao')
+    caocao.hp = 30
+    const next = applyAction(state, { type: 'useItem', unitId: caocao.id, itemId: 'hwanyak', target: caocao.pos })
+    expect(unit(next, 'caocao').hp).toBe(80)
+  })
+
+  it('사용자만 행동을 소진하고, 대상은 자기 턴을 잃지 않는다', () => {
+    const state = woundedBattle()
+    const next = applyAction(state, {
+      type: 'useItem',
+      unitId: unit(state, 'caocao').id,
+      itemId: 'hwanyak',
+      target: unit(state, 'dianwei').pos,
+    })
+    expect(unit(next, 'caocao').acted).toBe(true)
+    expect(unit(next, 'caocao').moved).toBe(true)
+    expect(unit(next, 'dianwei').acted).toBe(false)
+    expect(unit(next, 'dianwei').moved).toBe(false)
+  })
+})
+
+// ---------- useItem: range 값이 그대로 체비쇼프 반경으로 쓰인다 ----------
+
+describe('useItem — range는 체비쇼프 반경 (1로 하드코딩된 게 아니다)', () => {
+  // 현재 데이터의 도구는 전부 range 1이라, 반경이 실제로 def.range에서 온다는 것은 임시 정의로 확인한다.
   const RANGED = 'testTonic'
 
   beforeAll(() => {
     CONSUMABLES[RANGED] = {
       id: RANGED,
       name: '시험용 탕약',
-      desc: '테스트 전용 — 사거리 2의 회복 도구',
+      desc: '테스트 전용 — 체비쇼프 2의 회복 도구',
       price: 100,
       range: 2,
       effect: { kind: 'heal', amount: 40 },
@@ -215,35 +303,26 @@ describe('useItem — 사거리 있는 도구', () => {
     delete CONSUMABLES[RANGED]
   })
 
-  const stageWithAlly = (): Partial<StageDef> => ({
-    units: [
-      { officerId: 'caocao', faction: 'player', pos: { x: 1, y: 1 }, isLeader: true },
-      { officerId: 'dianwei', faction: 'player', pos: { x: 2, y: 1 } },
-      { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 2, y: 2 } },
-    ],
-  })
-
-  it('사거리 안의 아군을 회복한다 (사용자는 행동 소진, 대상은 그대로)', () => {
-    const state = mkBattle([{ itemId: RANGED, count: 1 }], stageWithAlly())
+  it('range 2 도구는 대각 2칸(체비쇼프 2 = 맨해튼 4)까지 닿는다', () => {
+    const state = mkBattle([{ itemId: RANGED, count: 2 }], {
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
+        { officerId: 'dianwei', faction: 'player', pos: { x: 4, y: 4 } }, // 체비쇼프 2 / 맨해튼 4
+        { officerId: 'xiahoudun', faction: 'player', pos: { x: 5, y: 5 } }, // 체비쇼프 3
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 9, y: 9 } },
+      ],
+    })
     const caocao = unit(state, 'caocao')
-    const dianwei = unit(state, 'dianwei')
-    dianwei.hp = 20
-    const next = applyAction(state, { type: 'useItem', unitId: caocao.id, itemId: RANGED, target: dianwei.pos })
+    const reachable = unit(state, 'dianwei')
+    const tooFar = unit(state, 'xiahoudun')
+    reachable.hp = 20
+    tooFar.hp = 20
+    expect(manhattan(caocao.pos, reachable.pos)).toBe(4)
 
+    const next = applyAction(state, { type: 'useItem', unitId: caocao.id, itemId: RANGED, target: reachable.pos })
     expect(unit(next, 'dianwei').hp).toBe(60)
-    expect(unit(next, 'caocao').acted).toBe(true)
-    expect(unit(next, 'dianwei').acted).toBe(false)
-    expect(next.consumables).toEqual([])
-  })
-
-  it('적에게는 쓸 수 없고, 빈 칸도 대상이 되지 않는다', () => {
-    const state = mkBattle([{ itemId: RANGED, count: 1 }], stageWithAlly())
-    const caocao = unit(state, 'caocao')
-    const foe = unit(state, 'yellowInfantry')
-    expect(applyAction(state, { type: 'useItem', unitId: caocao.id, itemId: RANGED, target: foe.pos })).toBe(state)
-    expect(
-      applyAction(state, { type: 'useItem', unitId: caocao.id, itemId: RANGED, target: { x: 1, y: 2 } }),
-    ).toBe(state)
+    // 체비쇼프 3은 여전히 사거리 밖
+    expect(applyAction(state, { type: 'useItem', unitId: caocao.id, itemId: RANGED, target: tooFar.pos })).toBe(state)
   })
 })
 
@@ -302,6 +381,69 @@ describe('useItem — 인수(印綬)', () => {
     expect(applyAction(state, { type: 'useItem', unitId: dun.id, itemId: 'insu', target: dun.pos })).toBe(state)
   })
 
+  it('인접한 아군에게도 쓸 수 있다 — 대상만 승급하고 사용자만 행동을 소진한다 (대각선 포함)', () => {
+    const state = mkBattle(
+      [{ itemId: 'insu', count: 1 }],
+      {
+        units: [
+          { officerId: 'caocao', faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
+          { officerId: 'xiahoudun', faction: 'player', pos: { x: 3, y: 3 } }, // 대각 인접
+          { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 8, y: 8 } },
+        ],
+      },
+      [entry('xiahoudun', { level: 15 })],
+    )
+    const caocao = unit(state, 'caocao')
+    const dun = unit(state, 'xiahoudun')
+    dun.hp = 30
+    expect(chebyshev(caocao.pos, dun.pos)).toBe(1)
+
+    const next = applyAction(state, { type: 'useItem', unitId: caocao.id, itemId: 'insu', target: dun.pos })
+    const promoted = unit(next, 'xiahoudun')
+    expect(promoted.classId).toBe('heavyCavalry')
+    expect(promoted.hp).toBe(promoted.maxHp)
+    expect(promoted.mp).toBe(promoted.maxMp)
+    // 승급한 쪽은 자기 턴을 잃지 않고, 인수를 쓴 조조만 행동을 소진한다
+    expect(promoted.acted).toBe(false)
+    expect(unit(next, 'caocao').acted).toBe(true)
+    expect(unit(next, 'caocao').classId).toBe('lord') // 사용자는 승급하지 않는다
+    expect(next.consumables).toEqual([])
+  })
+
+  it('거리 2의 아군에게는 인수를 쓸 수 없다', () => {
+    const state = mkBattle(
+      [{ itemId: 'insu', count: 1 }],
+      {
+        units: [
+          { officerId: 'caocao', faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
+          { officerId: 'xiahoudun', faction: 'player', pos: { x: 4, y: 2 } },
+          { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 8, y: 8 } },
+        ],
+      },
+      [entry('xiahoudun', { level: 15 })],
+    )
+    const caocao = unit(state, 'caocao')
+    const dun = unit(state, 'xiahoudun')
+    expect(applyAction(state, { type: 'useItem', unitId: caocao.id, itemId: 'insu', target: dun.pos })).toBe(state)
+  })
+
+  it('승급 조건을 못 채운 인접 아군에게 쓰면 거부된다 (인수 낭비 방지)', () => {
+    const state = mkBattle(
+      [{ itemId: 'insu', count: 1 }],
+      {
+        units: [
+          { officerId: 'caocao', faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
+          { officerId: 'xiahoudun', faction: 'player', pos: { x: 3, y: 2 } },
+          { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 8, y: 8 } },
+        ],
+      },
+      [entry('xiahoudun', { level: 14 })],
+    )
+    const caocao = unit(state, 'caocao')
+    const dun = unit(state, 'xiahoudun')
+    expect(applyAction(state, { type: 'useItem', unitId: caocao.id, itemId: 'insu', target: dun.pos })).toBe(state)
+  })
+
   it('승급하면 2차 전용 책략이 그 자리에서 열린다 (knownStrategies는 병과 파생)', () => {
     const state = mkBattle(
       [{ itemId: 'insu', count: 1 }],
@@ -350,7 +492,7 @@ describe('strategyAreaCells', () => {
   })
 })
 
-describe('범위 책략 — 빈 칸 중심 조준 (AoE 완화)', () => {
+describe('범위 책략 — 중심 칸은 유닛이 있어야 한다 (원작 조준 규칙)', () => {
   /** 곽가(책사) Lv8 = 화진(십자, MP12, 사거리4) 보유 */
   const aoeStage = (): Partial<StageDef> => ({
     units: [
@@ -359,11 +501,10 @@ describe('범위 책략 — 빈 칸 중심 조준 (AoE 완화)', () => {
     ],
   })
 
-  it('cross는 빈 칸을 중심으로 지정할 수 있다 (인접 적 1명에게 적중)', () => {
+  it('cross도 빈 칸 중심은 거부한다 — MP 불변 (원작: 커서 후보는 유닛 레코드뿐)', () => {
     const state = mkBattle([], aoeStage())
     const guojia = unit(state, 'guojia')
-    const foe = unit(state, 'yellowInfantry')
-    const emptyCenter = { x: 3, y: 1 } // 적의 바로 위 — 빈 칸
+    const emptyCenter = { x: 3, y: 1 } // 적의 바로 위 — 빈 칸 (여기가 중심이면 적이 십자에 들어오지만 거부)
     expect(state.units.some((u) => u.pos.x === 3 && u.pos.y === 1)).toBe(false)
 
     const next = applyAction(state, {
@@ -372,25 +513,11 @@ describe('범위 책략 — 빈 칸 중심 조준 (AoE 완화)', () => {
       strategyId: 'hwajin',
       target: emptyCenter,
     })
-    expect(next).not.toBe(state)
-    expect(unit(next, 'yellowInfantry').hp).toBeLessThan(foe.hp)
-    expect(unit(next, 'guojia').mp).toBe(guojia.mp - 12)
-  })
-
-  it('범위 안에 유효 대상이 0명이면 거부 — MP를 낭비하지 않는다', () => {
-    const state = mkBattle([], aoeStage())
-    const guojia = unit(state, 'guojia')
-    const next = applyAction(state, {
-      type: 'strategy',
-      unitId: guojia.id,
-      strategyId: 'hwajin',
-      target: { x: 1, y: 4 }, // 사거리 안이지만 십자 5칸 어디에도 적이 없다
-    })
     expect(next).toBe(state)
     expect(unit(state, 'guojia').mp).toBe(guojia.mp)
   })
 
-  it('single은 여전히 빈 칸을 거부한다 (원작 조준)', () => {
+  it('single도 빈 칸을 거부한다 (single/범위 규칙이 같다)', () => {
     const state = mkBattle([], aoeStage())
     const guojia = unit(state, 'guojia')
     expect(
@@ -398,7 +525,7 @@ describe('범위 책략 — 빈 칸 중심 조준 (AoE 완화)', () => {
     ).toBe(state)
   })
 
-  it('맵 밖을 중심으로 지정할 수는 없다 (범위 칸이 삐져나가는 것은 무해)', () => {
+  it('맵 밖은 중심이 될 수 없다 (범위 칸이 맵 밖으로 삐져나가는 것은 무해)', () => {
     const state = mkBattle([], {
       units: [
         { officerId: 'guojia', faction: 'player', pos: { x: 1, y: 1 }, level: 8 },
@@ -409,7 +536,7 @@ describe('범위 책략 — 빈 칸 중심 조준 (AoE 완화)', () => {
     expect(
       applyAction(state, { type: 'strategy', unitId: guojia.id, strategyId: 'hwajin', target: { x: -1, y: 1 } }),
     ).toBe(state)
-    // 맵 가장자리 칸을 중심으로 삼는 것은 정상 (십자의 일부가 맵 밖으로 나가도 무해)
+    // 맵 가장자리의 적을 중심으로 삼는 것은 정상 (십자의 일부가 맵 밖으로 나가도 무해)
     const edge = applyAction(state, {
       type: 'strategy',
       unitId: guojia.id,
@@ -420,7 +547,7 @@ describe('범위 책략 — 빈 칸 중심 조준 (AoE 완화)', () => {
     expect(unit(edge, 'yellowInfantry').hp).toBeLessThan(unit(state, 'yellowInfantry').hp)
   })
 
-  it('아군만 있는 칸을 중심으로 한 공격 책략은 거부된다 (오사 없음)', () => {
+  it('진영이 맞지 않는 중심은 거부된다 (아군 중심 공격 책략 / 적 중심 회복 책략)', () => {
     const state = mkBattle([], {
       units: [
         { officerId: 'guojia', faction: 'player', pos: { x: 1, y: 1 }, level: 8 },
@@ -429,9 +556,22 @@ describe('범위 책략 — 빈 칸 중심 조준 (AoE 완화)', () => {
       ],
     })
     const guojia = unit(state, 'guojia')
+    // 아군을 중심으로 한 공격 책략 (오사 없음)
     expect(
       applyAction(state, { type: 'strategy', unitId: guojia.id, strategyId: 'hwajin', target: { x: 2, y: 1 } }),
     ).toBe(state)
+
+    // 적을 중심으로 한 회복 책략도 같은 게이트에서 걸린다
+    const healer = mkBattle([], {
+      units: [
+        { officerId: 'xunyu', faction: 'player', pos: { x: 1, y: 1 } },
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 2, y: 1 } },
+      ],
+    })
+    const xunyu = unit(healer, 'xunyu')
+    expect(
+      applyAction(healer, { type: 'strategy', unitId: xunyu.id, strategyId: 'chiryo', target: { x: 2, y: 1 } }),
+    ).toBe(healer)
   })
 
   it('cross 중심의 적 2명을 한 번에 때린다 (범위 합산 확인)', () => {

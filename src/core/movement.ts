@@ -8,6 +8,13 @@ export const keyOf = (p: Vec2): string => `${p.x},${p.y}`
 
 export const manhattan = (a: Vec2, b: Vec2): number => Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
 
+/**
+ * 체비쇼프 거리 (대각선을 1로 세는 8방 거리).
+ * 원작 도구(회복 아이템·인수) 사용 게이트가 이 거리 ≤ 1 = "자기 + 인접 8방"이다.
+ * 이동·공격·책략 사거리는 원작대로 맨해튼이므로 여기서만 쓴다.
+ */
+export const chebyshev = (a: Vec2, b: Vec2): number => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
+
 const DIRS: Vec2[] = [
   { x: 0, y: -1 },
   { x: 0, y: 1 },
