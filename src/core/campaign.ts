@@ -2,6 +2,7 @@
 // core/ 규칙: 렌더러/브라우저 의존성 금지. 순수 TS + 데이터 참조만.
 
 import { CLASSES } from '../data/classes'
+import { CONSUMABLES } from '../data/consumables'
 import { EQUIPMENT } from '../data/equipment'
 import { FRUIT_ON_SELL, FRUITS } from '../data/fruits'
 import { OFFICERS } from '../data/officers'
@@ -16,6 +17,7 @@ import type {
   EquipSlot,
   OfficerStats,
   StageDef,
+  UnitState,
 } from './types'
 import { EQUIP_MAX_LEVEL_NORMAL, MAX_LEVEL } from './types'
 
@@ -302,10 +304,16 @@ function lootFor(battleState: BattleState): string[] {
  */
 export function applyVictory(campaign: CampaignState, battleState: BattleState): CampaignState {
   // 무구성장도 함께 회수한다 — 전투 중 오른 장비 레벨/경험치는 로스터 쪽 인스턴스가 정본이 된다.
-  const grown = new Map<string, { level: number; exp: number; equipment: EquipmentMap }>()
+  // classId까지 회수하는 이유: v0.9부터 승급은 전투 중 인수 사용으로 일어난다.
+  const grown = new Map<string, { level: number; exp: number; classId: string; equipment: EquipmentMap }>()
   for (const unit of battleState.units) {
     if (unit.faction !== 'player') continue
-    grown.set(unit.officerId, { level: unit.level, exp: unit.exp, equipment: toEquipmentMap(unit.equipment) })
+    grown.set(unit.officerId, {
+      level: unit.level,
+      exp: unit.exp,
+      classId: unit.classId,
+      equipment: toEquipmentMap(unit.equipment),
+    })
   }
 
   const node = currentNode(campaign)
@@ -320,9 +328,12 @@ export function applyVictory(campaign: CampaignState, battleState: BattleState):
     roster: campaign.roster.map((entry) => {
       const after = grown.get(entry.officerId)
       // 출진하지 않은 부대는 로스터 값 그대로. 출진했다면 레벨/경험치 + 장비 인스턴스를 회수한다.
-      return after
-        ? { ...cloneEntry(entry), level: after.level, exp: after.exp, equipment: after.equipment }
-        : cloneEntry(entry)
+      if (!after) return cloneEntry(entry)
+      const recovered = { ...cloneEntry(entry), level: after.level, exp: after.exp, equipment: after.equipment }
+      // 전투 중 인수로 승급했다면 병과 오버라이드도 회수한다.
+      // 기본 병과 그대로인 부대는 키를 만들지 않는다 — 세이브 라운드트립 동일성 유지.
+      if (after.classId !== OFFICERS[entry.officerId]?.classId) recovered.classId = after.classId
+      return recovered
     }),
     clearedStages,
     gold: campaign.gold + (node?.type === 'battle' ? node.rewardGold : 0),
@@ -353,34 +364,14 @@ export function classIdOf(entry: Pick<RosterEntry, 'officerId' | 'classId'>): st
   return OFFICERS[entry.officerId]?.classId ?? entry.classId ?? ''
 }
 
-/** 승급 가능 여부 — 로스터 소속 + Lv15 이상 + 인수 보유 + 상위 병과 존재 */
-export function canPromote(campaign: CampaignState, officerId: string): boolean {
-  const entry = campaign.roster.find((r) => r.officerId === officerId)
-  if (!entry) return false
-  if (entry.level < PROMOTION_LEVEL) return false
-  if (consumableCount(campaign.consumables, 'insu') <= 0) return false
-  return CLASSES[classIdOf(entry)]?.promotesTo !== undefined
-}
-
 /**
- * 승급 실행 (원본 불변) — 인수 1개를 쓰고 병과를 상위로 바꾼다.
- * 레벨/경험치/장비/열매 보정은 그대로 유지되고, 클래스업 보너스는 새 병과의 hpBase/성장등급으로 창발한다.
- * 조건 미충족이면 아무 일도 하지 않고 원본을 그대로 돌려준다.
+ * 승급 가능 판정 — 병과에 상위 병과가 있고 Lv15 이상인가. 인수 보유는 보지 않는다.
+ * 전투 리듀서(useItem 인수 분기)와 UI가 같은 규칙을 쓰도록 부대 단위로 뽑아낸 함수다.
  */
-export function promoteOfficer(campaign: CampaignState, officerId: string): CampaignState {
-  if (!canPromote(campaign, officerId)) return campaign
-  const entry = campaign.roster.find((r) => r.officerId === officerId)!
-  const promotesTo = CLASSES[classIdOf(entry)].promotesTo!
-
-  return {
-    ...campaign,
-    roster: campaign.roster.map((r) =>
-      r.officerId === officerId ? { ...cloneEntry(r), classId: promotesTo } : cloneEntry(r),
-    ),
-    inventory: cloneInventory(campaign.inventory),
-    fruits: [...campaign.fruits],
-    consumables: removeConsumable(campaign.consumables, 'insu', 1)!,
-  }
+export function canPromoteUnit(unit: Pick<UnitState, 'classId' | 'level'>): boolean {
+  if (unit.level < PROMOTION_LEVEL) return false
+  const promotesTo = CLASSES[unit.classId]?.promotesTo
+  return promotesTo !== undefined && CLASSES[promotesTo] !== undefined
 }
 
 // ---------- 장비 장착 / 상점 (모두 불변, 실패 시 원본 그대로 반환) ----------
@@ -499,6 +490,43 @@ export function sellItem(campaign: CampaignState, inventoryIndex: number): Campa
     gold: campaign.gold + Math.trunc(item.price / 2),
     inventory: cloneInventory(rest),
     fruits: fruitId ? [...campaign.fruits, fruitId] : [...campaign.fruits],
+  }
+}
+
+/**
+ * 도구(소모품) 구매 → 스톡 +1. 비매품(인수 등 price null)이거나 군자금이 부족하면 원본 그대로.
+ * 장비와 달리 인스턴스 상태가 없어 수량 스택으로만 관리한다.
+ */
+export function buyConsumable(campaign: CampaignState, itemId: string): CampaignState {
+  const def = CONSUMABLES[itemId]
+  if (!def || def.price === null) return campaign
+  if (campaign.gold < def.price) return campaign
+  return {
+    ...campaign,
+    roster: campaign.roster.map(cloneEntry),
+    gold: campaign.gold - def.price,
+    inventory: cloneInventory(campaign.inventory),
+    fruits: [...campaign.fruits],
+    consumables: addConsumable(campaign.consumables, itemId, 1),
+  }
+}
+
+/**
+ * 도구 판매 → 스톡 -1, 기본가의 반값 골드. 비매품(price null)은 판매 불가이며
+ * 스톡이 없으면 원본 그대로 (장비 sellItem과 같은 관례).
+ */
+export function sellConsumable(campaign: CampaignState, itemId: string): CampaignState {
+  const def = CONSUMABLES[itemId]
+  if (!def || def.price === null) return campaign
+  const rest = removeConsumable(campaign.consumables, itemId, 1)
+  if (!rest) return campaign
+  return {
+    ...campaign,
+    roster: campaign.roster.map(cloneEntry),
+    gold: campaign.gold + Math.floor(def.price / 2),
+    inventory: cloneInventory(campaign.inventory),
+    fruits: [...campaign.fruits],
+    consumables: rest,
   }
 }
 

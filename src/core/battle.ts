@@ -2,12 +2,13 @@
 // 공격 해소 순서: 명중 → 회심 → 데미지 → 2회 공격 → 반격 (조조전 사양)
 
 import { CLASSES } from '../data/classes'
+import { CONSUMABLES } from '../data/consumables'
 import { EQUIPMENT } from '../data/equipment'
 import { OFFICERS } from '../data/officers'
 import { STRATEGIES } from '../data/strategies'
 import { TERRAIN } from '../data/terrain'
 import type { RosterEntry } from './campaign'
-import { classIdOf, toEquipmentMap } from './campaign'
+import { canPromoteUnit, classIdOf, consumableCount, removeConsumable, toEquipmentMap } from './campaign'
 import type { CombatStats } from './formulas'
 import {
   affinityMultiplier,
@@ -647,14 +648,31 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
       if (manhattan(caster.pos, action.target) > strategy.range) return prev
       // 화계는 우천 시 사용 불가
       if (strategy.element === 'fire' && state.weather === 'rain') return prev
+      // 중심 칸은 맵 안이어야 한다 — 빈 칸 조준이 열렸으므로 명시적으로 막는다
+      // (범위 칸 자체는 맵 밖으로 삐져나가도 좋다: strategyAreaCells는 클립하지 않는다)
+      const { width, height } = state.map
+      if (action.target.x < 0 || action.target.y < 0 || action.target.x >= width || action.target.y >= height) {
+        return prev
+      }
 
       const targetCells: Vec2[] = strategyAreaCells(strategy.area, action.target)
+      // 진영 필터 — per-cell 판정과 같은 규칙 (오사 없음)
+      const isValidTarget = (u: UnitState): boolean =>
+        strategy.targets === 'enemy' ? isHostile(caster, u) : !isHostile(caster, u)
 
-      const primaryTarget = unitAt(state, action.target)
-      if (!primaryTarget) return prev
-      const validTarget =
-        strategy.targets === 'enemy' ? isHostile(caster, primaryTarget) : !isHostile(caster, primaryTarget)
-      if (!validTarget) return prev
+      if (strategy.area === 'single') {
+        // 단일 대상 책략은 원작대로 중심 칸에 유효 대상이 서 있어야 한다
+        const primaryTarget = unitAt(state, action.target)
+        if (!primaryTarget || !isValidTarget(primaryTarget)) return prev
+      } else {
+        // 범위 책략은 빈 칸을 중심으로 지정할 수 있다 (조준 완화 — 십자/ㅁ자 걸치기).
+        // 다만 범위 안에 유효 대상이 하나도 없으면 MP만 날아가므로 거부한다.
+        const anyTarget = targetCells.some((cell) => {
+          const u = unitAt(state, cell)
+          return u !== undefined && isValidTarget(u)
+        })
+        if (!anyTarget) return prev
+      }
 
       caster.mp -= strategy.mpCost
       const cStats = effectiveStats(caster)
@@ -722,6 +740,76 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
 
       caster.acted = true
       caster.moved = true
+      break
+    }
+
+    // 도구(소모품) 사용 — 회복/MP/승급(인수). 스톡은 전투 로컬 사본에서 차감되고
+    // 승리 시 applyVictory가 잔량을 캠페인으로 회수한다 (docs/research/items.md).
+    case 'useItem': {
+      const unit = state.units.find((u) => u.id === action.unitId)
+      if (!unit || unit.hp <= 0 || unit.faction !== state.phase || unit.acted) return prev
+
+      const def = CONSUMABLES[action.itemId]
+      if (!def) return prev
+      if (consumableCount(state.consumables, action.itemId) <= 0) return prev
+      if (manhattan(unit.pos, action.target) > def.range) return prev
+
+      // range 0 도구는 자기 자신 전용(target = 자기 위치). 사거리가 있으면 대상 칸에
+      // 비적대 생존 유닛이 서 있어야 한다 — 도구는 적에게 쓸 수 없다.
+      let target: UnitState
+      if (def.range === 0) {
+        target = unit
+      } else {
+        const at = unitAt(state, action.target)
+        if (!at || isHostile(unit, at)) return prev
+        target = at
+      }
+
+      switch (def.effect.kind) {
+        case 'heal': {
+          const healed = Math.min(def.effect.amount, target.maxHp - target.hp)
+          target.hp += healed
+          log(state, 'item', `${nameOf(unit)}의 ${def.name} → ${nameOf(target)}: ${healed} 회복`, {
+            targetId: target.id,
+            amount: healed,
+          })
+          break
+        }
+        case 'mpRestore': {
+          const regained = Math.min(def.effect.amount, target.maxMp - target.mp)
+          target.mp += regained
+          log(state, 'item', `${nameOf(unit)}의 ${def.name} → ${nameOf(target)}: 책략치 ${regained} 회복`, {
+            targetId: target.id,
+            amount: regained,
+          })
+          break
+        }
+        case 'promotion': {
+          // 승급 판정은 캠프 UI와 같은 함수를 쓴다 (Lv15↑ + 상위 병과 존재)
+          if (!canPromoteUnit(target)) return prev
+          const newCls = CLASSES[CLASSES[target.classId].promotesTo!]
+          const healed = target.maxHp - target.hp
+          target.classId = newCls.id
+          target.maxHp = maxHp(newCls, target.level)
+          target.maxMp = maxMp(newCls, target.level)
+          // 원작: 인수 사용 = 클래스업 + HP/MP 최대치 회복 (docs/research/promotion.md §4)
+          target.hp = target.maxHp
+          target.mp = target.maxMp
+          // 승급으로 늘어난 책략(참모 화룡/방술사 대치료)은 knownStrategies가 병과에서 파생하므로 자동 반영
+          log(
+            state,
+            'promote',
+            `${nameOf(target)}${subjectParticle(nameOf(target))} ${newCls.name}으로 승급! HP·책략치 완전회복`,
+            { targetId: target.id, amount: healed },
+          )
+          break
+        }
+      }
+
+      // 스톡 차감 — 0이 된 스택은 목록에서 사라진다 (removeConsumable 관례)
+      state.consumables = removeConsumable(state.consumables, action.itemId, 1) ?? state.consumables
+      unit.acted = true
+      unit.moved = true
       break
     }
 

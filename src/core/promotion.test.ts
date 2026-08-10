@@ -1,5 +1,7 @@
 // v0.8 승급(클래스 체인지) — 인수 경제 · 2차 병과 · 계열(lineage) 착용 규칙.
 // 근거: docs/research/caocao.md §2.1~2.2 (Lv15↑ 인수 → 2차, 클래스업 보너스)
+// v0.9: 승급은 원작대로 **전투 중 인수 사용**으로만 일어난다 (promotion.md §4).
+// 캠프(진영) 승급 경로(canPromote/promoteOfficer)는 deprecated — 이 파일도 전투 기반으로 재작성됐다.
 
 import { describe, expect, it } from 'vitest'
 import { validateCampaign } from '../app/persistence'
@@ -16,7 +18,7 @@ import {
   CAMPAIGN_NODES,
   canEquip,
   canEquipClass,
-  canPromote,
+  canPromoteUnit,
   classIdOf,
   completeChoice,
   consumableCount,
@@ -25,10 +27,9 @@ import {
   equipItem,
   newCampaign,
   PROMOTION_LEVEL,
-  promoteOfficer,
   stageForNode,
 } from './campaign'
-import { maxHp } from './formulas'
+import { maxHp, maxMp } from './formulas'
 import type { BattleState, StageDef } from './types'
 
 // ---------- 헬퍼 ----------
@@ -45,15 +46,40 @@ function withRoster(
   }
 }
 
-/** Lv15 + 인수 1개를 갖춘 승급 직전 상태 */
+/** Lv15 + 인수 1개를 갖춘 승급 직전 상태 (승급 자체는 전투 안에서 일어난다) */
 function readyToPromote(officerId: string, level = PROMOTION_LEVEL): CampaignState {
   return { ...withRoster(newCampaign(), officerId, { level }), consumables: [{ itemId: 'insu', count: 1 }] }
+}
+
+/** 승급을 마친 로스터 상태 — 전투에서 인수를 쓰고 승리로 회수한 결과 */
+function promotedInBattle(campaign: CampaignState, ...officerIds: string[]): CampaignState {
+  let state = startBattle(stage('stage01'), 1, campaign.roster, undefined, campaign.consumables)
+  for (const officerId of officerIds) {
+    const target = state.units.find((u) => u.officerId === officerId)!
+    state = applyAction(state, { type: 'useItem', unitId: target.id, itemId: 'insu', target: target.pos })
+  }
+  return applyVictory({ ...campaign, nodeId: 'n01' }, state)
 }
 
 const entryOf = (campaign: CampaignState, officerId: string): RosterEntry =>
   campaign.roster.find((r) => r.officerId === officerId)!
 
 const stage = (id: string): StageDef => STAGES.find((s) => s.id === id)!
+
+/** 전투를 열고 지정 부대에 인수를 쓴다 (거부되면 before와 같은 참조가 돌아온다) */
+function useInsu(
+  campaign: CampaignState,
+  officerId: string,
+): { before: BattleState; after: BattleState } {
+  const before = startBattle(stage('stage01'), 1, campaign.roster, undefined, campaign.consumables)
+  const target = before.units.find((u) => u.officerId === officerId)
+  const after = target
+    ? applyAction(before, { type: 'useItem', unitId: target.id, itemId: 'insu', target: target.pos })
+    : before
+  return { before, after }
+}
+
+const unitOf = (state: BattleState, officerId: string) => state.units.find((u) => u.officerId === officerId)!
 
 // ---------- 데이터 정합 ----------
 
@@ -202,97 +228,108 @@ describe('classIdOf', () => {
 
 // ---------- 승급 조건 ----------
 
-describe('canPromote — 승급 조건 매트릭스', () => {
-  it('Lv15 + 인수 + 상위 병과가 모두 갖춰지면 true', () => {
-    expect(canPromote(readyToPromote('xiahoudun'), 'xiahoudun')).toBe(true)
+describe('canPromoteUnit — 승급 조건 매트릭스 (전투·UI 공용)', () => {
+  it('상위 병과가 있고 Lv15 이상이면 true (인수 보유는 보지 않는다)', () => {
+    expect(canPromoteUnit({ classId: 'lightCavalry', level: PROMOTION_LEVEL })).toBe(true)
   })
 
-  it('레벨 미달이면 false (경계: Lv14 ✗ / Lv15 ✓)', () => {
-    expect(canPromote(readyToPromote('xiahoudun', PROMOTION_LEVEL - 1), 'xiahoudun')).toBe(false)
-    expect(canPromote(readyToPromote('xiahoudun', PROMOTION_LEVEL), 'xiahoudun')).toBe(true)
-    expect(canPromote(readyToPromote('xiahoudun', PROMOTION_LEVEL + 10), 'xiahoudun')).toBe(true)
+  it('레벨 경계 — Lv14 ✗ / Lv15 ✓ / Lv30 ✓', () => {
+    expect(canPromoteUnit({ classId: 'lightCavalry', level: PROMOTION_LEVEL - 1 })).toBe(false)
+    expect(canPromoteUnit({ classId: 'lightCavalry', level: PROMOTION_LEVEL })).toBe(true)
+    expect(canPromoteUnit({ classId: 'lightCavalry', level: PROMOTION_LEVEL + 15 })).toBe(true)
   })
 
-  it('인수가 없으면 false', () => {
-    expect(canPromote({ ...readyToPromote('xiahoudun'), consumables: [] }, 'xiahoudun')).toBe(false)
+  it('이미 2차면 false — 인수를 낭비하지 않는다', () => {
+    for (const cls of Object.values(CLASSES).filter((c) => c.tier === 2)) {
+      expect(canPromoteUnit({ classId: cls.id, level: 50 }), cls.id).toBe(false)
+    }
   })
 
-  it('상위 병과가 없으면(이미 2차) false — 인수를 낭비하지 않는다', () => {
-    const promoted = withRoster(readyToPromote('xiahoudun'), 'xiahoudun', { classId: 'heavyCavalry' })
-    expect(canPromote(promoted, 'xiahoudun')).toBe(false)
+  it('미등록 병과 id는 false (손상된 세이브 내성)', () => {
+    expect(canPromoteUnit({ classId: 'nonexistent', level: 50 })).toBe(false)
+    expect(canPromoteUnit({ classId: '', level: 50 })).toBe(false)
   })
 
-  it('로스터에 없는 장수는 false', () => {
-    expect(canPromote({ ...newCampaign(), consumables: [{ itemId: 'insu', count: 5 }] }, 'lüBu')).toBe(false)
-    expect(canPromote({ ...newCampaign(), consumables: [{ itemId: 'insu', count: 5 }] }, 'nobody')).toBe(false)
+  it('1차 6종은 전부 Lv15에 승급 가능하다', () => {
+    for (const cls of Object.values(CLASSES).filter((c) => c.tier === 1)) {
+      expect(canPromoteUnit({ classId: cls.id, level: PROMOTION_LEVEL }), cls.id).toBe(true)
+    }
   })
 
-  it('전 아군 6명이 Lv15 + 인수면 모두 승급 대상 (1차 6종 전부 트리를 갖는다)', () => {
-    for (const officerId of newCampaign().roster.map((r) => r.officerId)) {
-      expect(canPromote(readyToPromote(officerId), officerId), officerId).toBe(true)
+  it('아군 6명 전원이 Lv15면 승급 대상이다 (로스터 병과 기준)', () => {
+    for (const entry of newCampaign().roster) {
+      expect(canPromoteUnit({ classId: classIdOf(entry), level: PROMOTION_LEVEL }), entry.officerId).toBe(true)
     }
   })
 })
 
-describe('promoteOfficer', () => {
-  it('인수 1개를 쓰고 병과를 상위로 바꾼다', () => {
-    const before = readyToPromote('xiahoudun')
-    const after = promoteOfficer(before, 'xiahoudun')
+describe('전투 중 인수 사용 — 승급 (v0.9 정본 경로)', () => {
+  it('인수 1개를 쓰고 병과를 상위로 바꾼다 + HP/MP 완전회복', () => {
+    const campaign = readyToPromote('xiahoudun')
+    const { before, after } = useInsu(campaign, 'xiahoudun')
+    expect(after).not.toBe(before)
+
+    const dun = unitOf(after, 'xiahoudun')
+    expect(dun.classId).toBe('heavyCavalry')
+    expect(dun.maxHp).toBe(maxHp(CLASSES.heavyCavalry, PROMOTION_LEVEL))
+    expect(dun.maxMp).toBe(maxMp(CLASSES.heavyCavalry, PROMOTION_LEVEL))
+    expect(dun.hp).toBe(dun.maxHp)
+    expect(dun.mp).toBe(dun.maxMp)
     expect(consumableCount(after.consumables, 'insu')).toBe(0)
-    expect(entryOf(after, 'xiahoudun').classId).toBe('heavyCavalry')
-    expect(classIdOf(entryOf(after, 'xiahoudun'))).toBe('heavyCavalry')
+    // 원본 전투 상태는 불변
+    expect(unitOf(before, 'xiahoudun').classId).toBe('lightCavalry')
   })
 
-  it('원본을 건드리지 않는다 (불변)', () => {
-    const before = readyToPromote('xiahoudun')
-    const snapshot = JSON.parse(JSON.stringify(before))
-    const after = promoteOfficer(before, 'xiahoudun')
-    expect(before).toEqual(snapshot)
-    expect(after).not.toBe(before)
-    expect(after.roster[0]).not.toBe(before.roster[0])
+  it('승급 결과가 승리 결산에서 로스터로 이월된다', () => {
+    const promoted = promotedInBattle(readyToPromote('xiahoudun'), 'xiahoudun')
+    expect(entryOf(promoted, 'xiahoudun').classId).toBe('heavyCavalry')
+    expect(classIdOf(entryOf(promoted, 'xiahoudun'))).toBe('heavyCavalry')
+    expect(consumableCount(promoted.consumables, 'insu')).toBe(0)
   })
 
   it('레벨/경험치/장비/열매 보정은 그대로 유지된다', () => {
-    const before = { ...readyToPromote('xiahoudun', 17), fruits: ['strFruit'] }
-    const patched = withRoster(before, 'xiahoudun', { exp: 42, statBonus: { str: 4 } })
-    const after = promoteOfficer(patched, 'xiahoudun')
+    const base = { ...readyToPromote('xiahoudun', 17), fruits: ['strFruit'] }
+    const patched = withRoster(base, 'xiahoudun', { exp: 42, statBonus: { str: 4 } })
+    const after = promotedInBattle(patched, 'xiahoudun')
     const entry = entryOf(after, 'xiahoudun')
     expect(entry.level).toBe(17)
-    expect(entry.exp).toBe(42)
     expect(entry.statBonus).toEqual({ str: 4 })
-    expect(entry.equipment).toEqual(entryOf(patched, 'xiahoudun').equipment)
+    expect(entry.equipment.weapon?.itemId).toBe('woodSpear')
     expect(after.fruits).toEqual(['strFruit'])
-    expect(after.gold).toBe(patched.gold)
   })
 
-  it('다른 부대는 승급하지 않는다', () => {
-    const after = promoteOfficer(readyToPromote('xiahoudun'), 'xiahoudun')
+  it('다른 부대는 승급하지 않는다 (classId 키 자체가 생기지 않는다)', () => {
+    const after = promotedInBattle(readyToPromote('xiahoudun'), 'xiahoudun')
     for (const entry of after.roster) {
       if (entry.officerId === 'xiahoudun') continue
       expect(entry.classId, entry.officerId).toBeUndefined()
     }
   })
 
-  it('조건 미충족이면 원본을 그대로 돌려준다 (참조 동일)', () => {
-    const lowLevel = readyToPromote('xiahoudun', 14)
-    expect(promoteOfficer(lowLevel, 'xiahoudun')).toBe(lowLevel)
-    const noSeal = { ...readyToPromote('xiahoudun'), consumables: [] }
-    expect(promoteOfficer(noSeal, 'xiahoudun')).toBe(noSeal)
-    const absent = readyToPromote('xiahoudun')
-    expect(promoteOfficer(absent, 'nobody')).toBe(absent)
-    // 2차에서 한 번 더 → 인수가 남아 있어도 아무 일 없음
-    const twice = { ...promoteOfficer(readyToPromote('xiahoudun'), 'xiahoudun'), consumables: [{ itemId: 'insu', count: 3 }] }
-    expect(promoteOfficer(twice, 'xiahoudun')).toBe(twice)
+  it('조건 미충족이면 전투 상태를 그대로 돌려준다 (참조 동일)', () => {
+    // Lv14
+    const low = useInsu(readyToPromote('xiahoudun', 14), 'xiahoudun')
+    expect(low.after).toBe(low.before)
+    // 인수 미보유
+    const noSeal = useInsu({ ...readyToPromote('xiahoudun'), consumables: [] }, 'xiahoudun')
+    expect(noSeal.after).toBe(noSeal.before)
+    // 이미 2차 — 인수가 남아 있어도 아무 일 없음
+    const twice = withRoster(
+      { ...readyToPromote('xiahoudun'), consumables: [{ itemId: 'insu', count: 3 }] },
+      'xiahoudun',
+      { classId: 'heavyCavalry' },
+    )
+    const again = useInsu(twice, 'xiahoudun')
+    expect(again.after).toBe(again.before)
   })
 
-  it('인수 2개면 두 명을 각각 승급시킬 수 있다', () => {
+  it('인수 2개면 한 전투에서 두 명을 각각 승급시킬 수 있다', () => {
     let campaign = { ...withRoster(newCampaign(), 'xiahoudun', { level: 15 }), consumables: [{ itemId: 'insu', count: 2 }] }
     campaign = withRoster(campaign, 'guojia', { level: 20 })
-    campaign = promoteOfficer(campaign, 'xiahoudun')
-    campaign = promoteOfficer(campaign, 'guojia')
-    expect(consumableCount(campaign.consumables, 'insu')).toBe(0)
-    expect(entryOf(campaign, 'xiahoudun').classId).toBe('heavyCavalry')
-    expect(entryOf(campaign, 'guojia').classId).toBe('counselor')
+    const after = promotedInBattle(campaign, 'xiahoudun', 'guojia')
+    expect(consumableCount(after.consumables, 'insu')).toBe(0)
+    expect(entryOf(after, 'xiahoudun').classId).toBe('heavyCavalry')
+    expect(entryOf(after, 'guojia').classId).toBe('counselor')
   })
 })
 
@@ -332,8 +369,8 @@ describe('canEquipClass — 착용 판정은 계열(lineage) 기준', () => {
 
 describe('equipItem — 승급 병과로 판정한다', () => {
   it('승급 후에도 계열 무기를 장착할 수 있다', () => {
-    let campaign = { ...readyToPromote('xiahoudun'), inventory: [{ itemId: 'ironSpear', level: 1, exp: 0 }] }
-    campaign = promoteOfficer(campaign, 'xiahoudun')
+    const promoted = promotedInBattle(readyToPromote('xiahoudun'), 'xiahoudun')
+    const campaign = { ...promoted, inventory: [{ itemId: 'ironSpear', level: 1, exp: 0 }] }
     const equipped = equipItem(campaign, 'xiahoudun', 0)
     expect(equipped).not.toBe(campaign)
     expect(entryOf(equipped, 'xiahoudun').equipment.weapon?.itemId).toBe('ironSpear')
@@ -342,8 +379,8 @@ describe('equipItem — 승급 병과로 판정한다', () => {
   })
 
   it('승급해도 계열 밖 무기는 여전히 거부된다', () => {
-    let campaign = { ...readyToPromote('xiahoudun'), inventory: [{ itemId: 'ironSword', level: 1, exp: 0 }] }
-    campaign = promoteOfficer(campaign, 'xiahoudun')
+    const promoted = promotedInBattle(readyToPromote('xiahoudun'), 'xiahoudun')
+    const campaign = { ...promoted, inventory: [{ itemId: 'ironSword', level: 1, exp: 0 }] }
     expect(equipItem(campaign, 'xiahoudun', 0)).toBe(campaign)
   })
 })
@@ -448,7 +485,7 @@ describe('validateCampaign — v4~v5 → v6 승계', () => {
   })
 
   it('v5 라운드트립은 인수와 승급 병과를 보존한다', () => {
-    const promoted = promoteOfficer(readyToPromote('xiahoudun'), 'xiahoudun')
+    const promoted = withRoster(readyToPromote('xiahoudun'), 'xiahoudun', { classId: 'heavyCavalry' })
     const campaign = { ...promoted, consumables: [{ itemId: 'insu', count: 2 }] }
     expect(validateCampaign(JSON.parse(JSON.stringify(campaign)))).toEqual(campaign)
   })
@@ -472,7 +509,7 @@ describe('validateCampaign — v4~v5 → v6 승계', () => {
   })
 
   it('승급한 부대의 계열 무기는 세이브 정화에서 살아남는다', () => {
-    const promoted = promoteOfficer(readyToPromote('xiahoudun'), 'xiahoudun')
+    const promoted = promotedInBattle(readyToPromote('xiahoudun'), 'xiahoudun')
     const restored = validateCampaign(JSON.parse(JSON.stringify(promoted)))!
     expect(entryOf(restored, 'xiahoudun').equipment.weapon?.itemId).toBe('woodSpear')
     expect(restored.inventory).toEqual([])
@@ -514,6 +551,9 @@ describe('풀 캠페인 레벨 커브 (추격 루트 완주)', () => {
   it('전 노드를 AI로 완주하면 로스터가 이월되고 최고 레벨이 보고된다', () => {
     let campaign = newCampaign()
     const results: string[] = []
+    // v0.9 AI 확장 계측 — 회복/강화 책략을 실제로 쓰는지 (풍수사 순욱은 stage02부터 출진)
+    let healCasts = 0
+    let buffCasts = 0
     let guard = 0
 
     while (currentNode(campaign)?.type !== 'end' && guard++ < 60) {
@@ -529,6 +569,8 @@ describe('풀 캠페인 레벨 커브 (추격 루트 완주)', () => {
           600,
         )
         const bonusFired = state.log.some((l) => l.type === 'bonus')
+        healCasts += state.log.filter((l) => l.type === 'heal').length
+        buffCasts += state.log.filter((l) => l.type === 'buff' || l.type === 'debuff').length
         results.push(`${node.id}(${stageDef.id}): ${state.result}${bonusFired ? '+보너스' : ''}`)
         campaign = applyVictory(campaign, state)
       } else break
@@ -543,10 +585,11 @@ describe('풀 캠페인 레벨 커브 (추격 루트 완주)', () => {
     const promotable = campaign.roster.filter((r) => r.level >= PROMOTION_LEVEL).length
     console.log(
       [
-        '[v0.8 레벨 커브 시뮬] 추격 루트 완주',
+        '[v0.9 레벨 커브 시뮬] 추격 루트 완주',
         `  전투 결과: ${results.join(' / ')}`,
         `  최종 로스터: ${levels.join(', ')}`,
         `  최고 레벨 ${top} / 승급 기준 Lv${PROMOTION_LEVEL} 도달 ${promotable}명 / 인수 ${consumableCount(campaign.consumables, 'insu')}개`,
+        `  AI 지원 책략: 회복 ${healCasts}회 / 강화·방해 ${buffCasts}회`,
         top >= PROMOTION_LEVEL
           ? '  → Lv15 도달: 승급이 캠페인 안에서 열린다'
           : `  → Lv15 미달(${PROMOTION_LEVEL - top} 부족): bonusExp 상향 등 커브 조정 필요`,
@@ -555,13 +598,15 @@ describe('풀 캠페인 레벨 커브 (추격 루트 완주)', () => {
 
     // 완주 자체가 성장으로 이어졌는지만 고정 검증한다 (레벨 도달 여부는 밸런스 리포트)
     expect(top).toBeGreaterThan(Math.max(...newCampaign().roster.map((r) => r.level)))
+    // v0.9 AI 확장 계약: 풍수사가 실제로 회복을 쓴다 (0회면 계수/게이트가 잘못된 것)
+    expect(healCasts).toBeGreaterThan(0)
   })
 
-  it('Lv15에 도달한 부대는 인수로 즉시 승급할 수 있다 (경로 확인)', () => {
+  it('Lv15에 도달한 부대는 전투 중 인수로 즉시 승급할 수 있다 (경로 확인)', () => {
     // 커브와 무관하게 "레벨 + 인수" 두 자원만 있으면 승급이 성립한다는 계약 확인
     const campaign = readyToPromote('dianwei')
-    expect(canPromote(campaign, 'dianwei')).toBe(true)
-    const after = promoteOfficer(campaign, 'dianwei')
+    expect(canPromoteUnit({ classId: classIdOf(entryOf(campaign, 'dianwei')), level: PROMOTION_LEVEL })).toBe(true)
+    const after = promotedInBattle(campaign, 'dianwei')
     expect(classIdOf(entryOf(after, 'dianwei'))).toBe('guardInfantry')
     expect(CLASSES.guardInfantry.growth.def).toBe('S')
   })
