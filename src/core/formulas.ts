@@ -94,7 +94,10 @@ export const critRate = (attackerMorale: number, defenderMorale: number): number
   ratioChance(attackerMorale, defenderMorale)
 
 /**
- * 책략 명중률 (%) = 물리 명중 공식에 (정신력+사기)를 대입 × 책략별 한계명중.
+ * 책략 명중률 (%) — 원작 확정 공식 `r = clamp(α × y, 30, 100)` (docs/research/statuses.md §2).
+ * y = 물리 명중 곡선에 (정신력+사기)를 대입한 값, α = 책략별 "한계명중"(별도 상한이 아니라 **곱해지는 계수**).
+ * α를 곱한 뒤에도 하한 30이 다시 적용된다 — 계수가 낮은 책략도 최저 30%는 통한다.
+ * (명중 보조 장비 β/β'는 해당 장비가 들어올 때 괄호 안에 얹는다.)
  */
 export function strategyHitRate(
   casterMind: number,
@@ -104,7 +107,7 @@ export function strategyHitRate(
   capHitRate: number,
 ): number {
   const base = hitRate(casterMind + casterMorale, targetMind + targetMorale)
-  return t((base * capHitRate) / 100)
+  return Math.max(30, Math.min(100, t((base * capHitRate) / 100)))
 }
 
 // ---------- 데미지 ----------

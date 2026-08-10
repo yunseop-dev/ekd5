@@ -93,9 +93,11 @@ describe('strategyHitRate (책략 명중률)', () => {
     expect(strategyHitRate(100, 50, 100, 50, 100)).toBe(90)
   })
 
-  it('한계명중 33%(해일급)이면 동급 상대 29%', () => {
-    // floor(90 × 33 / 100) = 29
-    expect(strategyHitRate(100, 50, 100, 50, 33)).toBe(29)
+  it('α를 곱한 뒤에도 하한 30이 다시 적용된다 (원작 r = clamp(α×y, 30, 100))', () => {
+    // 해일급 α 0.33: floor(90 × 33 / 100) = 29 → 하한 30으로 올라온다 (statuses.md §2)
+    expect(strategyHitRate(100, 50, 100, 50, 33)).toBe(30)
+    // 상대가 압도적으로 강해 y가 이미 하한(30)이어도 α로 더 깎이지 않는다
+    expect(strategyHitRate(10, 10, 100, 100, 80)).toBe(30)
   })
 
   it('사기 버프는 책략 방어에 기여한다 (대상 사기 상승 → 명중 하락)', () => {

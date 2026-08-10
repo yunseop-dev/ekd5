@@ -155,8 +155,10 @@ export const STRATEGIES: Record<string, StrategyDef> = {
   },
 
   // ---- 방해 (상태이상 부여) — 전부 원작 ルＡ = 사거리 4 / 단일 / MP8 ----
-  // 지속턴이 없는 게 원작 사양이다: 걸리면 장수 운÷2 % 자연 해제나 해제약까지 계속 간다
-  // (docs/research/caocao.md §90). 그래서 위력 대신 **한계명중**이 유일한 조절 손잡이다.
+  // 수치 전부 원작 확정 (docs/research/statuses.md §3 — Data.e5 실측 + α/C 역공학).
+  // 지속턴은 없다: 걸리면 부대 사기% 자연 해제나 해제약까지 계속 간다.
+  // capHitRate는 상한이 아니라 **곱해지는 계수 α**다 (statuses.md §2).
+  // power를 가진 독연·포박은 데미지와 상태를 **독립 2회** 판정한다 (리듀서 status 분기).
   heobo: {
     id: 'heobo',
     name: '허보',
@@ -166,7 +168,7 @@ export const STRATEGIES: Record<string, StrategyDef> = {
     range: 4,
     area: 'single',
     inflicts: 'confusion',
-    capHitRate: 80, // 원작 확정 (docs/research/items.md §3)
+    capHitRate: 80, // α 0.80 — 원작 확정
     targets: 'enemy',
   },
   bongchaek: {
@@ -178,7 +180,7 @@ export const STRATEGIES: Record<string, StrategyDef> = {
     range: 4,
     area: 'single',
     inflicts: 'seal',
-    capHitRate: 80, // [설계값] 허보와 동급 — R 조사 확정 대기
+    capHitRate: 80, // α 0.80 — 원작 확정
     targets: 'enemy',
   },
   dogyeon: {
@@ -190,7 +192,8 @@ export const STRATEGIES: Record<string, StrategyDef> = {
     range: 4,
     area: 'single',
     inflicts: 'poison',
-    capHitRate: 80, // [설계값]
+    power: 70, // 데미지계수 C 0.7 (우리 위력 % 관례)
+    capHitRate: 90, // α 0.90 — 원작 확정
     targets: 'enemy',
   },
   pobak: {
@@ -202,7 +205,8 @@ export const STRATEGIES: Record<string, StrategyDef> = {
     range: 4,
     area: 'single',
     inflicts: 'immobile',
-    capHitRate: 80, // [설계값]
+    power: 50, // 데미지계수 C 0.5
+    capHitRate: 80, // α 0.80 — 원작 확정
     targets: 'enemy',
   },
 }

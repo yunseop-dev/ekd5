@@ -103,31 +103,32 @@ describe('캠페인 노드', () => {
     return visited
   }
 
-  it('추격 갈래로 따라가면 동탁 추격전을 거쳐 제2부를 통과해 종막에 닿는다', () => {
+  it('첫 갈래(추격·토벌)로 따라가면 전투 노드를 하나도 건너뛰지 않고 종막에 닿는다', () => {
     expect(walk(0)).toEqual([
       's00', 'n01', 's01', 'n02', 's02', 'n03',
       's10', 'n11', 's11', 'n12', 'c01', 'n13', 's13',
-      // 제2부 — c02는 두 갈래가 같은 전투(n21)로 합류하므로 노드 열은 갈래와 무관하다
       's20', 'n20', 's21', 'c02', 'n21', 's22', 'n22', 's23', 'n23', 's24', 'n24', 's25', 'fin',
     ])
   })
 
-  it('회군 갈래로 따라가면 전투 노드(n13)를 건너뛰고 종막에 닿는다', () => {
+  it('둘째 갈래(회군·화친)는 전투 노드 n13·n21을 건너뛰고 종막에 닿는다', () => {
     const visited = walk(1)
     expect(visited).toEqual([
       's00', 'n01', 's01', 'n02', 's02', 'n03',
       's10', 'n11', 's11', 'n12', 'c01', 's12', 's13',
-      's20', 'n20', 's21', 'c02', 'n21', 's22', 'n22', 's23', 'n23', 's24', 'n24', 's25', 'fin',
+      's20', 'n20', 's21', 'c02', 's22', 'n22', 's23', 'n23', 's24', 'n24', 's25', 'fin',
     ])
     expect(visited).not.toContain('n13')
+    expect(visited).not.toContain('n21')
   })
 
-  it('c02는 게이지만 가르고 두 갈래가 같은 전투로 합류한다 (원작 서주 대학살 소재)', () => {
+  it('c02는 원작 c05의 「화친/토벌」 선택지 — 화친을 고르면 서주 전투를 건너뛴다', () => {
     const c02 = CAMPAIGN_NODES.find((n) => n.id === 'c02')!
     expect(c02.type).toBe('choice')
     if (c02.type !== 'choice') return
-    expect(c02.options.map((o) => o.next)).toEqual(['n21', 'n21'])
-    expect(c02.options.map((o) => o.gaugeDelta)).toEqual([10, -10])
+    // 원작에 서주 학살 선택지는 없다 (조조가 명시 부정) — 대신 화친 시 전투가 사라진다
+    expect(c02.options.map((o) => o.next)).toEqual(['n21', 's22'])
+    expect(c02.options.map((o) => o.gaugeDelta)).toEqual([5, -5])
     expect(c02.speaker).toBe('caocao')
   })
 
@@ -156,7 +157,7 @@ describe('캠페인 노드', () => {
     const stories = CAMPAIGN_NODES.filter((n) => n.type === 'story')
     expect(stories.map((n) => n.scriptId)).toEqual([
       'intro', 'afterStage01', 'afterStage02', 'coalition', 'toHulao', 'retreat', 'chapterEnd',
-      'chapter2Intro', 'fatherDeath', 'puyangBetrayal', 'xuzhouRescue', 'xiapiFlood', 'chapter2End',
+      'chapter2Intro', 'fatherDeath', 'puyangBetrayal', 'xuzhouRescue', 'xiapiSiege', 'chapter2End',
     ])
     for (const node of stories) expect(node.title.length).toBeGreaterThan(0)
   })
@@ -435,7 +436,7 @@ describe('applyVictory', () => {
     return campaign
   }
 
-  it('추격 갈래를 끝까지 진행하면 11전투를 모두 클리어하고 종막에 닿는다', () => {
+  it('첫 갈래를 끝까지 진행하면 11전투를 모두 클리어하고 종막에 닿는다', () => {
     const campaign = playThrough(0)
     expect(campaign.nodeId).toBe('fin')
     expect(isCampaignFinished(campaign)).toBe(true)
@@ -443,22 +444,22 @@ describe('applyVictory', () => {
       'stage01', 'stage02', 'stage03', 'stage04', 'stage05', 'stage06',
       'stage07', 'stage08', 'stage09', 'stage10', 'stage11',
     ])
-    // c01 추격 +10, c02 복수 +10 (둘 다 사실 루트)
-    expect(campaign.gauge).toBe(GAUGE_INITIAL + 20)
+    // c01 추격 +10, c02 토벌 속행 +5
+    expect(campaign.gauge).toBe(GAUGE_INITIAL + 15)
     // 2부 합류 2명이 로스터에 얹힌다
     expect(campaign.roster.map((r) => r.officerId)).toEqual([...PLAYER_OFFICER_IDS, 'xuChu', 'zhangLiao'])
   })
 
-  it('회군 갈래를 끝까지 진행하면 stage06을 건너뛴 채 종막에 닿는다', () => {
+  it('둘째 갈래를 끝까지 진행하면 stage06·stage08을 건너뛴 채 종막에 닿는다', () => {
     const campaign = playThrough(1)
     expect(campaign.nodeId).toBe('fin')
     expect(isCampaignFinished(campaign)).toBe(true)
     expect(campaign.clearedStages).toEqual([
       'stage01', 'stage02', 'stage03', 'stage04', 'stage05',
-      'stage07', 'stage08', 'stage09', 'stage10', 'stage11',
+      'stage07', 'stage09', 'stage10', 'stage11',
     ])
-    // c01 회군 -10, c02 백성 불가침 -10 (둘 다 가상 루트)
-    expect(campaign.gauge).toBe(GAUGE_INITIAL - 20)
+    // c01 회군 -10, c02 화친 -5
+    expect(campaign.gauge).toBe(GAUGE_INITIAL - 15)
   })
 
   it('보상금은 노드에 박힌 값의 합이다 (추격 갈래)', () => {

@@ -111,18 +111,19 @@ export const STORY_SCRIPTS: Record<string, DialogueLine[]> = {
     { speaker: 'caocao', text: '누구냐.' },
     { speaker: 'xiahouyuan', text: '도겸의 부장이 이끄는 군사였다 합니다. 재물을 노렸다는 말도 있습니다.' },
     { speaker: 'xunyu', text: '주공, 사람을 보내 사실을 먼저 확인하십시오. 지금 군을 내면 명분이 흐려집니다.' },
-    { speaker: 'caocao', text: '…명분.' },
-    { speaker: 'caocao', text: '아버지의 뼈가 서주 길가에 흩어져 있다. 그 이상의 명분이 필요한가.' },
+    { speaker: 'xiahoudun', text: '명분이라니. 서주를 통째로 갈아엎어도 모자란 일이오!' },
+    { speaker: 'caocao', text: '아니다. 나는 서주의 백성을 도륙할 생각이 없다 — 창을 받을 자는 도겸 하나다.' },
   ],
 
-  // s22 — 여포·진궁의 연주 급습. 뒤가 무너진 상황 (복양 전투 직전)
+  // s22 — 연주로 회군해 복양의 여포와 맞선다
+  // (c02에서 화친을 고른 갈래에서도 자연스럽게 이어져야 하므로 서주 전투 결과를 단정하지 않는다)
   puyangBetrayal: [
-    { speaker: null, text: '서주의 성들이 차례로 열렸다. 그러나 승보가 오는 길로 급보가 함께 올라왔다.' },
-    { speaker: 'xunyu', text: '연주입니다. 장막이 배신했습니다 — 여포를 연주목으로 맞아들였습니다.' },
+    { speaker: null, text: '조조의 군세는 서주를 등지고 북으로 말머리를 돌렸다. 연주가 남의 손에 있었다.' },
+    { speaker: 'xunyu', text: '장막이 배신했습니다. 여포를 연주목으로 맞아들여 성 대부분이 넘어갔습니다.' },
     { speaker: 'caocao', text: '여포. 호로관의 그 사내가 이제 남의 땅을 얻어 앉았군.' },
-    { speaker: 'guojia', text: '판을 짠 것은 여포가 아니라 진궁입니다. 우리 군이 서주에 묶인 틈을 정확히 노렸습니다.' },
-    { speaker: 'xiahoudun', text: '뒤가 비었소. 서주를 놓고 돌아가야 하오.' },
-    { speaker: 'caocao', text: '돌아간다. 땅은 다시 얻을 수 있으나 근거지를 잃으면 군이 굶는다.' },
+    { speaker: 'guojia', text: '판을 짠 것은 여포가 아니라 진궁입니다. 우리 군이 남쪽에 묶인 틈을 정확히 노렸습니다.' },
+    { speaker: 'xiahoudun', text: '근거지를 잃으면 군이 굶소. 다른 것은 다 뒤로 미뤄야 하오.' },
+    { speaker: 'caocao', text: '그렇다. 땅은 다시 얻을 수 있으나 연주는 다시 얻을 수 없다.' },
     { speaker: 'xunyu', text: '여포는 복양에 들어 성을 등지고 있습니다. 시가지에서 기병을 상대하게 됩니다.' },
     { speaker: 'caocao', text: '좋다. 좁은 거리에서는 적토마도 달릴 곳이 없다. 복양으로!' },
   ],
@@ -139,26 +140,26 @@ export const STORY_SCRIPTS: Record<string, DialogueLine[]> = {
     { speaker: 'xuChu', text: '이 몸이 서 있는 동안은 주공의 등에 화살 한 대도 닿지 않습니다.' },
   ],
 
-  // s24 — 하비 수공
-  xiapiFlood: [
+  // s24 — 하비 겨울 포위전 (원작 c14: 설원 + 강 + 다리 2개, 악천후로 화계 불가)
+  xiapiSiege: [
     { speaker: null, text: '고순은 꺾였고, 여포는 남은 병력을 모아 하비성으로 물러났다.' },
-    { speaker: 'xunyu', text: '하비는 성벽이 두껍고 양식이 넉넉합니다. 정공으로는 반년이 걸립니다.' },
-    { speaker: 'guojia', text: '반년을 줄 수 없습니다. 여포군은 안에서 이미 갈라지고 있습니다 — 지금이 마지막 밀 때입니다.' },
-    { speaker: 'caocao', text: '성 북쪽으로 기수와 사수가 흐른다고 했지.' },
-    { speaker: 'xunyu', text: '…물길을 끊어 성으로 돌리자는 말씀입니까.' },
-    { speaker: 'caocao', text: '성을 부수는 것은 사람이 아니라 물이다. 제방을 터라.' },
-    { speaker: null, text: '두 강의 물이 하비의 성벽 아래로 밀려들었다. 진입로는 물길 사이 좁은 길 하나로 줄었다.' },
-    { speaker: 'xuChu', text: '길이 하나라면 제가 앞에 섭니다. 성문까지 열어 드리겠습니다.' },
+    { speaker: null, text: '그 사이 겨울이 왔다. 성 앞의 들판은 눈에 덮이고 강은 살얼음을 물고 흘렀다.' },
+    { speaker: 'chenGong', text: '(성루에서) 조조군은 먼 길을 왔다. 겨울 장기전은 저쪽에 불리하다 — 문을 닫고 버티면 된다.' },
+    { speaker: 'xunyu', text: '진궁의 계산이 옳습니다. 눈 속에서 오래 끌면 우리 쪽 양식이 먼저 마릅니다.' },
+    { speaker: 'guojia', text: '게다가 이 날씨에는 화계를 쓸 수 없습니다. 불이 붙지 않습니다.' },
+    { speaker: 'caocao', text: '그럼 불 없이 한다. 강은 다리가 둘뿐이라 했지 — 그 둘만 잡으면 성은 갇힌다.' },
+    { speaker: 'xuChu', text: '다리는 제가 앞에 섭니다. 성문까지 열어 드리겠습니다.' },
+    { speaker: 'caocao', text: '길게 끌지 않는다. 눈이 더 깊어지기 전에 끝낸다.' },
   ],
 
   // s25 — 제2부 종장. 여포의 최후 + 장료 합류
   chapter2End: [
-    { speaker: null, text: '물에 잠긴 하비의 성문이 안에서 열렸다. 포박된 여포가 조조 앞에 끌려 나왔다.' },
+    { speaker: null, text: '눈에 덮인 하비의 성문이 안에서 열렸다. 포박된 여포가 조조 앞에 끌려 나왔다.' },
     { speaker: 'lüBu', text: '조공. 나를 살려 부린다면 천하에 당할 자가 없을 것이오.' },
     { speaker: 'caocao', text: '…네 말이 옳다. 그러나 너는 섬긴 주인마다 등을 찔렀다.' },
     { speaker: 'caocao', text: '데려가라. 진궁도 함께다.' },
     { speaker: null, text: '뒤이어 끌려온 장수는 무릎을 꿇지 않고 조조를 바라보았다.' },
-    { speaker: 'zhangLiao', text: '장료다. 죽음이 두려워 말을 고르지는 않겠다. 벨 것이면 지금 베라.' },
+    { speaker: 'zhangLiao', text: '나는 두 주인을 섬기지 않는다. 벨 것이면 지금 베라.' },
     { speaker: 'caocao', text: '…과연. 이 자의 결박을 풀어라. 오늘 하비에서 내가 얻은 것은 성이 아니라 사람이다.' },
     { speaker: null, text: '— 제2부 「연주에서 서주로」 완 —' },
   ],

@@ -6,14 +6,17 @@
 import { TERRAIN } from '../data/terrain'
 import {
   applyAction,
+  canAct,
   canCast,
   classOf,
   effectiveStats,
   hasStatus,
+  hitRateAgainst,
   isHostile,
   knownStrategies,
   livingUnits,
   movementRangeOf,
+  strategyRateAgainst,
   terrainEffectOf,
   unitAt,
 } from './battle'
@@ -26,7 +29,6 @@ import {
   physicalDamage,
   strategyDamage,
   strategyHealAmount,
-  strategyHitRate,
 } from './formulas'
 import { manhattan, strategyAreaCells } from './movement'
 import type { BattleAction, BattleState, Faction, StatusId, StrategyArea, UnitState, Vec2 } from './types'
@@ -78,7 +80,7 @@ function scorePhysical(state: BattleState, unit: UnitState, cell: Vec2, target: 
     attackerLevel: unit.level,
     multipliers: [affinityMultiplier(uCls, tCls)],
   })
-  const hit = hitRate(uStats.agi, tStats.agi) / 100
+  const hit = hitRateAgainst(uStats.agi, target, tStats.agi) / 100 // 혼란 대상은 확정 피격
   const dbl = doubleAttackRate(uStats.agi, tStats.agi) / 100
   const crit = critRateOf(uStats.morale, tStats.morale) / 100
   const expected = dmg * hit * (1 + dbl) * (1 + 0.5 * crit)
@@ -87,9 +89,9 @@ function scorePhysical(state: BattleState, unit: UnitState, cell: Vec2, target: 
   if (expected >= target.hp) score += KILL_BONUS
   if (target.isLeader) score += 10 // 주인공 우선 압박
 
-  // 반격 리스크 (근접 공격 시)
+  // 반격 리스크 (근접 공격 시). 혼란에 걸린 상대는 반격하지 못한다 (statuses.md §1)
   const dist = manhattan(cell, target.pos)
-  if (!uCls.ranged && dist === 1 && !tCls.ranged && tCls.minRange <= 1) {
+  if (!uCls.ranged && dist === 1 && !tCls.ranged && tCls.minRange <= 1 && canAct(target)) {
     const counterDmg = physicalDamage({
       atk: tStats.atk,
       def: uStats.def,
@@ -164,15 +166,21 @@ function scoreStrategy(
     let value = 0
     for (const foe of affected) {
       const fStats = effectiveStats(foe)
-      const hit =
-        strategyHitRate(uStats.mind, uStats.morale, fStats.mind, fStats.morale, strategy.capHitRate) / 100
+      // 혼란 대상 확정 피격까지 반영된 실효 명중률 (리듀서와 같은 헬퍼)
+      const hit = strategyRateAgainst(uStats, foe, strategy.capHitRate) / 100
       if (strategy.kind === 'damage') {
         const dmg = strategyDamage(uStats.mind, fStats.mind, unit.level, strategy.power!)
         value += dmg * hit
         if (dmg * hit >= foe.hp) value += KILL_BONUS
       } else if (strategy.kind === 'status') {
-        // 명중 기대는 한계명중률로 본다 (방해 책략은 위력이 없어 cap이 유일한 조절 손잡이다)
-        value += statusValueAgainst(foe, strategy.inflicts!) * (strategy.capHitRate / 100)
+        // 방해계는 상태 가치 + (독연·포박처럼 위력이 있으면) 기대 데미지.
+        // 데미지와 상태는 독립 판정이라 기대값도 각각 곱해서 더한다.
+        value += statusValueAgainst(foe, strategy.inflicts!) * hit
+        if (strategy.power !== undefined) {
+          const dmg = strategyDamage(uStats.mind, fStats.mind, unit.level, strategy.power)
+          value += dmg * hit
+          if (dmg * hit >= foe.hp) value += KILL_BONUS
+        }
       } else if (!hasBuffOn(foe, strategy.buff!.stat)) {
         value += BUFF_VALUE * hit
       }

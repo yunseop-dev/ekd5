@@ -57,11 +57,12 @@ export const OFFICERS: Record<string, OfficerDef> = {
   // ---- 아군 (제2부 합류) ----
   // 원작은 합류 시점의 로스터 평균에 맞춘 레벨과 병과 기본 장비를 들고 온다 (campaign-ux.md §7.2).
   // 무기는 계열이 강제된다 — 경보병 계열은 검(woodSword/bronzeSword…), 기병 계열은 창이다.
+  // 능력치는 원작 Data.e5 실측(부대치×2 = 장수치, 전부 짝수) — statuses.md §4
   xuChu: {
     id: 'xuChu',
     name: '허저',
-    // 조조 친위대장. 무력 최상위 · 지력 최하위의 순수 방벽형 (s23 서주 구원 요청에서 합류)
-    stats: { str: 96, ldr: 72, int: 36, agi: 62, luck: 74 },
+    // 조조 친위대장. 무력·운 최상위 · 지력 최하위의 순수 방벽형 (원작 c08 합류)
+    stats: { str: 98, ldr: 90, int: 36, agi: 68, luck: 98 },
     classId: 'heavyInfantry',
     initialEquipment: { weapon: 'bronzeSword', armor: 'leatherArmor' },
     level: 14,
@@ -71,7 +72,8 @@ export const OFFICERS: Record<string, OfficerDef> = {
     name: '장료',
     // 원작 "기합류(=이미 승급된 채 합류) 장수는 클래스업 보너스가 없다"를 재현 —
     // 기본 병과 자체가 2차(중기병)라 인수를 써도 더 오를 곳이 없다 (promotion.md §3).
-    stats: { str: 92, ldr: 90, int: 78, agi: 80, luck: 70 },
+    // 원작 c15(여포 격파 후) 합류이며 기병 계열, 레벨은 아군 평균 연동이다.
+    stats: { str: 92, ldr: 84, int: 86, agi: 78, luck: 94 },
     classId: 'heavyCavalry',
     initialEquipment: { weapon: 'bronzeSpear', armor: 'bronzeArmor' },
     level: 18,
@@ -183,10 +185,11 @@ export const OFFICERS: Record<string, OfficerDef> = {
     level: 7,
   },
   // 동탁의 사위이자 당대 최강 — 제1부에서 정면으로 이길 수 없게 설계된 벽
+  // 원작 Data.e5 실측: 무력·통솔 만점에 지력 12 (전 장수 최하위권) — 책략에 극도로 약하다
   lüBu: {
     id: 'lüBu',
     name: '여포',
-    stats: { str: 98, ldr: 80, int: 30, agi: 94, luck: 70 },
+    stats: { str: 100, ldr: 100, int: 12, agi: 94, luck: 84 },
     classId: 'lightCavalry',
     // 방천화극과 적토마를 함께 지닌다. 적토마만 전리품으로 떨어진다(극은 원작처럼 끝까지 여포의 것).
     initialEquipment: { weapon: 'fangtianHalberd', armor: 'bronzeArmor', accessory: 'chituma' },
@@ -202,32 +205,25 @@ export const OFFICERS: Record<string, OfficerDef> = {
     level: 7,
   },
 
-  // ---- 적군 (제2부 · 황건 잔당 · 서주군 · 여포군) ----
-  // 제2부 적은 아군 도달 예상(Lv13~20)에 러버밴딩된 레벨을 갖는다.
+  // ---- 적군 (제2부 · 서주군 · 여포군) ----
+  // 능력치는 원작 Data.e5 실측 (statuses.md §4). 제2부 적 레벨만 아군 도달 예상(Lv13~20)에 러버밴딩한다.
   // 잡병(yellow*/west*)은 기존 정의를 스테이지 level 오버라이드로 재사용한다.
-  guanHai: {
-    id: 'guanHai',
-    name: '관해',
-    // 청주 황건 잔당의 두목 — 물량을 이끄는 두목급이라 잡병보다 한 급 위다
-    stats: { str: 80, ldr: 66, int: 30, agi: 56, luck: 48 },
-    classId: 'heavyInfantry',
-    initialEquipment: { weapon: 'woodSword', armor: 'leatherArmor' },
-    level: 12,
-  },
-  caoBao: {
-    id: 'caoBao',
-    name: '조표',
-    // 도겸의 장수. 서주 수성전의 실질적인 지휘관
-    stats: { str: 76, ldr: 64, int: 40, agi: 66, luck: 44 },
-    classId: 'lightCavalry',
-    initialEquipment: { weapon: 'bronzeSpear', armor: 'leatherArmor' },
+  // ※ 관해(管亥)·조표(曹豹)는 원작 512인 명부에 없어 정의하지 않는다 —
+  //   청주(c04)는 적장 없는 황건 익명 부대뿐이고, 서주 수성의 실존 적장은 조성(曹性)이다.
+  caoXing: {
+    id: 'caoXing',
+    name: '조성',
+    // 원작 궁기병 — 우리 병과 목록에 궁기병이 없어 궁병(archer)으로 재편성했다 [의도적 이탈]
+    stats: { str: 72, ldr: 74, int: 50, agi: 64, luck: 76 },
+    classId: 'archer',
+    initialEquipment: { weapon: 'bronzeBow', armor: 'leatherArmor' },
     level: 13,
   },
   taoQian: {
     id: 'taoQian',
     name: '도겸',
-    // 서주목. 노쇠해 싸울 힘이 없다 — 통솔·지력만 남은 약체 보스급 비(非)보스
-    stats: { str: 40, ldr: 70, int: 72, agi: 44, luck: 60 },
+    // 서주목. 원작 c05 B선택 승리조건이 "도겸 격파"라 이쪽이 보스다
+    stats: { str: 74, ldr: 64, int: 72, agi: 58, luck: 56 },
     classId: 'lord',
     initialEquipment: { weapon: 'woodSword', armor: 'leatherArmor' },
     level: 14,
@@ -235,8 +231,9 @@ export const OFFICERS: Record<string, OfficerDef> = {
   chenGong: {
     id: 'chenGong',
     name: '진궁',
-    // 여포의 모사. 병과가 2차(참모)라 화룡을 포함한 책략 전부를 실제로 쓴다
-    stats: { str: 30, ldr: 66, int: 94, agi: 62, luck: 66 },
+    // 여포의 모사. 원작은 화·수·지계+소보급만 쓰는 책사지만, 우리는 도사 병과가 없어
+    // 참모(2차)로 정의해 방해 책략의 적측 실사용을 확보했다 (statuses.md §3 [의도적 이탈])
+    stats: { str: 68, ldr: 76, int: 90, agi: 62, luck: 52 },
     classId: 'counselor',
     initialEquipment: { weapon: 'whiteFeatherFan', armor: 'silkRobe' },
     level: 18,
@@ -244,19 +241,19 @@ export const OFFICERS: Record<string, OfficerDef> = {
   gaoShun: {
     id: 'gaoShun',
     name: '고순',
-    // 함진영(陷陣營)을 이끄는 여포군 최정예. 방어 특화 2차 병과(중보병)
-    stats: { str: 86, ldr: 88, int: 56, agi: 60, luck: 58 },
+    // 원작 병과는 서량기병이나, 함진영(陷陣營) 컨셉을 살려 방어 특화 2차(중보병)로 재편성 [의도적 이탈]
+    stats: { str: 88, ldr: 90, int: 48, agi: 62, luck: 38 },
     classId: 'guardInfantry',
     initialEquipment: { weapon: 'bronzeSword', armor: 'bronzeArmor' },
     level: 17,
   },
 
-  // ---- 우군 (유비군 — stage10 서주 구원의 ally 진영) ----
-  // 조작 대상이 아니라 AI로 움직인다. 원작 우군처럼 아군과 함께 싸우되 지휘를 받지 않는다.
+  // ---- 유비군 (stage08 = 적 원군 / stage10 = 우군) ----
+  // 원작 인과 재현: c05에서는 적 원군으로 등장하고, c13(구원 선택)에서 우군이 된다.
   liuBei: {
     id: 'liuBei',
     name: '유비',
-    stats: { str: 72, ldr: 88, int: 76, agi: 66, luck: 92 },
+    stats: { str: 78, ldr: 72, int: 76, agi: 74, luck: 100 },
     classId: 'lord',
     initialEquipment: { weapon: 'woodSword', armor: 'leatherArmor' },
     level: 13,
@@ -265,7 +262,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     id: 'guanYu',
     // 원작에서 "이미 승급 상태로 등장"하는 급 — 병과 자체가 2차다
     name: '관우',
-    stats: { str: 96, ldr: 90, int: 70, agi: 74, luck: 74 },
+    stats: { str: 96, ldr: 98, int: 90, agi: 68, luck: 62 },
     classId: 'guardInfantry',
     initialEquipment: { weapon: 'bronzeSword', armor: 'bronzeArmor' },
     level: 15,
@@ -273,7 +270,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
   zhangFei: {
     id: 'zhangFei',
     name: '장비',
-    stats: { str: 98, ldr: 74, int: 42, agi: 78, luck: 62 },
+    stats: { str: 100, ldr: 74, int: 46, agi: 72, luck: 76 },
     classId: 'heavyCavalry',
     initialEquipment: { weapon: 'bronzeSpear', armor: 'bronzeArmor' },
     level: 15,

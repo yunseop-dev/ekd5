@@ -282,33 +282,36 @@ describe('스테이지 6 — 동탁 추격전', () => {
 // 고난도(stage09 여포 조우 · stage11 최종전)는 양쪽 허용 + 크래시 없음만 단정한다.
 
 describe('스테이지 7 — 청주 평정', () => {
-  it('물량전 구성: 2단 증원까지 합쳐 적 14기, 1차 전멸 / 2차 두목(관해) 격파다', () => {
+  it('원작 c04 충실: 적장이 한 명도 없고 승리조건은 전멸 단일이다 (보너스도 없다)', () => {
+    // 관해(管亥)·조표(曹豹)는 원작 512인 명부에 없다 — 청주는 황건 익명 부대만 (statuses.md §4)
+    expect(STAGE_07.units.some((u) => u.isBoss)).toBe(false)
+    expect(OFFICERS.guanHai).toBeUndefined()
+    expect(OFFICERS.caoBao).toBeUndefined()
+    expect(STAGE_07.victory).toEqual([{ type: 'annihilation' }])
+    expect(STAGE_07.bonusExp).toBeUndefined()
+    expect(STAGE_07.deployMax).toBe(7)
+    expect(STAGE_07.forcedOfficers).toEqual(['caocao'])
+  })
+
+  it('물량전 구성: 초기 9기 + 턴3 증원 3기 = 12기, 전원 Lv12~13', () => {
     const initial = STAGE_07.units.filter((u) => u.faction === 'enemy')
     const reinforced = STAGE_07.reinforcements.flatMap((r) => r.units)
-    expect(initial.length).toBeGreaterThanOrEqual(9)
-    expect(initial.length + reinforced.length).toBeGreaterThanOrEqual(12)
-    expect(STAGE_07.reinforcements.map((r) => r.trigger)).toEqual([
-      { type: 'turnStart', turn: 3 },
-      { type: 'turnStart', turn: 5 },
-    ])
+    expect(initial.length).toBe(9)
+    expect(initial.length + reinforced.length).toBe(12)
+    expect(STAGE_07.reinforcements.map((r) => r.trigger)).toEqual([{ type: 'turnStart', turn: 3 }])
     // 적 레벨은 2부 진입 예상(Lv13~14)에 러버밴딩 — 전원 Lv12~13
     for (const u of [...initial, ...reinforced]) {
       const level = u.level ?? OFFICERS[u.officerId].level
       expect(level, u.officerId).toBeGreaterThanOrEqual(12)
       expect(level, u.officerId).toBeLessThanOrEqual(13)
     }
-    const boss = STAGE_07.units.find((u) => u.isBoss)!
-    expect(boss.officerId).toBe('guanHai')
-    expect(boss.behavior).toBe('guard')
-    expect(STAGE_07.victory).toEqual([{ type: 'annihilation' }, { type: 'defeatBoss' }])
-    expect(STAGE_07.bonusExp).toBe(150)
-    expect(STAGE_07.deployMax).toBe(7)
-    expect(STAGE_07.forcedOfficers).toEqual(['caocao'])
   })
 
-  it('stage06 클리어 로스터(Lv14 + 장비)면 물량을 정리하고 승리한다', () => {
+  it('stage06 클리어 로스터(Lv14 + 장비)면 물량을 끝까지 정리하고 승리한다', () => {
     const grown = simulate(startBattle(STAGE_07, 42, rosterAt(STAGE_07, 14)), 600)
     expect(grown.result).toBe('victory')
+    // 전멸 단일 조건이므로 승리 = 적 0기
+    expect(livingUnits(grown, 'enemy')).toHaveLength(0)
   })
 
   it('장수 기본 레벨로도 크래시 없이 승패가 난다', () => {
@@ -331,22 +334,44 @@ describe('스테이지 8 — 서주 침공', () => {
     expect(rivers).toBe(14) // 폭 16 - 다리 2
   })
 
-  it('보스는 조표이고 도겸은 본진을 지키는 비(非)보스다 (격파 불필요)', () => {
+  it('원작 c05 충실: 보스는 도겸이고 부장은 실존 적장 조성이다 (조표는 없다)', () => {
     const bosses = STAGE_08.units.filter((u) => u.isBoss)
-    expect(bosses.map((u) => u.officerId)).toEqual(['caoBao'])
-    const taoQian = STAGE_08.units.find((u) => u.officerId === 'taoQian')!
-    expect(taoQian.isBoss).toBeUndefined()
-    expect(taoQian.behavior).toBe('guard')
-    // 도겸은 성채 위 — 매턴 회복하며 버틴다
-    expect(STAGE_08.map.tiles[taoQian.pos.y][taoQian.pos.x]).toBe('fort')
+    expect(bosses.map((u) => u.officerId)).toEqual(['taoQian'])
+    // 도겸은 성내(120% 방어 보정)에 선다 — 성채(매턴 회복)에 두면 8턴 격파가 불가능해진다
+    expect(STAGE_08.map.tiles[bosses[0].pos.y][bosses[0].pos.x]).toBe('castle')
+    expect(bosses[0].behavior).toBe('guard')
+    expect(STAGE_08.units.some((u) => u.officerId === 'caoXing')).toBe(true)
+    expect(OFFICERS.caoXing.stats).toEqual({ str: 72, ldr: 74, int: 50, agi: 64, luck: 76 })
+    expect(OFFICERS.taoQian.stats).toEqual({ str: 74, ldr: 64, int: 72, agi: 58, luck: 56 })
     expect(STAGE_08.victory).toEqual([{ type: 'defeatBoss' }, { type: 'annihilation' }])
     expect(STAGE_08.bonusExp).toBe(150)
   })
 
-  it('stage07 클리어 로스터(Lv14 + 장비)면 다리를 건너 조표를 잡는다', () => {
+  it('턴 8에 유비·관우·장비가 적(enemy) 원군으로 배후에 등장한다 (원작 c05)', () => {
+    const wave = STAGE_08.reinforcements.find((r) => r.trigger.type === 'turnStart' && r.trigger.turn === 8)!
+    expect(wave.units.map((u) => u.officerId)).toEqual(['liuBei', 'guanYu', 'zhangFei'])
+    for (const u of wave.units) {
+      expect(u.faction, u.officerId).toBe('enemy') // stage10에서는 같은 3인이 ally가 된다
+      expect(u.behavior, u.officerId).toBe('pursue')
+      expect(u.level, u.officerId).toBe(16) // 스테이지 적 평균(≈13.4) +2
+      // 배후 = 출진 슬롯보다 남쪽
+      expect(u.pos.y).toBeGreaterThan(Math.max(...STAGE_08.playerSlots!.map((s) => s.y)))
+    }
+  })
+
+  it('stage07 클리어 로스터(Lv14 + 장비)면 도겸을 잡고 이긴다', () => {
     const grown = simulate(startBattle(STAGE_08, 42, rosterAt(STAGE_08, 14)), 600)
     expect(grown.result).toBe('victory')
     expect(grown.units.find((u) => u.isBoss)!.hp).toBe(0)
+  })
+
+  it('유비군이 도착한 뒤에는 전멸(2차 보너스)이 사실상 닫힌다 — 보스 격파로 끊는 것이 정석', () => {
+    const grown = simulate(startBattle(STAGE_08, 42, rosterAt(STAGE_08, 14)), 600)
+    // 원군이 떴다면 전멸 조건을 채우지 못하므로 보너스 로그가 없다
+    if (grown.units.some((u) => u.officerId === 'guanYu')) {
+      expect(livingUnits(grown, 'enemy').length).toBeGreaterThan(0)
+      expect(grown.log.some((l) => l.type === 'bonus')).toBe(false)
+    }
   })
 })
 
@@ -419,21 +444,21 @@ describe('스테이지 10 — 서주 구원', () => {
 })
 
 describe('스테이지 11 — 하비 여포 포위전', () => {
-  it('침수 구조: 강이 진입로를 좁히고 성문은 (7,3) 하나뿐이다', () => {
+  it('원작 c14 충실: 설원 + 강 + 다리 2개, 성문 1개, 악천후로 화계 봉쇄', () => {
     const gates: string[] = []
-    let rivers = 0
+    const bridges: string[] = []
     for (let y = 0; y < STAGE_11.map.height; y++) {
       for (let x = 0; x < STAGE_11.map.width; x++) {
         const t = STAGE_11.map.tiles[y][x]
         if (t === 'gate') gates.push(`${x},${y}`)
-        if (t === 'river') rivers += 1
+        if (t === 'bridge') bridges.push(`${x},${y}`)
       }
     }
     expect(gates).toEqual(['7,3'])
-    expect(rivers).toBeGreaterThan(20) // 수공으로 잠긴 면적
-    // 성문 앞 둑길은 3칸으로 졸아든다
-    const causeway = STAGE_11.map.tiles[4].filter((t) => t === 'plain')
-    expect(causeway).toHaveLength(3)
+    // 강은 북서 → 남동으로 흐르고 건널 곳은 정확히 두 군데다 (수공/침수는 원작에 없다)
+    expect(bridges).toEqual(['3,5', '11,7'])
+    // 악천후 — 원작 "화계 불가"를 우리 날씨 시스템으로 재현
+    expect(STAGE_11.weather).toBe('rain')
   })
 
   it('최종전 구성: 여포 Lv20(보스) + 진궁 + 고순, 보너스 200, 보스 전리품 방천화극', () => {

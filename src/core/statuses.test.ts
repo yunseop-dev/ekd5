@@ -10,7 +10,7 @@ import { OFFICERS } from '../data/officers'
 import { STATUSES, statusName } from '../data/statuses'
 import { STRATEGIES } from '../data/strategies'
 import { decideUnit } from './ai'
-import { applyAction, effectiveStats, startBattle } from './battle'
+import { applyAction, effectiveStats, forecastAttack, startBattle, statusCureRate } from './battle'
 import { strategyHitRate } from './formulas'
 import type {
   BattleAction,
@@ -42,6 +42,9 @@ const DISRUPTER = 'testDisrupter'
 const TARGET_MAGE = 'testTargetMage' // 책사 — 책략 보유 + MP > 0 (금책 유효 대상)
 const TARGET_FOOT = 'testTargetFoot' // 보병 — 책략 없음, 근접 (부동 유효 대상)
 const TARGET_BOW = 'testTargetBow' // 궁병 — 원거리 (부동 무효 대상)
+/** 경보병과 능력치가 완전히 같고 ranged 플래그만 다른 쌍둥이 — 부동 가치만 분리해 재는 용도 */
+const TWIN_RANGED_CLASS = 'testTwinRangedClass'
+const TARGET_TWIN_RANGED = 'testTargetTwinRanged'
 
 const TEST_OFFICERS: [string, { classId: string; luck: number; int?: number; level: number }][] = [
   [CASTER, { classId: 'strategist', luck: 60, int: 100, level: 16 }],
@@ -53,6 +56,7 @@ const TEST_OFFICERS: [string, { classId: string; luck: number; int?: number; lev
   [TARGET_MAGE, { classId: 'strategist', luck: 40, level: 5 }],
   [TARGET_FOOT, { classId: 'heavyInfantry', luck: 40, level: 5 }],
   [TARGET_BOW, { classId: 'archer', luck: 40, level: 5 }],
+  [TARGET_TWIN_RANGED, { classId: TWIN_RANGED_CLASS, luck: 40, level: 5 }],
 ]
 
 beforeAll(() => {
@@ -63,6 +67,16 @@ beforeAll(() => {
     name: '시험용 방해술사',
     promotesTo: undefined,
     strategies: [], // 테스트마다 교체
+  }
+  CLASSES[TWIN_RANGED_CLASS] = {
+    ...CLASSES.heavyInfantry,
+    id: TWIN_RANGED_CLASS,
+    lineage: TWIN_RANGED_CLASS,
+    name: '시험용 원거리 쌍둥이',
+    promotesTo: undefined,
+    ranged: true,
+    minRange: 2,
+    maxRange: 2,
   }
   for (const [id, spec] of TEST_OFFICERS) {
     OFFICERS[id] = {
@@ -77,6 +91,7 @@ beforeAll(() => {
 })
 afterAll(() => {
   delete CLASSES[DISRUPTER_CLASS]
+  delete CLASSES[TWIN_RANGED_CLASS]
   for (const [id] of TEST_OFFICERS) delete OFFICERS[id]
 })
 
@@ -106,8 +121,9 @@ const unit = (state: BattleState, officerId: string): UnitState =>
 
 const logsOf = (state: BattleState, type: string) => state.log.filter((l) => l.type === type)
 
-/** 방해술사(적)의 AI 판단 결과 액션 */
-const actOf = (state: BattleState): BattleAction => decideUnit(state, unit(state, DISRUPTER)).act
+/** 방해술사(적)의 AI 판단 계획 / 액션 */
+const planOf = (state: BattleState) => decideUnit(state, unit(state, DISRUPTER))
+const actOf = (state: BattleState): BattleAction => planOf(state).act
 
 /** 시전자(책사 Lv16) + 피격자(운 0 보병 Lv1)가 인접해 선 전투 */
 const castBattle = (): BattleState =>
@@ -119,14 +135,15 @@ const castBattle = (): BattleState =>
 // ---------- 데이터 계약 ----------
 
 describe('방해 책략 데이터', () => {
-  it('4종 모두 원작 ルＡ 규격이다 — 사거리 4 / 단일 / MP8 / 무속성 / 적 대상', () => {
-    const expected: [string, StatusId][] = [
-      ['heobo', 'confusion'],
-      ['bongchaek', 'seal'],
-      ['dogyeon', 'poison'],
-      ['pobak', 'immobile'],
+  it('4종 모두 원작 ルＡ 규격 + α·데미지계수 확정치 (statuses.md §3)', () => {
+    // [id, 부여 상태, α, 데미지계수 C(우리 위력 %)]
+    const expected: [string, StatusId, number, number | undefined][] = [
+      ['heobo', 'confusion', 80, undefined],
+      ['bongchaek', 'seal', 80, undefined],
+      ['dogyeon', 'poison', 90, 70],
+      ['pobak', 'immobile', 80, 50],
     ]
-    for (const [id, inflicts] of expected) {
+    for (const [id, inflicts, alpha, power] of expected) {
       const s = STRATEGIES[id]
       expect(s, id).toBeDefined()
       expect(s.kind, id).toBe('status')
@@ -135,11 +152,11 @@ describe('방해 책략 데이터', () => {
       expect(s.mpCost, id).toBe(8)
       expect(s.range, id).toBe(4)
       expect(s.area, id).toBe('single')
-      expect(s.capHitRate, id).toBe(80)
+      expect(s.capHitRate, id).toBe(alpha)
+      expect(s.power, id).toBe(power)
       expect(s.targets, id).toBe('enemy')
-      // 지속턴은 존재하지 않는다 (원작: 운÷2 자연해제 / 해제약만)
+      // 지속턴은 존재하지 않는다 (원작: 부대 사기% 자연해제 / 해제약만)
       expect(s.buff, id).toBeUndefined()
-      expect(s.power, id).toBeUndefined()
     }
   })
 
@@ -344,19 +361,43 @@ describe('상태이상 행동 게이트', () => {
 // ---------- 페이즈 시작 턴 처리 ----------
 
 describe('endPhase — 상태이상 턴 처리', () => {
-  it('운 0은 절대 자연 해제되지 않고, 운 200은 전부 해제된다 (판정은 원시 luck ÷ 2)', () => {
+  it('자연 해제 확률 = 부대 사기 (운÷2 + 레벨×성장치) — 장비·버프는 타지 않고 열매는 포함', () => {
     const state = mkBattle([
       { officerId: CASTER, faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
       { officerId: VICTIM, faction: 'enemy', pos: { x: 8, y: 8 } },
-      { officerId: LUCKY, faction: 'enemy', pos: { x: 9, y: 9 } },
+    ])
+    const victim = unit(state, VICTIM)
+    // 경보병(사기 성장 B=3) Lv1 + 운 0 → 0 + 3 = 3%
+    expect(statusCureRate(victim)).toBe(3)
+
+    // 레벨이 오르면 사기와 함께 회복률도 오른다
+    victim.level = 20
+    expect(statusCureRate(victim)).toBe(60)
+
+    // 전장 버프(고양)는 회복률에 관여하지 않는다 — 장기 레코드를 읽기 때문
+    victim.buffs = [{ stat: 'morale', amount: 50, remainingTurns: 3 }]
+    expect(effectiveStats(victim).morale).toBe(110)
+    expect(statusCureRate(victim)).toBe(60)
+
+    // 열매(statBonus)는 장기 레코드라 포함된다 — 운 +20 → 회복률 +10
+    victim.statBonus = { luck: 20 }
+    expect(statusCureRate(victim)).toBe(70)
+  })
+
+  it('사기 100↑이면 매 페이즈 전부 해제되고, 낮으면 시드대로 남는다', () => {
+    const state = mkBattle([
+      { officerId: CASTER, faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
+      { officerId: VICTIM, faction: 'enemy', pos: { x: 8, y: 8 } }, // 사기 3
+      { officerId: LUCKY, faction: 'enemy', pos: { x: 9, y: 9 } }, // 운 200 → 사기 103
     ])
     unit(state, VICTIM).statuses = [{ id: 'seal' }, { id: 'immobile' }]
     unit(state, LUCKY).statuses = [{ id: 'seal' }, { id: 'immobile' }]
 
-    const next = applyAction(state, { type: 'endPhase' }) // → 적 페이즈
+    // rngState 21 → 첫 10난수가 모두 25 이상 → 사기 3은 한 번도 해제되지 않는다
+    const next = applyAction({ ...state, rngState: 21 }, { type: 'endPhase' })
     expect(next.phase).toBe('enemy')
     expect(unit(next, VICTIM).statuses).toEqual([{ id: 'seal' }, { id: 'immobile' }])
-    expect(unit(next, LUCKY).statuses).toEqual([])
+    expect(unit(next, LUCKY).statuses).toEqual([]) // 103% = 확정 해제
 
     const cured = logsOf(next, 'statusCured')
     expect(cured).toHaveLength(2)
@@ -364,7 +405,7 @@ describe('endPhase — 상태이상 턴 처리', () => {
     expect(cured.map((l) => l.message).join(' ')).toContain(statusName('seal'))
   })
 
-  it('자연 해제 확률은 운÷2 — 운 40은 20% 임계값 양쪽에서 갈린다 (고정 시드)', () => {
+  it('해제 판정은 사기% 임계값을 정확히 쓴다 — 사기 23 양쪽에서 갈린다 (고정 시드)', () => {
     const build = (rngState: number): BattleState => {
       const state = mkBattle([
         { officerId: CASTER, faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
@@ -373,29 +414,30 @@ describe('endPhase — 상태이상 턴 처리', () => {
       unit(state, MID).statuses = [{ id: 'seal' }]
       return { ...state, rngState }
     }
-    // rngState 9 → 첫 난수 19.87 (< 20) → 해제
+    expect(statusCureRate(unit(build(1), MID))).toBe(23) // floor(40/2) + 1×3
+    // rngState 9 → 첫 난수 19.87 (< 23) → 해제
     expect(unit(applyAction(build(9), { type: 'endPhase' }), MID).statuses).toEqual([])
-    // rngState 44 → 첫 난수 83.62 (≥ 20) → 유지
-    expect(unit(applyAction(build(44), { type: 'endPhase' }), MID).statuses).toEqual([{ id: 'seal' }])
+    // rngState 21 → 첫 난수 43.23 (≥ 23) → 유지
+    expect(unit(applyAction(build(21), { type: 'endPhase' }), MID).statuses).toEqual([{ id: 'seal' }])
   })
 
-  it('독은 최대 HP 10%를 dealDamage 경유로 깎는다 (격파 로그 + 증원 트리거 공유)', () => {
+  it('독은 max(1, floor(maxHP/10))을 깎고 로그는 플로터 계약(음수)을 지킨다', () => {
     const state = mkBattle([
       { officerId: CASTER, faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
       { officerId: VICTIM, faction: 'enemy', pos: { x: 8, y: 8 } },
     ])
     const victim = unit(state, VICTIM)
     victim.statuses = [{ id: 'poison' }]
-    const expected = Math.trunc((victim.maxHp * 10) / 100)
+    const expected = Math.max(1, Math.trunc(victim.maxHp / 10))
 
-    const next = applyAction(state, { type: 'endPhase' })
+    const next = applyAction({ ...state, rngState: 21 }, { type: 'endPhase' })
     expect(unit(next, VICTIM).hp).toBe(victim.hp - expected)
     const entry = logsOf(next, 'poison').at(-1)!
     expect(entry.targetId).toBe(victim.id)
-    expect(entry.amount).toBe(-expected) // 플로터 계약: 음수
+    expect(entry.amount).toBe(-expected)
   })
 
-  it('독으로 보스가 죽으면 승리 판정까지 이어진다 (증원 트리거도 발동)', () => {
+  it('독으로는 죽지 않는다 — 보스도 HP 1에서 멈추고 승리가 나지 않는다 (원작 0x44DFC7)', () => {
     const state = mkBattle(
       [
         { officerId: CASTER, faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
@@ -405,8 +447,8 @@ describe('endPhase — 상태이상 턴 처리', () => {
     )
     const boss = unit(state, VICTIM)
     boss.statuses = [{ id: 'poison' }]
-    boss.hp = 1
-    // 격파 이벤트가 dealDamage에서 나온다는 증거 — 격파 트리거 증원을 달아둔다
+    boss.hp = 5 // 독 데미지 13보다 적다
+    // 격파 처리 자체가 일어나지 않는다는 증거 — 격파 트리거 증원이 발동하지 않아야 한다
     state.__stage!.reinforcements = [
       {
         trigger: { type: 'unitDefeated', unitId: boss.id },
@@ -414,28 +456,34 @@ describe('endPhase — 상태이상 턴 처리', () => {
       },
     ]
 
-    const next = applyAction(state, { type: 'endPhase' })
-    expect(logsOf(next, 'defeat').some((l) => l.message.includes('괴멸'))).toBe(true)
-    expect(next.spawnedReinforcements).toEqual([0])
-    expect(next.result).toBe('victory')
+    const next = applyAction({ ...state, rngState: 21 }, { type: 'endPhase' })
+    expect(unit(next, VICTIM).hp).toBe(1)
+    expect(next.result).toBe('ongoing')
+    expect(logsOf(next, 'defeat')).toHaveLength(0)
+    expect(next.spawnedReinforcements).toEqual([])
+    // 로그 금액은 실제 감소량(4)이지 명목 데미지(13)가 아니다
+    expect(logsOf(next, 'poison').at(-1)!.amount).toBe(-4)
+
+    // 이미 HP 1이면 더 깎이지 않고 로그도 남기지 않는다 (amount 0 = 미스 계약 회피)
+    const again = applyAction({ ...next, phase: 'player' as const }, { type: 'endPhase' })
+    expect(unit(again, VICTIM).hp).toBe(1)
+    expect(logsOf(again, 'poison')).toHaveLength(1) // 앞 페이즈 것 하나뿐
   })
 
-  it('독으로 주인공이 죽으면 패배 판정이 잡힌다', () => {
+  it('독으로 주인공도 죽지 않는다 — 패배가 나지 않는다', () => {
     const state = mkBattle([
       { officerId: VICTIM, faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
-      { officerId: VICTIM, faction: 'enemy', pos: { x: 8, y: 8 } },
+      { officerId: VICTIM2, faction: 'enemy', pos: { x: 8, y: 8 } },
     ])
-    const leader = state.units.find((u) => u.faction === 'player')!
+    const leader = unit(state, VICTIM)
     leader.statuses = [{ id: 'poison' }]
-    leader.hp = 1
+    leader.hp = 3
 
-    const enemyPhase = applyAction(state, { type: 'endPhase' }) // 적 페이즈 — 아군은 아직 처리 전
-    expect(enemyPhase.result).toBe('ongoing')
-    expect(enemyPhase.units.find((u) => u.faction === 'player')!.hp).toBe(1)
-
-    const playerPhase = applyAction(enemyPhase, { type: 'endPhase' }) // → 아군 페이즈에서 독사
+    const enemyPhase = applyAction({ ...state, rngState: 21 }, { type: 'endPhase' })
+    const playerPhase = applyAction(enemyPhase, { type: 'endPhase' }) // → 아군 페이즈에서 독 처리
     expect(playerPhase.turn).toBe(2)
-    expect(playerPhase.result).toBe('defeat')
+    expect(unit(playerPhase, VICTIM).hp).toBe(1)
+    expect(playerPhase.result).toBe('ongoing')
   })
 
   it('혼란은 페이즈 시작에 행동을 소진시키고(statusHold), 부동은 이동만 소진시킨다', () => {
@@ -447,7 +495,7 @@ describe('endPhase — 상태이상 턴 처리', () => {
     unit(state, VICTIM).statuses = [{ id: 'confusion' }]
     unit(state, VICTIM2).statuses = [{ id: 'immobile' }]
 
-    const next = applyAction(state, { type: 'endPhase' })
+    const next = applyAction({ ...state, rngState: 21 }, { type: 'endPhase' })
     const confused = unit(next, VICTIM)
     expect(confused.acted).toBe(true)
     expect(confused.moved).toBe(true)
@@ -460,27 +508,161 @@ describe('endPhase — 상태이상 턴 처리', () => {
     expect(immobile.moved).toBe(true)
     expect(immobile.acted).toBe(false)
   })
+})
 
-  it('독사한 유닛은 지형 회복으로 되살아나지 않는다 (처리 순서 보호)', () => {
-    const tiles: TerrainId[][] = Array.from({ length: 12 }, () =>
-      Array.from({ length: 12 }, () => 'plain' as TerrainId),
-    )
-    tiles[8][8] = 'fort' // 매턴 회복 지형
-    const state = mkBattle(
-      [
-        { officerId: CASTER, faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
-        { officerId: VICTIM, faction: 'enemy', pos: { x: 8, y: 8 } },
-        { officerId: MID, faction: 'enemy', pos: { x: 9, y: 9 } },
-      ],
-      { map: { width: 12, height: 12, tiles } },
-    )
+// ---------- 혼란 특례: 확정 피격 + 반격 불가 ----------
+
+describe('혼란 특례 (statuses.md §1·§2)', () => {
+  /** 아군 CASTER가 적 VICTIM을 인접에서 때리는 전투 (반격 성립 구도) */
+  const meleeBattle = (attackerOfficer: string): BattleState =>
+    mkBattle([
+      { officerId: attackerOfficer, faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
+      { officerId: VICTIM, faction: 'enemy', pos: { x: 2, y: 3 } },
+    ])
+
+  it('혼란 대상은 물리 확정 피격 — 빗나감 시드에서도 명중한다', () => {
+    const state = meleeBattle(VICTIM2)
+    const me = unit(state, VICTIM2)
+    const foe = unit(state, VICTIM)
+    // rngState 43 → 첫 난수 99.98: 어떤 정상 명중률로도 빗나가는 시드
+    const missed = applyAction({ ...state, rngState: 43 }, { type: 'attack', unitId: me.id, targetId: foe.id })
+    expect(logsOf(missed, 'miss')).toHaveLength(1)
+
+    foe.statuses = [{ id: 'confusion' }]
+    const forced = applyAction({ ...state, rngState: 43 }, { type: 'attack', unitId: me.id, targetId: foe.id })
+    expect(logsOf(forced, 'miss')).toHaveLength(0)
+    expect(unit(forced, VICTIM).hp).toBeLessThan(foe.hp)
+    expect(forecastAttack(state, me, foe).hitRate).toBe(100) // UI 예측도 100
+  })
+
+  it('혼란 대상은 책략도 확정 피격 (α 무시)', () => {
+    const state = castBattle()
+    const caster = unit(state, CASTER)
     const victim = unit(state, VICTIM)
-    victim.statuses = [{ id: 'poison' }]
-    victim.hp = 1
+    // rngState 44 → 첫 난수 83.62: α 80인 허보는 정상적으로 빗나간다
+    const missed = applyAction({ ...state, rngState: 44 }, {
+      type: 'strategy',
+      unitId: caster.id,
+      strategyId: 'heobo',
+      target: victim.pos,
+    })
+    expect(logsOf(missed, 'miss')).toHaveLength(1)
 
-    const next = applyAction(state, { type: 'endPhase' })
-    expect(unit(next, VICTIM).hp).toBe(0)
-    expect(logsOf(next, 'terrainHeal')).toHaveLength(0)
+    victim.statuses = [{ id: 'confusion' }]
+    const forced = applyAction({ ...state, rngState: 44 }, {
+      type: 'strategy',
+      unitId: caster.id,
+      strategyId: 'choyeol',
+      target: victim.pos,
+    })
+    expect(logsOf(forced, 'miss')).toHaveLength(0)
+    expect(unit(forced, VICTIM).hp).toBeLessThan(victim.hp)
+  })
+
+  it('혼란 대상은 반격하지 못한다 — 부동·금책은 반격 정상', () => {
+    const state = meleeBattle(VICTIM2)
+    const me = unit(state, VICTIM2)
+    const foe = unit(state, VICTIM)
+    expect(forecastAttack(state, me, foe).willCounter).toBe(true) // 대조군
+
+    for (const status of ['immobile', 'seal'] as StatusId[]) {
+      foe.statuses = [{ id: status }]
+      expect(forecastAttack(state, me, foe).willCounter, status).toBe(true)
+    }
+
+    foe.statuses = [{ id: 'confusion' }]
+    expect(forecastAttack(state, me, foe).willCounter).toBe(false)
+    const attacked = applyAction({ ...state, rngState: 21 }, {
+      type: 'attack',
+      unitId: me.id,
+      targetId: foe.id,
+    })
+    expect(logsOf(attacked, 'counter')).toHaveLength(0)
+  })
+})
+
+// ---------- 독연·포박: 데미지 + 상태 독립 2회 판정 ----------
+
+describe('독연·포박 — 데미지와 상태를 각각 판정한다 (statuses.md §3)', () => {
+  // 시전자는 4종을 다 아는 시험용 방해술사(정신 100 / 사기 60, Lv10) — 피격자는 운 0 경보병 Lv1.
+  // 실효 명중 r = α 그 자체다 (기본 명중 y가 100이라 α가 곧 확률).
+  // 난수 소비 순서: [데미지 판정] → (명중 시 데미지 랜덤 가산) → [상태 판정].
+  const disrupterBattle = (): BattleState => {
+    CLASSES[DISRUPTER_CLASS].strategies = ['heobo', 'bongchaek', 'dogyeon', 'pobak'].map((strategyId) => ({
+      strategyId,
+      learnLevel: 1,
+    }))
+    return mkBattle([
+      { officerId: DISRUPTER, faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
+      { officerId: VICTIM, faction: 'enemy', pos: { x: 2, y: 3 } },
+    ])
+  }
+  const cast = (rngState: number, strategyId: string): BattleState => {
+    const state = { ...disrupterBattle(), rngState }
+    return applyAction(state, {
+      type: 'strategy',
+      unitId: unit(state, DISRUPTER).id,
+      strategyId,
+      target: unit(state, VICTIM).pos,
+    })
+  }
+  const dmgLogs = (state: BattleState) => logsOf(state, 'strategy')
+  const fullHp = (): number => unit(disrupterBattle(), VICTIM).hp
+
+  it('실효 명중률은 α 그 자체다 (독연 90 / 포박 80)', () => {
+    const state = disrupterBattle()
+    const cs = effectiveStats(unit(state, DISRUPTER))
+    const vs = effectiveStats(unit(state, VICTIM))
+    expect(strategyHitRate(cs.mind, cs.morale, vs.mind, vs.morale, 100)).toBe(100)
+    expect(strategyHitRate(cs.mind, cs.morale, vs.mind, vs.morale, 90)).toBe(90)
+    expect(strategyHitRate(cs.mind, cs.morale, vs.mind, vs.morale, 80)).toBe(80)
+  })
+
+  it('둘 다 명중 (rngState 20 — 데미지 75.26 / 상태 59.76, 모두 90 미만)', () => {
+    const next = cast(20, 'dogyeon')
+    expect(dmgLogs(next)).toHaveLength(1)
+    expect(unit(next, VICTIM).hp).toBeLessThan(fullHp())
+    expect(unit(next, VICTIM).statuses).toEqual([{ id: 'poison' }])
+    expect(logsOf(next, 'miss')).toHaveLength(0)
+  })
+
+  it('데미지만 명중 (rngState 7 — 데미지 1.17 통과 / 상태 97.69 실패)', () => {
+    const next = cast(7, 'dogyeon')
+    expect(dmgLogs(next)).toHaveLength(1)
+    expect(unit(next, VICTIM).hp).toBeLessThan(fullHp())
+    expect(unit(next, VICTIM).statuses).toEqual([]) // 독은 안 걸렸다
+    expect(logsOf(next, 'miss')).toHaveLength(0) // 한쪽이라도 통했으면 miss 아님
+  })
+
+  it('상태만 명중 (rngState 4 — 데미지 92.36 실패 / 상태 33.3 통과)', () => {
+    const next = cast(4, 'dogyeon')
+    expect(dmgLogs(next)).toHaveLength(0)
+    expect(unit(next, VICTIM).hp).toBe(fullHp()) // 데미지 0
+    expect(unit(next, VICTIM).statuses).toEqual([{ id: 'poison' }])
+  })
+
+  it('둘 다 빗나가면 miss 로그가 딱 하나 남는다 (rngState 36 — 95.62 / 94.27)', () => {
+    const next = cast(36, 'dogyeon')
+    expect(dmgLogs(next)).toHaveLength(0)
+    expect(unit(next, VICTIM).statuses).toEqual([])
+    expect(logsOf(next, 'miss')).toHaveLength(1)
+  })
+
+  it('포박도 같은 구조다 (α 80 / 위력 50 — 독연보다 약하게 때린다)', () => {
+    const pobak = cast(20, 'pobak')
+    const dogyeon = cast(20, 'dogyeon')
+    expect(unit(pobak, VICTIM).statuses).toEqual([{ id: 'immobile' }])
+    expect(dmgLogs(pobak)).toHaveLength(1)
+    expect(unit(pobak, VICTIM).hp).toBeGreaterThan(unit(dogyeon, VICTIM).hp)
+  })
+
+  it('순수 방해(허보·봉책)는 상태 판정 1회뿐 — 데미지가 없다', () => {
+    for (const strategyId of ['heobo', 'bongchaek']) {
+      const next = cast(20, strategyId)
+      expect(dmgLogs(next), strategyId).toHaveLength(0)
+      expect(unit(next, VICTIM).hp, strategyId).toBe(fullHp())
+      expect(unit(next, VICTIM).statuses, strategyId).toHaveLength(1)
+    }
   })
 })
 
@@ -503,17 +685,28 @@ describe('AI — 방해 책략 채점', () => {
     if (onMage.type === 'strategy') expect(onMage.strategyId).toBe('bongchaek')
   })
 
-  it('부동은 근접 병과에게만 건다 (원거리는 제자리에서 계속 쏜다)', () => {
-    const onFoot = actOf(aiBattle(['pobak'], TARGET_FOOT))
-    expect(onFoot.type).toBe('strategy')
-    const onBow = actOf(aiBattle(['pobak'], TARGET_BOW))
-    expect(onBow.type).toBe('wait')
+  it('부동의 상태 가치는 원거리 상대에게만 0이 된다 (포박은 데미지가 있어 시전 자체는 한다)', () => {
+    // 능력치가 완전히 같고 ranged 플래그만 다른 쌍둥이 병과로 비교한다 —
+    // 점수 차이가 곧 STATUS_VALUE.immobile × 명중률(0.8 × 10 = 8)이어야 한다.
+    const melee = planOf(aiBattle(['pobak'], TARGET_FOOT))
+    const ranged = planOf(aiBattle(['pobak'], TARGET_TWIN_RANGED))
+    expect(melee.act.type).toBe('strategy')
+    expect(ranged.act.type).toBe('strategy') // 데미지 몫이 남아 있으니 여전히 쓴다
+    expect(melee.score - ranged.score).toBeCloseTo(8, 5)
   })
 
-  it('여러 방해를 알면 가치가 가장 높은 혼란(허보)을 고른다', () => {
-    const act = actOf(aiBattle(['heobo', 'bongchaek', 'dogyeon', 'pobak'], TARGET_MAGE))
+  it('순수 방해끼리는 혼란(허보) > 금책(봉책) — 값이 큰 쪽을 고른다', () => {
+    const act = actOf(aiBattle(['heobo', 'bongchaek'], TARGET_MAGE))
     expect(act.type).toBe('strategy')
     if (act.type === 'strategy') expect(act.strategyId).toBe('heobo')
+  })
+
+  it('데미지까지 얹은 독연은 순수 방해보다 높게 채점된다', () => {
+    const withDamage = planOf(aiBattle(['dogyeon'], TARGET_MAGE))
+    const pureOnly = planOf(aiBattle(['heobo'], TARGET_MAGE))
+    expect(withDamage.score).toBeGreaterThan(pureOnly.score)
+    const act = actOf(aiBattle(['heobo', 'dogyeon'], TARGET_MAGE))
+    if (act.type === 'strategy') expect(act.strategyId).toBe('dogyeon')
   })
 
   it('이미 그 상태인 상대에게는 재시전하지 않는다', () => {

@@ -101,6 +101,33 @@ export function canCast(unit: UnitState): boolean {
   return canAct(unit) && !hasStatus(unit, 'seal')
 }
 
+/**
+ * 물리 명중률 — 혼란 대상은 **확정 피격**(100 강제, statuses.md §1).
+ * 부동·금책에는 확정 피격이 없다 (6.5 MOD가 麻痹로 옮긴 것 — 원작 아님).
+ */
+export function hitRateAgainst(attackerAgi: number, defender: UnitState, defenderAgi: number): number {
+  return hasStatus(defender, 'confusion') ? 100 : hitRate(attackerAgi, defenderAgi)
+}
+
+/**
+ * 책략 명중률 — 혼란 대상은 확정 피격 (statuses.md §2 특례. 즉사기 예외는 우리에게 즉사기가 없어 불요).
+ * α 하한 30 재적용은 strategyHitRate 안에 있다.
+ */
+export function strategyRateAgainst(caster: CombatStats, target: UnitState, capHitRate: number): number {
+  if (hasStatus(target, 'confusion')) return 100
+  const tStats = effectiveStats(target)
+  return strategyHitRate(caster.mind, caster.morale, tStats.mind, tStats.morale, capHitRate)
+}
+
+/**
+ * 상태이상 자연 해제 확률(%) = **부대 사기** = floor(운÷2) + 레벨 × 사기 성장치 (statuses.md §1).
+ * 인물 장기 레코드를 읽는 판정이라 **장비 보정과 전장 버프(고양·환성)는 타지 않고**, 열매(statBonus)는 포함한다.
+ * → effectiveStats를 쓰면 안 된다. 4종 모두 같은 확률로 각각 독립 판정된다.
+ */
+export function statusCureRate(unit: UnitState): number {
+  return combatStats(boostedStats(unit), classOf(unit).growth, unit.level).morale
+}
+
 /** 장착 중인 장비 인스턴스 목록 (미등록 id 포함 — 정의 조회는 호출부에서) */
 export function equippedInstances(unit: UnitState): EquipInstance[] {
   return Object.values(unit.equipment ?? {}).filter((i): i is EquipInstance => i !== undefined)
@@ -247,12 +274,13 @@ export function forecastAttack(state: BattleState, attacker: UnitState, defender
     multipliers: [affinityMultiplier(aCls, dCls)],
   })
 
-  // 반격: 직접(근접) 공격에만, 반격측 사거리에 거리 1이 포함될 때, 항상 1회
-  const willCounter = !aCls.ranged && dist === 1 && !dCls.ranged && dCls.minRange <= 1
+  // 반격: 직접(근접) 공격에만, 반격측 사거리에 거리 1이 포함될 때, 항상 1회.
+  // 혼란은 반격도 못 한다 (행동 완전 불가) — 부동·금책은 반격 정상 (statuses.md §1).
+  const willCounter = !aCls.ranged && dist === 1 && !dCls.ranged && dCls.minRange <= 1 && canAct(defender)
 
   return {
     damage,
-    hitRate: hitRate(aStats.agi, dStats.agi),
+    hitRate: hitRateAgainst(aStats.agi, defender, dStats.agi),
     critRate: critRate(aStats.morale, dStats.morale),
     doubleRate: doubleAttackRate(aStats.agi, dStats.agi),
     willCounter,
@@ -266,7 +294,7 @@ export function forecastAttack(state: BattleState, attacker: UnitState, defender
           multipliers: [affinityMultiplier(dCls, aCls), COUNTER_DAMAGE_SCALE],
         })
       : 0,
-    counterHitRate: willCounter ? hitRate(dStats.agi, aStats.agi) : 0,
+    counterHitRate: willCounter ? hitRateAgainst(dStats.agi, attacker, aStats.agi) : 0,
   }
 }
 
@@ -444,7 +472,7 @@ function resolveStrike(
   const aStats = effectiveStats(attacker)
   const dStats = effectiveStats(defender)
 
-  const hitRoll = roll(state.rngState, hitRate(aStats.agi, dStats.agi))
+  const hitRoll = roll(state.rngState, hitRateAgainst(aStats.agi, defender, dStats.agi))
   state.rngState = hitRoll.nextState
   if (!hitRoll.value) {
     log(state, 'miss', `${nameOf(attacker)}의 공격이 빗나갔다!`, { targetId: defender.id, amount: 0 })
@@ -711,13 +739,62 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
         const target = unitAt(state, cell)
         if (!target) continue
 
-        if (strategy.kind === 'damage' || strategy.kind === 'debuff' || strategy.kind === 'status') {
+        if (strategy.kind === 'status') {
           if (!isHostile(caster, target)) continue
           const tStats = effectiveStats(target)
-          const hit = roll(
-            state.rngState,
-            strategyHitRate(cStats.mind, cStats.morale, tStats.mind, tStats.morale, strategy.capHitRate),
-          )
+          const rate = strategyRateAgainst(cStats, target, strategy.capHitRate)
+
+          // 원작 확정: 데미지와 상태이상은 **각각 독립으로 명중 판정**한다 (statuses.md §3).
+          // 독연 α0.9 → 81% 둘 다 / 9% 독만 / 9% 데미지만 / 1% 무효 — "한쪽만 걸릴 때도 있다"의 정체.
+          // power가 없는 순수 방해(허보·봉책)는 상태 판정 1회뿐이다.
+          let landed = false
+
+          if (strategy.power !== undefined) {
+            const dmgHit = roll(state.rngState, rate)
+            state.rngState = dmgHit.nextState
+            if (dmgHit.value) {
+              landed = true
+              const bonus = nextInt(state.rngState, 0, 7)
+              state.rngState = bonus.nextState
+              const dmg = strategyDamage(cStats.mind, tStats.mind, caster.level, strategy.power, bonus.value)
+              log(state, 'strategy', `${nameOf(caster)}의 ${strategy.name} → ${nameOf(target)}: ${dmg} 데미지`, {
+                targetId: target.id,
+                amount: -dmg,
+              })
+              dealDamage(state, target, dmg)
+              grantExp(state, caster, target.level, target.hp === 0)
+            }
+          }
+
+          // 격파된 대상에게는 상태를 얹지 않는다 (판정 자체를 건너뛴다)
+          if (target.hp > 0) {
+            const statusHit = roll(state.rngState, rate)
+            state.rngState = statusHit.nextState
+            if (statusHit.value) {
+              landed = true
+              // 지속턴이 없으므로 중복 부여는 무의미하다 (원작 AI도 "이미 걸린 대상 재사용 금지").
+              // 낭비 캐스팅 자체는 막지 않는다(리듀서 관례) — 경험치만 주지 않는다.
+              const statusId = strategy.inflicts!
+              const name = nameOf(target)
+              if (hasStatus(target, statusId)) {
+                log(state, 'status', `${name}${subjectParticle(name)} 이미 ${statusName(statusId)} 상태다`, {
+                  targetId: target.id,
+                })
+              } else {
+                target.statuses.push({ id: statusId })
+                log(state, 'status', `${name}${subjectParticle(name)} ${statusName(statusId)}에 빠졌다!`, {
+                  targetId: target.id,
+                })
+                grantExp(state, caster, target.level, false)
+              }
+            }
+          }
+
+          if (!landed) log(state, 'miss', `${strategy.name}이(가) ${nameOf(target)}에게 통하지 않았다!`)
+        } else if (strategy.kind === 'damage' || strategy.kind === 'debuff') {
+          if (!isHostile(caster, target)) continue
+          const tStats = effectiveStats(target)
+          const hit = roll(state.rngState, strategyRateAgainst(cStats, target, strategy.capHitRate))
           state.rngState = hit.nextState
           if (!hit.value) {
             log(state, 'miss', `${strategy.name}이(가) ${nameOf(target)}에게 통하지 않았다!`)
@@ -746,22 +823,6 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
               'armor',
               caster.level >= target.level ? EQUIP_EXP_ARMOR_HIT.higher : EQUIP_EXP_ARMOR_HIT.lower,
             )
-          } else if (strategy.kind === 'status') {
-            // 방해 책략 — 지속턴이 없으므로 중복 부여는 그냥 무의미하다(원작: 이미 걸린 상태에 재부여 없음).
-            // 낭비 캐스팅 자체는 막지 않는다(리듀서 관례) — 경험치만 주지 않는다.
-            const statusId = strategy.inflicts!
-            const name = nameOf(target)
-            if (hasStatus(target, statusId)) {
-              log(state, 'status', `${name}${subjectParticle(name)} 이미 ${statusName(statusId)} 상태다`, {
-                targetId: target.id,
-              })
-            } else {
-              target.statuses.push({ id: statusId })
-              log(state, 'status', `${name}${subjectParticle(name)} ${statusName(statusId)}에 빠졌다!`, {
-                targetId: target.id,
-              })
-              grantExp(state, caster, target.level, false)
-            }
           } else {
             target.buffs.push({ ...strategy.buff!, remainingTurns: strategy.buff!.duration })
             log(state, 'debuff', `${nameOf(caster)}의 ${strategy.name} → ${nameOf(target)}`)
@@ -902,10 +963,9 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
           .map((b) => ({ ...b, remainingTurns: b.remainingTurns - 1 }))
           .filter((b) => b.remainingTurns > 0)
 
-        // ---- 상태이상 (자기 페이즈 시작 시 처리 — caocao.md §90) ----
-        // 1) 자연 해제: 상태마다 장수 **운÷2 %**. 판정에 쓰는 값은 원시 luck이다 —
-        //    effectiveStats.morale은 luck을 성장·버프까지 섞어 변환한 값이라 여기서는 쓸 수 없다.
-        const cureRate = Math.floor(officerOf(unit).stats.luck / 2)
+        // ---- 상태이상 (자기 페이즈 시작 시 처리 — statuses.md §1) ----
+        // 1) 자연 해제: 상태마다 **부대 사기 %** (= 운÷2 + 레벨×성장치, 장비·버프 제외). 각각 독립 난수.
+        const cureRate = statusCureRate(unit)
         const kept: StatusEffect[] = []
         for (const status of unit.statuses) {
           const cure = roll(state.rngState, cureRate)
@@ -920,13 +980,20 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
         }
         unit.statuses = kept
 
-        // 2) 독 데미지 — 최대 HP 비례. dealDamage 경유가 계약이다
-        //    (격파 로그·증원 트리거·주인공 사망 판정을 물리 데미지와 한 경로로 유지).
+        // 2) 독 데미지 — `HP = max(1, HP − max(1, floor(maxHP/10)))`.
+        //    **독으로는 죽지 않는다**: HP 1에서 정지한다 (원작 확정 0x44DFC7 / statuses.md §1).
+        //    그래서 dealDamage를 타지 않는다 — 격파 처리 자체가 발생하지 않으므로 승패·증원과 무관하다.
         if (hasStatus(unit, 'poison')) {
           const dmg = Math.max(1, Math.trunc((unit.maxHp * STATUSES.poison.poisonDamagePct!) / 100))
-          log(state, 'poison', `${nameOf(unit)} — 독으로 ${dmg} 데미지`, { targetId: unit.id, amount: -dmg })
-          dealDamage(state, unit, dmg)
-          if (unit.hp <= 0) continue // 독사: 지형 회복·MP 리젠·행동 선세팅 대상이 아니다
+          const applied = unit.hp - Math.max(1, unit.hp - dmg) // HP 1 하한에서 잘린 실제 감소량
+          if (applied > 0) {
+            unit.hp -= applied
+            log(state, 'poison', `${nameOf(unit)} — 독으로 ${applied} 데미지`, {
+              targetId: unit.id,
+              amount: -applied,
+            })
+          }
+          // 이미 HP 1이면 아무 일도 일어나지 않는다 (amount 0 로그 = 미스 계약이라 아예 남기지 않는다)
         }
 
         // 3) 행동 불가 선세팅 — 혼란은 이 시점에 행동을 소진시킨다.

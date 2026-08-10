@@ -163,7 +163,7 @@ export const FRUIT_STAT_BONUS = 2
 // v0.7에서 제1부(반동탁 연합) 구간과 선택지 분기(c01)를 얹었다:
 //   c01에서 "그만둔다"(회군)를 고르면 동탁 추격전(n13) 전투 노드를 통째로 건너뛴다 — 원작 03 스킵 재현.
 // v1.0에서 제2부(청주~하비, 원작 1장 후반)를 5전투로 압축해 얹었다:
-//   c02는 노드를 가르지 않고 게이지만 움직인다(같은 전투로 합류) — 원작 서주 대학살 소재.
+//   c02(원작 c05)에서 "도겸과 화친"을 고르면 서주 전투(n21)를 통째로 건너뛴다 — c01과 같은 스킵 패턴.
 //   합류(join)는 노드 필드로 선언하고 completeStory/applyVictory가 joinOfficers로 소화한다.
 // battle 노드 id(n01/n02)는 v0.3 세이브 호환을 위해 유지한다.
 export const CAMPAIGN_NODES: CampaignNode[] = [
@@ -203,15 +203,17 @@ export const CAMPAIGN_NODES: CampaignNode[] = [
   {
     id: 'c02',
     type: 'choice',
-    title: '원수는 누구인가',
+    title: '화친이냐 토벌이냐',
     prompt:
-      '아버지 조숭이 서주 경계에서 도겸의 군사에게 살해됐다. 군은 이미 복수를 외치며 창을 갈고 있다.',
+      '서주로 진군하던 중 급보가 날아들었다. 여포가 연주를 급습해 복양에 들어앉았다는 것이다.',
     speaker: 'caocao',
-    // 원작 서주 대학살 소재 — 실제 역사의 조조는 서주에서 백성을 도륙했다(사실 루트).
-    // 두 갈래 모두 같은 전투(n21)로 합류하고 게이지만 갈린다 (campaign-ux.md 1부 §5).
+    // 원작 c05의 실제 선택지 = 「도겸과 화친 / 토벌 속행」이다.
+    // 서주 대학살 선택지는 원작에 없다 — 조조가 학살 의도를 명시 부정한다 (statuses.md §4).
+    // 화친을 고르면 서주 전투(n21)를 통째로 건너뛴다 — 원작도 화친 시 전투가 즉시 끝난다.
+    // 증감폭 5는 우리 게이지 시스템 활용 [설계값] — 원작은 이 선택지에서 게이지가 움직이지 않는다.
     options: [
-      { text: '아버지의 원수다. 서주를 쓸어버린다.', gaugeDelta: 10, next: 'n21' },
-      { text: '원수는 도겸뿐. 백성은 건드리지 않는다.', gaugeDelta: -10, next: 'n21' },
+      { text: '여포는 나중이다. 도겸 토벌을 속행한다.', gaugeDelta: 5, next: 'n21' },
+      { text: '도겸과 화친하고 복양으로 향한다.', gaugeDelta: -5, next: 's22' },
     ],
   },
   { id: 'n21', type: 'battle', stageId: 'stage08', rewardGold: 1100, next: 's22' },
@@ -227,7 +229,7 @@ export const CAMPAIGN_NODES: CampaignNode[] = [
     next: 'n23',
   },
   { id: 'n23', type: 'battle', stageId: 'stage10', rewardGold: 1400, next: 's24' },
-  { id: 's24', type: 'story', title: '하비 수공', scriptId: 'xiapiFlood', next: 'n24' },
+  { id: 's24', type: 'story', title: '하비 포위', scriptId: 'xiapiSiege', next: 'n24' },
   { id: 'n24', type: 'battle', stageId: 'stage11', rewardGold: 1800, rewardSeal: true, next: 's25' },
   // 장료 합류 — 원작 명장면("장료는 죽음을 두려워하지 않는다") 직후 2차 병과 그대로 들어온다
   { id: 's25', type: 'story', title: '2부 종장', scriptId: 'chapter2End', join: ['zhangLiao'], next: 'fin' },
