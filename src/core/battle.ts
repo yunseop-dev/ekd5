@@ -40,6 +40,7 @@ import type {
   OfficerStats,
   StageDef,
   StageUnitDef,
+  StatusId,
   StrategyDef,
   UnitClassDef,
   UnitState,
@@ -74,6 +75,29 @@ const hostileTo = (a: UnitState['faction']): UnitState['faction'][] =>
   a === 'enemy' ? ['player', 'ally'] : ['enemy']
 
 export const isHostile = (a: UnitState, b: UnitState): boolean => hostileTo(a.faction).includes(b.faction)
+
+// ---------- 상태이상 게이트 (v1.0) ----------
+// 원작: 혼란 = 행동 불가(각성약 자가사용 불가의 근거), 부동 = 이동만 불가, 금책 = 책략만 불가.
+// 리듀서 각 케이스와 AI·UI가 같은 헬퍼를 쓴다 — 혼란 규칙이 바뀌면(오조작 등) canAct만 교체.
+
+export function hasStatus(unit: UnitState, id: StatusId): boolean {
+  return unit.statuses.some((s) => s.id === id)
+}
+
+/** 이동 가능 여부 — 부동·혼란이면 불가 */
+export function canMove(unit: UnitState): boolean {
+  return !hasStatus(unit, 'immobile') && !hasStatus(unit, 'confusion')
+}
+
+/** 행동(공격/도구/대기) 가능 여부 — 혼란이면 불가 */
+export function canAct(unit: UnitState): boolean {
+  return !hasStatus(unit, 'confusion')
+}
+
+/** 책략 사용 가능 여부 — 행동 가능 + 금책 아님 */
+export function canCast(unit: UnitState): boolean {
+  return canAct(unit) && !hasStatus(unit, 'seal')
+}
 
 /** 장착 중인 장비 인스턴스 목록 (미등록 id 포함 — 정의 조회는 호출부에서) */
 export function equippedInstances(unit: UnitState): EquipInstance[] {

@@ -13,6 +13,8 @@
 // [설계값] 표시는 원작이 "줍기 전용"(보물고·점령)이라 상점 가격 사료가 없는 항목 —
 // 점령 습득 시스템이 들어올 때까지 상점 판매로 대체한다.
 
+import type { CampaignState } from '../core/campaign'
+import { chapterOf } from '../core/campaign'
 import type { ConsumableDef } from '../core/types'
 
 /** 종류별 재고 상한 — 원작 저장 구조가 1바이트 카운트다 (Data.e5 / 엔진 확정) */
@@ -109,14 +111,26 @@ export const CONSUMABLES: Record<string, ConsumableDef> = {
 
   // ---- 승급 (Data.e5 ID 97) ----
   // 원작대로 전투 중 사용하는 승급 아이템. 사용 즉시 클래스업 + HP/MP 완전회복.
-  // 원작은 **2장부터 1000에 상점 판매**하지만 현재 캠페인은 1장뿐이라 비매품으로 둔다
-  // (2장 추가 시 price 1000 활성화 — items.md §5 결정표).
+  // 원작 확정: **2부(원작 2장)부터 1000에 상점 판매** — 진열 여부는 shopConsumables가
+  // chapterOf로 판정한다 (1부에서는 전투 보상으로만 입수).
   insu: {
     id: 'insu',
     name: '인수(印綬)',
     desc: 'Lv15 이상의 부대를 상위 병과로 승급시킨다. 사용하면 HP와 MP가 모두 회복된다.',
-    price: null,
+    price: 1000,
     range: 1,
     effect: { kind: 'promotion' },
   },
+}
+
+/**
+ * 상점 진열 목록 — 가격이 있는 도구 중, 인수는 2부부터 (원작: 2장부터 상점 판매).
+ * 판정은 현재 노드에서 파생(chapterOf) — 세이브에 장 상태를 두지 않는다.
+ */
+export function shopConsumables(campaign: Pick<CampaignState, 'nodeId'>): ConsumableDef[] {
+  const chapter = chapterOf(campaign.nodeId)
+  return Object.values(CONSUMABLES)
+    .filter((c) => c.price !== null)
+    .filter((c) => c.effect.kind !== 'promotion' || chapter >= 2)
+    .sort((a, b) => (a.price ?? 0) - (b.price ?? 0) || a.name.localeCompare(b.name, 'ko'))
 }

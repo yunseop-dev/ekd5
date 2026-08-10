@@ -62,9 +62,19 @@ export type CampaignNode =
       stageId: string
       rewardGold: number
       rewardSeal?: boolean
+      /** 이 전투 승리 시 합류하는 장수 id 목록 (applyVictory가 소화) */
+      join?: string[]
       next: string | null
     }
-  | { id: string; type: 'story'; title: string; scriptId: string; next: string | null }
+  | {
+      id: string
+      type: 'story'
+      title: string
+      scriptId: string
+      /** 이 스토리 소화 시 합류하는 장수 id 목록 (completeStory가 소화) */
+      join?: string[]
+      next: string | null
+    }
   // 선택지 노드 — 원작 "사실/가상 게이지"를 움직이며 후속 노드를 가른다 (campaign-ux.md 1부 §5).
   // 원작 03 동탁 추격전처럼 "그만둔다"를 고르면 전투 노드를 통째로 건너뛴다.
   | {
@@ -188,18 +198,57 @@ export const CAMPAIGN_NODES: CampaignNode[] = [
 /** 초기 로스터 — 서장 클리어 후 6명 일괄 합류 커브를 압축한 구성 (campaign-ux.md 1부 §7) */
 export const PLAYER_OFFICER_IDS = ['caocao', 'xiahoudun', 'dianwei', 'xiahouyuan', 'guojia', 'xunyu']
 
+/**
+ * 로스터 엔트리 생성 — 초기 편성과 중간 합류가 같은 규칙을 쓴다.
+ * 원작 디테일: 장수는 합류 시 병과 기본 무기를 장착하고 온다 (조조 = 의천검) — 전부 Lv1 인스턴스.
+ * 이미 승급된 채 합류하는 장수(장료 등)는 OfficerDef.classId 자체가 2차라 오버라이드가 필요 없다.
+ */
+export function newRosterEntry(officerId: string): RosterEntry {
+  return {
+    officerId,
+    level: OFFICERS[officerId].level,
+    exp: 0,
+    equipment: toEquipmentMap(OFFICERS[officerId].initialEquipment),
+    statBonus: {},
+  }
+}
+
+/**
+ * 장수 합류 (원본 불변, 멱등) — 이미 로스터에 있거나 미등록 id인 장수는 조용히 건너뛴다.
+ * 노드의 join 필드를 completeStory/applyVictory가 이 함수로 소화한다.
+ */
+export function joinOfficers(campaign: CampaignState, officerIds: string[]): CampaignState {
+  const fresh = officerIds.filter(
+    (id) => OFFICERS[id] !== undefined && !campaign.roster.some((r) => r.officerId === id),
+  )
+  if (fresh.length === 0) return campaign
+  return {
+    ...campaign,
+    roster: [...campaign.roster.map(cloneEntry), ...fresh.map(newRosterEntry)],
+    clearedStages: [...campaign.clearedStages],
+    inventory: cloneInventory(campaign.inventory),
+    fruits: [...campaign.fruits],
+    consumables: campaign.consumables.map((s) => ({ ...s })),
+  }
+}
+
+/**
+ * 노드가 속한 부(장) — 상태 필드 없이 노드 그래프 위치에서 파생한다.
+ * 2부 첫 노드(s20) 이전이면 1부. s20이 아직 없으면(1부만 존재) 항상 1.
+ * 원작: 인수는 2장부터 상점 판매 (items.md §5) — 상점 해금 판정에 쓴다.
+ */
+export function chapterOf(nodeId: string): 1 | 2 {
+  const start = CAMPAIGN_NODES.findIndex((n) => n.id === 's20')
+  if (start < 0) return 1
+  const index = CAMPAIGN_NODES.findIndex((n) => n.id === nodeId)
+  return index >= start ? 2 : 1
+}
+
 export function newCampaign(): CampaignState {
   return {
     version: 6,
     nodeId: CAMPAIGN_NODES[0].id,
-    roster: PLAYER_OFFICER_IDS.map((officerId) => ({
-      officerId,
-      level: OFFICERS[officerId].level,
-      exp: 0,
-      // 원작 디테일: 장수는 합류 시 병과 기본 무기를 장착하고 온다 (조조 = 의천검) — 전부 Lv1 인스턴스
-      equipment: toEquipmentMap(OFFICERS[officerId].initialEquipment),
-      statBonus: {},
-    })),
+    roster: PLAYER_OFFICER_IDS.map(newRosterEntry),
     clearedStages: [],
     gold: INITIAL_GOLD,
     inventory: [],

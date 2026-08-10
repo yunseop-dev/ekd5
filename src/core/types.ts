@@ -186,7 +186,7 @@ export interface FruitDef {
 
 export type StrategyElement = 'fire' | 'water' | 'wind' | 'earth' | 'holy' | 'none'
 
-export type StrategyKind = 'damage' | 'heal' | 'buff' | 'debuff'
+export type StrategyKind = 'damage' | 'heal' | 'buff' | 'debuff' | 'status'
 
 export type BuffStat = 'atk' | 'def' | 'mind' | 'agi' | 'morale'
 
@@ -208,6 +208,8 @@ export interface StrategyDef {
    */
   heal?: { base: number; mindDiv: number }
   buff?: { stat: BuffStat; amount: number; duration: number } // buff/debuff 전용
+  /** status 전용 — 부여하는 상태이상. 지속턴은 없다 (원작: 매턴 운÷2% 자연 해제뿐) */
+  inflicts?: StatusId
   capHitRate: number // 한계 명중률 % (100/90/80/60/50/33). buff/heal은 100
   targets: 'enemy' | 'ally' | 'self'
 }

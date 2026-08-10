@@ -3,7 +3,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { CLASSES } from '../data/classes'
-import { CONSUMABLE_STOCK_MAX, CONSUMABLES } from '../data/consumables'
+import { CONSUMABLE_STOCK_MAX, CONSUMABLES, shopConsumables } from '../data/consumables'
 import { STRATEGIES } from '../data/strategies'
 import { decideUnit } from './ai'
 import { applyAction, effectiveStats, startBattle } from './battle'
@@ -892,10 +892,19 @@ describe('buyConsumable / sellConsumable', () => {
     expect(consumableCount(buyConsumable(filled, 'hoebokSsal').consumables, 'hoebokSsal')).toBe(1)
   })
 
-  it('비매품(인수)과 미등록 id는 구매 불가', () => {
+  it('인수도 코어에서는 구매 가능(1000) — 1부 미진열은 상점(shopConsumables)이 거른다', () => {
     const rich = { ...newCampaign(), gold: 99999 }
-    expect(buyConsumable(rich, 'insu')).toBe(rich)
+    const bought = buyConsumable(rich, 'insu')
+    expect(bought.gold).toBe(99999 - CONSUMABLES.insu.price!)
+    expect(consumableCount(bought.consumables, 'insu')).toBe(1)
     expect(buyConsumable(rich, 'nonexistent')).toBe(rich)
+  })
+
+  it('상점 진열: 인수는 2부부터 (1부 노드에서는 목록에 없다)', () => {
+    // 현재 그래프는 1부뿐 — chapterOf가 항상 1이므로 인수 미진열. 2부(s20) 추가 시 진열 테스트는 W3가 확장한다.
+    const listed = shopConsumables(newCampaign()).map((c) => c.id)
+    expect(listed).not.toContain('insu')
+    expect(listed).toContain('hoebokKong')
   })
 
   it('판매는 스톡을 1 줄이고 반값 골드를 준다 (0이 된 스택은 사라진다)', () => {
@@ -905,9 +914,7 @@ describe('buyConsumable / sellConsumable', () => {
     expect(after.consumables).toEqual([])
   })
 
-  it('비매품은 판매 불가 · 스톡이 없으면 원본 반환', () => {
-    const sealed = { ...newCampaign(), consumables: [{ itemId: 'insu', count: 2 }] }
-    expect(sellConsumable(sealed, 'insu')).toBe(sealed)
+  it('스톡이 없으면 판매는 원본 반환', () => {
     const empty = newCampaign()
     expect(sellConsumable(empty, 'hoebokSsal')).toBe(empty)
     expect(sellConsumable(empty, 'nonexistent')).toBe(empty)

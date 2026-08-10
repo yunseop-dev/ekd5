@@ -40,7 +40,7 @@ import type {
   UnitClassDef,
 } from '../core/types'
 import { CLASSES } from '../data/classes'
-import { CONSUMABLES } from '../data/consumables'
+import { CONSUMABLES, shopConsumables } from '../data/consumables'
 import { EQUIPMENT } from '../data/equipment'
 import { FRUITS } from '../data/fruits'
 import { OFFICERS } from '../data/officers'
@@ -365,13 +365,6 @@ function sellPreview(
 
 // ---------- 도구(소모품) ----------
 
-/** 상점 진열 대상 = 가격이 있는 도구. 비매품(인수)은 전투 보상으로만 들어온다 */
-function shopConsumables(): ConsumableDef[] {
-  return Object.values(CONSUMABLES)
-    .filter((c) => c.price !== null)
-    .sort((a, b) => (a.price ?? 0) - (b.price ?? 0) || a.name.localeCompare(b.name, 'ko'))
-}
-
 /** 보유 중인 도구 (비매품 포함) — 창고 읽기 전용 표시용 */
 function ownedConsumables(campaign: CampaignState): Array<{ def: ConsumableDef; count: number }> {
   return campaign.consumables
@@ -682,7 +675,7 @@ function ShopTab({ campaign, onChange }: TabProps) {
   }, [])
 
   const sellable = useMemo(() => inventoryRows(campaign), [campaign])
-  const items = useMemo(() => shopConsumables(), [])
+  const items = useMemo(() => shopConsumables(campaign), [campaign])
 
   const doBuy = (itemId: string) => {
     const next = buyItem(campaign, itemId)
