@@ -5,6 +5,7 @@ import { CLASSES } from '../data/classes'
 import { CONSUMABLES } from '../data/consumables'
 import { EQUIPMENT } from '../data/equipment'
 import { OFFICERS } from '../data/officers'
+import { STATUSES, statusName } from '../data/statuses'
 import { STRATEGIES } from '../data/strategies'
 import { TERRAIN } from '../data/terrain'
 import type { RosterEntry } from './campaign'
@@ -40,6 +41,7 @@ import type {
   OfficerStats,
   StageDef,
   StageUnitDef,
+  StatusEffect,
   StatusId,
   StrategyDef,
   UnitClassDef,
@@ -626,6 +628,7 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
     case 'move': {
       const unit = state.units.find((u) => u.id === action.unitId)
       if (!unit || unit.hp <= 0 || unit.faction !== state.phase || unit.moved || unit.acted) return prev
+      if (!canMove(unit)) return prev // 부동·혼란
       const range = movementRangeOf(state, unit)
       const cell = range.get(keyOf(action.to))
       if (!cell || !cell.canStop) return prev
@@ -639,6 +642,7 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
       const defender = state.units.find((u) => u.id === action.targetId)
       if (!attacker || !defender || attacker.hp <= 0 || defender.hp <= 0) return prev
       if (attacker.faction !== state.phase || attacker.acted) return prev
+      if (!canAct(attacker)) return prev // 혼란
       if (!isHostile(attacker, defender)) return prev
 
       const aCls = classOf(attacker)
@@ -675,6 +679,7 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
     case 'strategy': {
       const caster = state.units.find((u) => u.id === action.unitId)
       if (!caster || caster.hp <= 0 || caster.faction !== state.phase || caster.acted) return prev
+      if (!canCast(caster)) return prev // 혼란 + 금책
 
       const strategy = knownStrategies(caster).find((s) => s.id === action.strategyId)
       if (!strategy || caster.mp < strategy.mpCost) return prev
@@ -706,7 +711,7 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
         const target = unitAt(state, cell)
         if (!target) continue
 
-        if (strategy.kind === 'damage' || strategy.kind === 'debuff') {
+        if (strategy.kind === 'damage' || strategy.kind === 'debuff' || strategy.kind === 'status') {
           if (!isHostile(caster, target)) continue
           const tStats = effectiveStats(target)
           const hit = roll(
@@ -741,6 +746,22 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
               'armor',
               caster.level >= target.level ? EQUIP_EXP_ARMOR_HIT.higher : EQUIP_EXP_ARMOR_HIT.lower,
             )
+          } else if (strategy.kind === 'status') {
+            // 방해 책략 — 지속턴이 없으므로 중복 부여는 그냥 무의미하다(원작: 이미 걸린 상태에 재부여 없음).
+            // 낭비 캐스팅 자체는 막지 않는다(리듀서 관례) — 경험치만 주지 않는다.
+            const statusId = strategy.inflicts!
+            const name = nameOf(target)
+            if (hasStatus(target, statusId)) {
+              log(state, 'status', `${name}${subjectParticle(name)} 이미 ${statusName(statusId)} 상태다`, {
+                targetId: target.id,
+              })
+            } else {
+              target.statuses.push({ id: statusId })
+              log(state, 'status', `${name}${subjectParticle(name)} ${statusName(statusId)}에 빠졌다!`, {
+                targetId: target.id,
+              })
+              grantExp(state, caster, target.level, false)
+            }
           } else {
             target.buffs.push({ ...strategy.buff!, remainingTurns: strategy.buff!.duration })
             log(state, 'debuff', `${nameOf(caster)}의 ${strategy.name} → ${nameOf(target)}`)
@@ -776,6 +797,9 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
     case 'useItem': {
       const unit = state.units.find((u) => u.id === action.unitId)
       if (!unit || unit.hp <= 0 || unit.faction !== state.phase || unit.acted) return prev
+      // 혼란은 행동 불가 — 혼란에 빠진 부대가 스스로 각성약을 먹을 수 없는 근거가 이 게이트다
+      // (해제는 인접 아군이 먹여주는 경로뿐. docs/research/items.md §1 각성약 비고)
+      if (!canAct(unit)) return prev
 
       const def = CONSUMABLES[action.itemId]
       if (!def) return prev
@@ -852,6 +876,7 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
     case 'wait': {
       const unit = state.units.find((u) => u.id === action.unitId)
       if (!unit || unit.hp <= 0 || unit.faction !== state.phase || unit.acted) return prev
+      if (!canAct(unit)) return prev // 혼란 (선세팅으로 이미 acted=true지만 이중 방어)
       unit.acted = true
       unit.moved = true
       break
@@ -869,13 +894,50 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
         triggerReinforcements(state, { type: 'turnStart', turn: state.turn })
       }
 
-      // 새 페이즈 진영: 행동 초기화 + 버프 턴 감소 + 지형 회복
+      // 새 페이즈 진영: 행동 초기화 + 버프 턴 감소 + 상태이상 처리 + 지형 회복
       for (const unit of livingUnits(state, state.phase)) {
         unit.moved = false
         unit.acted = false
         unit.buffs = unit.buffs
           .map((b) => ({ ...b, remainingTurns: b.remainingTurns - 1 }))
           .filter((b) => b.remainingTurns > 0)
+
+        // ---- 상태이상 (자기 페이즈 시작 시 처리 — caocao.md §90) ----
+        // 1) 자연 해제: 상태마다 장수 **운÷2 %**. 판정에 쓰는 값은 원시 luck이다 —
+        //    effectiveStats.morale은 luck을 성장·버프까지 섞어 변환한 값이라 여기서는 쓸 수 없다.
+        const cureRate = Math.floor(officerOf(unit).stats.luck / 2)
+        const kept: StatusEffect[] = []
+        for (const status of unit.statuses) {
+          const cure = roll(state.rngState, cureRate)
+          state.rngState = cure.nextState
+          if (cure.value) {
+            log(state, 'statusCured', `${nameOf(unit)}의 ${statusName(status.id)} 상태가 회복되었다`, {
+              targetId: unit.id,
+            })
+            continue
+          }
+          kept.push(status)
+        }
+        unit.statuses = kept
+
+        // 2) 독 데미지 — 최대 HP 비례. dealDamage 경유가 계약이다
+        //    (격파 로그·증원 트리거·주인공 사망 판정을 물리 데미지와 한 경로로 유지).
+        if (hasStatus(unit, 'poison')) {
+          const dmg = Math.max(1, Math.trunc((unit.maxHp * STATUSES.poison.poisonDamagePct!) / 100))
+          log(state, 'poison', `${nameOf(unit)} — 독으로 ${dmg} 데미지`, { targetId: unit.id, amount: -dmg })
+          dealDamage(state, unit, dmg)
+          if (unit.hp <= 0) continue // 독사: 지형 회복·MP 리젠·행동 선세팅 대상이 아니다
+        }
+
+        // 3) 행동 불가 선세팅 — 혼란은 이 시점에 행동을 소진시킨다.
+        //    AI의 미행동 유닛 탐색(find(u => !u.acted))이 혼란 유닛을 자연히 건너뛰게 만드는 장치다.
+        if (hasStatus(unit, 'confusion')) {
+          unit.acted = true
+          unit.moved = true
+          log(state, 'statusHold', `${nameOf(unit)} — 혼란으로 움직일 수 없다`, { targetId: unit.id })
+        } else if (hasStatus(unit, 'immobile')) {
+          unit.moved = true // 이동만 봉쇄 (제자리 공격·책략은 가능)
+        }
 
         const tile = TERRAIN[state.map.tiles[unit.pos.y][unit.pos.x]]
         if (tile.healPerTurn && unit.hp < unit.maxHp) {

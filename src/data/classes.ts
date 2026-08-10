@@ -116,6 +116,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
       { strategyId: 'hwajin', learnLevel: 8 },
       { strategyId: 'pungjin', learnLevel: 10 }, // 풍계 ㅁ자(3×3) — 습득 레벨은 설계값
       { strategyId: 'eophwa', learnLevel: 12 },
+      { strategyId: 'heobo', learnLevel: 14 }, // 방해(혼란) — 습득 레벨 [설계값]
     ],
   },
   geomancer: {
@@ -140,6 +141,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
       { strategyId: 'sobogeup', learnLevel: 1 },
       { strategyId: 'goyang', learnLevel: 3 },
       { strategyId: 'yeonbyeong', learnLevel: 6 },
+      { strategyId: 'pobak', learnLevel: 14 }, // 방해(부동) — 습득 레벨 [설계값]
     ],
   },
 
@@ -254,7 +256,9 @@ export const CLASSES: Record<string, UnitClassDef> = {
       { strategyId: 'hwajin', learnLevel: 8 },
       { strategyId: 'pungjin', learnLevel: 10 }, // 풍계 ㅁ자(3×3) — 습득 레벨은 설계값
       { strategyId: 'eophwa', learnLevel: 12 },
+      { strategyId: 'heobo', learnLevel: 14 }, // 1차 전승 (책사와 같은 learnLevel — promotion 계약)
       { strategyId: 'hwaryong', learnLevel: 15 }, // 승급 해금 — "한층 더 강력해진 공격계 책략"
+      { strategyId: 'bongchaek', learnLevel: 16 }, // 승급 해금 — 방해(금책) [설계값]
     ],
   },
   seniorGeomancer: {
@@ -278,7 +282,9 @@ export const CLASSES: Record<string, UnitClassDef> = {
       { strategyId: 'sobogeup', learnLevel: 1 },
       { strategyId: 'goyang', learnLevel: 3 },
       { strategyId: 'yeonbyeong', learnLevel: 6 },
+      { strategyId: 'pobak', learnLevel: 14 }, // 1차 전승 (풍수사와 같은 learnLevel — promotion 계약)
       { strategyId: 'guwondae', learnLevel: 15 }, // 승급 해금 — 광역 회복
+      { strategyId: 'dogyeon', learnLevel: 16 }, // 승급 해금 — 방해(독) [설계값]
     ],
   },
 }

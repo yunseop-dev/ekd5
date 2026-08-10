@@ -6,8 +6,10 @@
 import { TERRAIN } from '../data/terrain'
 import {
   applyAction,
+  canCast,
   classOf,
   effectiveStats,
+  hasStatus,
   isHostile,
   knownStrategies,
   livingUnits,
@@ -27,7 +29,7 @@ import {
   strategyHitRate,
 } from './formulas'
 import { manhattan, strategyAreaCells } from './movement'
-import type { BattleAction, BattleState, Faction, StrategyArea, UnitState, Vec2 } from './types'
+import type { BattleAction, BattleState, Faction, StatusId, StrategyArea, UnitState, Vec2 } from './types'
 
 const KILL_BONUS = 40
 /** 회복 1점의 가치 계수 — 데미지 1점보다 낮게 본다 (기대값이 비슷하면 공격을 고른다) */
@@ -36,6 +38,17 @@ const HEAL_VALUE = 0.8
 const HEAL_MIN_LOSS_RATIO = 0.25
 /** 버프/디버프 1대상의 고정 가치 — 공격 기대값과 겨루기엔 소박한 값(대개 공격이 이긴다) */
 const BUFF_VALUE = 12
+/**
+ * 상태이상 1대상의 고정 가치 (BUFF_VALUE의 연장선).
+ * 혼란(행동 전면 봉쇄) > 금책(책략만) > 부동·독(부분 봉쇄/지속딜) 순.
+ * 매혹은 부여 수단이 없어 기재하지 않는다 — 미기재 상태는 BUFF_VALUE로 본다.
+ */
+const STATUS_VALUE: Partial<Record<StatusId, number>> = {
+  confusion: 18,
+  seal: 14,
+  immobile: 10,
+  poison: 10,
+}
 /** 버프 판단용 전투 반경 — 이 거리 안에 적이 있는 아군만 강화 대상으로 본다 */
 const COMBAT_RADIUS = 4
 
@@ -105,6 +118,20 @@ function unitsInArea(state: BattleState, area: StrategyArea, center: Vec2): Unit
 /** 같은 능력치에 이미 걸린 버프/디버프가 있는지 (중복 시전 방지) */
 const hasBuffOn = (unit: UnitState, stat: string): boolean => unit.buffs.some((b) => b.stat === stat)
 
+/**
+ * 방해 책략 1대상의 가치 — 0이면 후보에서 빠진다.
+ * 이미 걸린 상태는 재부여해도 지속턴이 늘지 않으니(원작 사양) 가치가 없고,
+ * 봉쇄형은 그 봉쇄가 실제로 아픈 상대에게만 값을 준다.
+ */
+function statusValueAgainst(foe: UnitState, statusId: StatusId): number {
+  if (hasStatus(foe, statusId)) return 0
+  // 금책: 쓸 책략도 MP도 없는 상대에겐 무의미
+  if (statusId === 'seal' && (knownStrategies(foe).length === 0 || foe.mp <= 0)) return 0
+  // 부동: 붙어야 때리는 근접 병과에게만 치명적 (원거리는 제자리에서 계속 쏜다)
+  if (statusId === 'immobile' && classOf(foe).ranged) return 0
+  return STATUS_VALUE[statusId] ?? BUFF_VALUE
+}
+
 /** 지원 책략의 중심 좌표 — 자기 자신이 대상이면 이동 후 위치, 아니면 아군 위치 */
 const supportTargetOf = (unit: UnitState, cell: Vec2, ally: UnitState): Vec2 =>
   ally.id === unit.id ? cell : ally.pos
@@ -120,11 +147,12 @@ function scoreStrategy(
   cell: Vec2,
   target: UnitState,
 ): { score: number; strategyId: string } | null {
+  if (!canCast(unit)) return null // 혼란·금책
   const uStats = effectiveStats(unit)
   let best: { score: number; strategyId: string } | null = null
 
   for (const strategy of knownStrategies(unit)) {
-    if (strategy.kind !== 'damage' && strategy.kind !== 'debuff') continue
+    if (strategy.kind !== 'damage' && strategy.kind !== 'debuff' && strategy.kind !== 'status') continue
     if (unit.mp < strategy.mpCost) continue
     if (strategy.element === 'fire' && state.weather === 'rain') continue
     if (manhattan(cell, target.pos) > strategy.range) continue
@@ -142,6 +170,9 @@ function scoreStrategy(
         const dmg = strategyDamage(uStats.mind, fStats.mind, unit.level, strategy.power!)
         value += dmg * hit
         if (dmg * hit >= foe.hp) value += KILL_BONUS
+      } else if (strategy.kind === 'status') {
+        // 명중 기대는 한계명중률로 본다 (방해 책략은 위력이 없어 cap이 유일한 조절 손잡이다)
+        value += statusValueAgainst(foe, strategy.inflicts!) * (strategy.capHitRate / 100)
       } else if (!hasBuffOn(foe, strategy.buff!.stat)) {
         value += BUFF_VALUE * hit
       }
@@ -168,6 +199,7 @@ function scoreSupportStrategy(
   cell: Vec2,
   ally: UnitState,
 ): { score: number; strategyId: string } | null {
+  if (!canCast(unit)) return null // 혼란·금책
   let best: { score: number; strategyId: string } | null = null
   const center = supportTargetOf(unit, cell, ally)
   const hostiles = livingUnits(state).filter((u) => isHostile(unit, u))
@@ -223,9 +255,10 @@ export function decideUnit(state: BattleState, unit: UnitState): UnitPlan {
   const cls = classOf(unit)
 
   // guard: 이동하지 않음. 현재 위치에서 공격 가능할 때만 행동.
+  // 부동(immobile)도 같은 취급 — 제자리에서 공격·책략만 검토한다 (리듀서 canMove 게이트와 같은 결론).
   const range = movementRangeOf(state, unit)
   const candidateCells: Vec2[] =
-    unit.behavior === 'guard'
+    unit.behavior === 'guard' || hasStatus(unit, 'immobile')
       ? [unit.pos]
       : [...range.values()].filter((c) => c.canStop).map((c) => c.pos)
 

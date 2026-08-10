@@ -97,6 +97,37 @@ describe('decideUnit', () => {
     const plan = decideUnit(state, unit(state, 'yellowShaman'))
     expect(plan.act.type).toBe('strategy')
   })
+
+  it('금책에 걸린 적 책사는 책략을 고르지 않는다 (물리로 내려온다)', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
+        { officerId: 'yellowShaman', faction: 'enemy', pos: { x: 5, y: 2 }, level: 5 },
+      ],
+    })
+    let state = startBattle(stage, 1)
+    state = applyAction(state, { type: 'endPhase' })
+    unit(state, 'yellowShaman').statuses = [{ id: 'seal' }]
+    expect(decideUnit(state, unit(state, 'yellowShaman')).act.type).not.toBe('strategy')
+  })
+
+  it('부동에 걸린 적은 제자리에서만 판단한다 (이동 후보 = 현재 칸)', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 0, y: 0 }, isLeader: true },
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 9, y: 9 } },
+      ],
+    })
+    let state = startBattle(stage, 1)
+    state = applyAction(state, { type: 'endPhase' })
+    const foe = unit(state, 'yellowInfantry')
+    expect(decideUnit(state, foe).moveTo).not.toBeNull() // 대조군: 평소엔 추격한다
+
+    foe.statuses = [{ id: 'immobile' }]
+    const plan = decideUnit(state, foe)
+    expect(plan.moveTo).toBeNull()
+    expect(plan.act.type).toBe('wait')
+  })
 })
 
 describe('stepAiUnit', () => {
@@ -159,6 +190,29 @@ describe('runAiPhase', () => {
     expect(unit(state, 'caocao').hp).toBeLessThanOrEqual(hpBefore)
     // 멀리 있던 기병은 접근했어야 함
     expect(manhattan(unit(state, 'yellowCavalry').pos, { x: 2, y: 2 })).toBeLessThan(12)
+  })
+
+  it('혼란에 걸린 적이 있어도 페이즈가 무한 루프 없이 완주한다', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 8, y: 8 } },
+        { officerId: 'yellowCavalry', faction: 'enemy', pos: { x: 7, y: 8 } },
+      ],
+    })
+    let state = startBattle(stage, 1)
+    unit(state, 'yellowInfantry').statuses = [{ id: 'confusion' }]
+    // rngState 44 → 첫 난수 83.62 ≥ 20(황건적병 운 40 ÷ 2) → 자연 해제 실패, 혼란 유지
+    state = applyAction({ ...state, rngState: 44 }, { type: 'endPhase' })
+
+    const confused = unit(state, 'yellowInfantry')
+    expect(confused.acted).toBe(true) // endPhase 선세팅 — AI의 미행동 탐색이 자연 스킵한다
+    const frozen = { ...confused.pos }
+
+    state = runAiPhase(state, 'enemy')
+    expect(state.phase).toBe('player')
+    expect(state.turn).toBe(2)
+    expect(unit(state, 'yellowInfantry').pos).toEqual(frozen)
   })
 
   it('AI vs AI 자동 시뮬레이션이 크래시 없이 종료된다 (스모크)', () => {

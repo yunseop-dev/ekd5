@@ -165,12 +165,33 @@ describe('useItem — 상태이상 해제약', () => {
     }
   })
 
-  it('만능약은 모든 상태이상을 한 번에 해제한다', () => {
-    const state = afflicted([{ itemId: 'mannungYak', count: 1 }])
+  it('만능약은 모든 상태이상을 한 번에 해제한다 (혼란 포함 → 인접 아군이 먹여준다)', () => {
+    // v1.0: 혼란은 행동 불가라 자기 자신에게는 도구를 쓸 수 없다 → 만능약도 인접 아군 경로로만 닿는다.
+    const state = mkBattle([{ itemId: 'mannungYak', count: 1 }], {
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
+        { officerId: 'dianwei', faction: 'player', pos: { x: 3, y: 3 } }, // 대각 인접
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 8, y: 8 } },
+      ],
+    })
     const caocao = unit(state, 'caocao')
     caocao.statuses = [{ id: 'poison' }, { id: 'seal' }, { id: 'confusion' }, { id: 'immobile' }]
-    const next = applyAction(state, { type: 'useItem', unitId: caocao.id, itemId: 'mannungYak', target: caocao.pos })
+    const next = applyAction(state, {
+      type: 'useItem',
+      unitId: unit(state, 'dianwei').id,
+      itemId: 'mannungYak',
+      target: caocao.pos,
+    })
     expect(unit(next, 'caocao').statuses).toEqual([])
+  })
+
+  it('혼란에 빠진 부대는 스스로 각성약을 쓸 수 없다 (원작 비고의 근거 게이트)', () => {
+    const state = mkBattle([{ itemId: 'gakseongYak', count: 1 }])
+    const caocao = unit(state, 'caocao')
+    caocao.statuses = [{ id: 'confusion' }]
+    expect(
+      applyAction(state, { type: 'useItem', unitId: caocao.id, itemId: 'gakseongYak', target: caocao.pos }),
+    ).toBe(state)
   })
 
   it('해제할 것이 없어도 소모되고 행동이 끝난다 (원작: 효과 0 사용 허용 — 낭비 방지는 UI 몫)', () => {

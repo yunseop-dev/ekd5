@@ -153,4 +153,56 @@ export const STRATEGIES: Record<string, StrategyDef> = {
     capHitRate: 100,
     targets: 'ally',
   },
+
+  // ---- 방해 (상태이상 부여) — 전부 원작 ルＡ = 사거리 4 / 단일 / MP8 ----
+  // 지속턴이 없는 게 원작 사양이다: 걸리면 장수 운÷2 % 자연 해제나 해제약까지 계속 간다
+  // (docs/research/caocao.md §90). 그래서 위력 대신 **한계명중**이 유일한 조절 손잡이다.
+  heobo: {
+    id: 'heobo',
+    name: '허보',
+    kind: 'status',
+    element: 'none',
+    mpCost: 8,
+    range: 4,
+    area: 'single',
+    inflicts: 'confusion',
+    capHitRate: 80, // 원작 확정 (docs/research/items.md §3)
+    targets: 'enemy',
+  },
+  bongchaek: {
+    id: 'bongchaek',
+    name: '봉책',
+    kind: 'status',
+    element: 'none',
+    mpCost: 8,
+    range: 4,
+    area: 'single',
+    inflicts: 'seal',
+    capHitRate: 80, // [설계값] 허보와 동급 — R 조사 확정 대기
+    targets: 'enemy',
+  },
+  dogyeon: {
+    id: 'dogyeon',
+    name: '독연',
+    kind: 'status',
+    element: 'none',
+    mpCost: 8,
+    range: 4,
+    area: 'single',
+    inflicts: 'poison',
+    capHitRate: 80, // [설계값]
+    targets: 'enemy',
+  },
+  pobak: {
+    id: 'pobak',
+    name: '포박',
+    kind: 'status',
+    element: 'none',
+    mpCost: 8,
+    range: 4,
+    area: 'single',
+    inflicts: 'immobile',
+    capHitRate: 80, // [설계값]
+    targets: 'enemy',
+  },
 }
