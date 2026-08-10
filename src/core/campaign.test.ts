@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { validateCampaign } from '../app/persistence'
 import { CLASSES } from '../data/classes'
+import { shopConsumables } from '../data/consumables'
 import { OFFICERS } from '../data/officers'
 import { STAGES } from '../data/stages'
 import { STORY_SCRIPTS } from '../data/story'
@@ -11,7 +12,9 @@ import type { CampaignNode, GrowthSnapshot, RosterEntry } from './campaign'
 import {
   applyVictory,
   CAMPAIGN_NODES,
+  chapterOf,
   clampGauge,
+  classIdOf,
   completeChoice,
   completeStory,
   currentNode,
@@ -21,7 +24,9 @@ import {
   growthSummary,
   INITIAL_GOLD,
   isCampaignFinished,
+  joinOfficers,
   newCampaign,
+  newRosterEntry,
   PLAYER_OFFICER_IDS,
   stageForNode,
 } from './campaign'
@@ -98,10 +103,12 @@ describe('캠페인 노드', () => {
     return visited
   }
 
-  it('추격 갈래로 따라가면 동탁 추격전을 거쳐 종막에 닿는다', () => {
+  it('추격 갈래로 따라가면 동탁 추격전을 거쳐 제2부를 통과해 종막에 닿는다', () => {
     expect(walk(0)).toEqual([
       's00', 'n01', 's01', 'n02', 's02', 'n03',
-      's10', 'n11', 's11', 'n12', 'c01', 'n13', 's13', 'fin',
+      's10', 'n11', 's11', 'n12', 'c01', 'n13', 's13',
+      // 제2부 — c02는 두 갈래가 같은 전투(n21)로 합류하므로 노드 열은 갈래와 무관하다
+      's20', 'n20', 's21', 'c02', 'n21', 's22', 'n22', 's23', 'n23', 's24', 'n24', 's25', 'fin',
     ])
   })
 
@@ -109,9 +116,30 @@ describe('캠페인 노드', () => {
     const visited = walk(1)
     expect(visited).toEqual([
       's00', 'n01', 's01', 'n02', 's02', 'n03',
-      's10', 'n11', 's11', 'n12', 'c01', 's12', 's13', 'fin',
+      's10', 'n11', 's11', 'n12', 'c01', 's12', 's13',
+      's20', 'n20', 's21', 'c02', 'n21', 's22', 'n22', 's23', 'n23', 's24', 'n24', 's25', 'fin',
     ])
     expect(visited).not.toContain('n13')
+  })
+
+  it('c02는 게이지만 가르고 두 갈래가 같은 전투로 합류한다 (원작 서주 대학살 소재)', () => {
+    const c02 = CAMPAIGN_NODES.find((n) => n.id === 'c02')!
+    expect(c02.type).toBe('choice')
+    if (c02.type !== 'choice') return
+    expect(c02.options.map((o) => o.next)).toEqual(['n21', 'n21'])
+    expect(c02.options.map((o) => o.gaugeDelta)).toEqual([10, -10])
+    expect(c02.speaker).toBe('caocao')
+  })
+
+  it('chapterOf: s13까지는 1부, s20부터는 2부다 (인수 상점 해금 경계)', () => {
+    for (const id of ['s00', 'n01', 'n12', 'c01', 'n13', 's12', 's13']) {
+      expect(chapterOf(id), id).toBe(1)
+    }
+    for (const id of ['s20', 'n20', 'c02', 'n21', 's23', 'n24', 's25', 'fin']) {
+      expect(chapterOf(id), id).toBe(2)
+    }
+    // 미등록 노드는 1부로 떨어진다 (findIndex -1 < start)
+    expect(chapterOf('nope')).toBe(1)
   })
 
   it('두 갈래를 합치면 모든 노드가 정확히 한 번씩 등장한다 (고아 노드 없음)', () => {
@@ -119,14 +147,16 @@ describe('캠페인 노드', () => {
     expect([...all].sort()).toEqual(CAMPAIGN_NODES.map((n) => n.id).sort())
   })
 
-  it('battle 노드는 stage01→06, story 노드는 스크립트를 가리킨다', () => {
+  it('battle 노드는 stage01→11, story 노드는 스크립트를 가리킨다', () => {
     const battles = CAMPAIGN_NODES.filter((n) => n.type === 'battle')
     expect(battles.map((n) => n.stageId)).toEqual([
       'stage01', 'stage02', 'stage03', 'stage04', 'stage05', 'stage06',
+      'stage07', 'stage08', 'stage09', 'stage10', 'stage11',
     ])
     const stories = CAMPAIGN_NODES.filter((n) => n.type === 'story')
     expect(stories.map((n) => n.scriptId)).toEqual([
       'intro', 'afterStage01', 'afterStage02', 'coalition', 'toHulao', 'retreat', 'chapterEnd',
+      'chapter2Intro', 'fatherDeath', 'puyangBetrayal', 'xuzhouRescue', 'xiapiFlood', 'chapter2End',
     ])
     for (const node of stories) expect(node.title.length).toBeGreaterThan(0)
   })
@@ -219,6 +249,22 @@ describe('스토리 스크립트', () => {
         expect(line.text.length, scriptId).toBeGreaterThan(0)
       }
     }
+  })
+})
+
+describe('인수 상점 진열 — 2부 해금 (chapterOf 연동)', () => {
+  it('1부 노드에서는 진열되지 않고, 2부(s20~) 노드에서는 진열된다', () => {
+    expect(shopConsumables({ nodeId: 's00' }).map((c) => c.id)).not.toContain('insu')
+    expect(shopConsumables({ nodeId: 's13' }).map((c) => c.id)).not.toContain('insu')
+    expect(shopConsumables({ nodeId: 's20' }).map((c) => c.id)).toContain('insu')
+    expect(shopConsumables({ nodeId: 'n24' }).map((c) => c.id)).toContain('insu')
+  })
+
+  it('진열 목록은 가격 오름차순이고 비매품은 빠진다', () => {
+    const listed = shopConsumables({ nodeId: 's20' })
+    expect(listed.every((c) => c.price !== null)).toBe(true)
+    const prices = listed.map((c) => c.price!)
+    expect([...prices].sort((a, b) => a - b)).toEqual(prices)
   })
 })
 
@@ -376,7 +422,7 @@ describe('applyVictory', () => {
    */
   const playThrough = (optionIndex: number) => {
     let campaign = newCampaign()
-    for (let guard = 0; guard < 50 && !isCampaignFinished(campaign); guard++) {
+    for (let guard = 0; guard < 100 && !isCampaignFinished(campaign); guard++) {
       const node = currentNode(campaign)!
       if (node.type === 'battle') {
         campaign = applyVictory(campaign, startBattle(mkStage({ id: node.stageId }), 1, campaign.roster))
@@ -389,22 +435,30 @@ describe('applyVictory', () => {
     return campaign
   }
 
-  it('추격 갈래를 끝까지 진행하면 6전투를 모두 클리어하고 종막에 닿는다', () => {
+  it('추격 갈래를 끝까지 진행하면 11전투를 모두 클리어하고 종막에 닿는다', () => {
     const campaign = playThrough(0)
     expect(campaign.nodeId).toBe('fin')
     expect(isCampaignFinished(campaign)).toBe(true)
     expect(campaign.clearedStages).toEqual([
       'stage01', 'stage02', 'stage03', 'stage04', 'stage05', 'stage06',
+      'stage07', 'stage08', 'stage09', 'stage10', 'stage11',
     ])
-    expect(campaign.gauge).toBe(GAUGE_INITIAL + 10) // 추격 = 사실 +10
+    // c01 추격 +10, c02 복수 +10 (둘 다 사실 루트)
+    expect(campaign.gauge).toBe(GAUGE_INITIAL + 20)
+    // 2부 합류 2명이 로스터에 얹힌다
+    expect(campaign.roster.map((r) => r.officerId)).toEqual([...PLAYER_OFFICER_IDS, 'xuChu', 'zhangLiao'])
   })
 
   it('회군 갈래를 끝까지 진행하면 stage06을 건너뛴 채 종막에 닿는다', () => {
     const campaign = playThrough(1)
     expect(campaign.nodeId).toBe('fin')
     expect(isCampaignFinished(campaign)).toBe(true)
-    expect(campaign.clearedStages).toEqual(['stage01', 'stage02', 'stage03', 'stage04', 'stage05'])
-    expect(campaign.gauge).toBe(GAUGE_INITIAL - 10) // 회군 = 가상 -10
+    expect(campaign.clearedStages).toEqual([
+      'stage01', 'stage02', 'stage03', 'stage04', 'stage05',
+      'stage07', 'stage08', 'stage09', 'stage10', 'stage11',
+    ])
+    // c01 회군 -10, c02 백성 불가침 -10 (둘 다 가상 루트)
+    expect(campaign.gauge).toBe(GAUGE_INITIAL - 20)
   })
 
   it('보상금은 노드에 박힌 값의 합이다 (추격 갈래)', () => {
@@ -464,12 +518,73 @@ describe('completeChoice', () => {
   })
 
   it('completeStory는 종막(end) 노드로도 전진한다', () => {
-    const atFinalStory = { ...newCampaign(), nodeId: 's13' }
+    const atFinalStory = { ...newCampaign(), nodeId: 's25' }
     const done = completeStory(atFinalStory)
     expect(done.nodeId).toBe('fin')
     expect(isCampaignFinished(done)).toBe(true)
     // 종막에서는 더 이상 전진하지 않는다
     expect(completeStory(done)).toBe(done)
+  })
+})
+
+// ---------- 장수 합류 (노드 join) ----------
+
+describe('joinOfficers / 노드 join 배선', () => {
+  it('신규 장수는 장수 기본 레벨 + 병과 기본 장비를 지니고 합류한다', () => {
+    const after = joinOfficers(newCampaign(), ['xuChu'])
+    const entry = after.roster.find((r) => r.officerId === 'xuChu')!
+    expect(entry).toEqual(newRosterEntry('xuChu'))
+    expect(entry.level).toBe(OFFICERS.xuChu.level)
+    expect(entry.equipment.weapon).toEqual({ itemId: 'bronzeSword', level: 1, exp: 0 })
+    expect(entry.equipment.armor).toEqual({ itemId: 'leatherArmor', level: 1, exp: 0 })
+  })
+
+  it('멱등: 이미 있는 장수 / 미등록 id는 조용히 무시하고 원본 참조를 돌려준다', () => {
+    const once = joinOfficers(newCampaign(), ['xuChu'])
+    expect(joinOfficers(once, ['xuChu'])).toBe(once)
+    expect(joinOfficers(once, ['caocao'])).toBe(once)
+    expect(joinOfficers(once, ['nobodyHere'])).toBe(once)
+    expect(joinOfficers(once, [])).toBe(once)
+    // 유효 id가 섞여 있으면 그것만 들어온다
+    const mixed = joinOfficers(once, ['nobodyHere', 'zhangLiao'])
+    expect(mixed.roster.map((r) => r.officerId)).toEqual([...PLAYER_OFFICER_IDS, 'xuChu', 'zhangLiao'])
+  })
+
+  it('장료는 2차 병과(중기병)로 합류한다 — 원작 "기합류 장수는 클래스업 보너스 없음"', () => {
+    const entry = joinOfficers(newCampaign(), ['zhangLiao']).roster.find((r) => r.officerId === 'zhangLiao')!
+    // classId 오버라이드가 아니라 장수 정의 자체가 2차다 (세이브에 classId 키가 생기지 않는다)
+    expect(entry.classId).toBeUndefined()
+    expect(classIdOf(entry)).toBe('heavyCavalry')
+    expect(CLASSES.heavyCavalry.tier).toBe(2)
+  })
+
+  it('completeStory가 story 노드의 join(s23 허저 / s25 장료)을 소화한다', () => {
+    const atS23 = { ...newCampaign(), nodeId: 's23' }
+    const joined = completeStory(atS23)
+    expect(joined.nodeId).toBe('n23')
+    expect(joined.roster.some((r) => r.officerId === 'xuChu')).toBe(true)
+    // 재진입해도 중복되지 않는다 (멱등)
+    expect(completeStory({ ...joined, nodeId: 's23' }).roster.filter((r) => r.officerId === 'xuChu')).toHaveLength(1)
+
+    const atS25 = { ...joined, nodeId: 's25' }
+    expect(completeStory(atS25).roster.some((r) => r.officerId === 'zhangLiao')).toBe(true)
+  })
+
+  it('join이 없는 story 노드는 로스터를 건드리지 않는다', () => {
+    const before = newCampaign()
+    expect(completeStory(before).roster.map((r) => r.officerId)).toEqual(PLAYER_OFFICER_IDS)
+  })
+
+  it('applyVictory도 노드 join을 소화한다 (battle 노드에 join이 붙는 경우 대비)', () => {
+    // 그래프상 join은 story 노드에만 있으므로 battle 노드에 붙은 경우를 직접 확인한다
+    const battleNode = CAMPAIGN_NODES.find((n) => n.id === 'n23')!
+    expect(battleNode.type).toBe('battle')
+    const campaign = { ...newCampaign(), nodeId: 's23' }
+    const advanced = completeStory(campaign) // s23의 join(허저) 소화 → n23
+    const state = startBattle(mkStage({ id: 'stage10' }), 1, advanced.roster)
+    const after = applyVictory(advanced, state)
+    expect(after.nodeId).toBe('s24')
+    expect(after.roster.filter((r) => r.officerId === 'xuChu')).toHaveLength(1)
   })
 })
 

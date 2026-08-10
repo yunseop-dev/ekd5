@@ -88,4 +88,78 @@ export const STORY_SCRIPTS: Record<string, DialogueLine[]> = {
     { speaker: 'caocao', text: '연주로 간다. 땅을 얻고, 군을 기르고, 다시 낙양을 본다.' },
     { speaker: null, text: '— 제1부 「패왕 탄생」 완 —' },
   ],
+
+  // ---------- 제2부 「연주에서 서주로」 ----------
+
+  // s20 — 제2부 개막. 청주 황건 잔당 토벌 (원작 1장 후반부의 시작)
+  chapter2Intro: [
+    { speaker: null, text: '연합이 흩어진 이듬해. 조조는 연주에 들어앉아 스스로 군을 먹였다.' },
+    { speaker: null, text: '그 연주로, 청주에서 살아남은 황건의 무리 수십만이 밀려 내려왔다.' },
+    { speaker: 'xunyu', text: '청주에서 올라온 황건 잔당입니다. 두목은 관해, 머릿수만 헤아려도 우리의 열 배입니다.' },
+    { speaker: 'caocao', text: '열 배라. 그런데 그자들은 처자식을 짐수레에 싣고 다닌다지.' },
+    { speaker: 'guojia', text: '그렇습니다. 싸우러 온 군대가 아니라 먹을 땅을 찾아 흐르는 무리입니다.' },
+    { speaker: 'xiahoudun', text: '그럼 두목만 꺾으면 나머지는 무릎을 꿇겠군.' },
+    { speaker: 'caocao', text: '항복한 자는 죽이지 않는다. 쓸 만한 장정은 내 군에 넣는다 — 청주병이다.' },
+    { speaker: 'caocao', text: '구릉을 등지고 진을 편다. 관해를 잡아라!' },
+  ],
+
+  // s21 — 조숭 피살. 서주 침공의 도화선 (c02 선택지 직전)
+  fatherDeath: [
+    { speaker: null, text: '청주병 삼십만이 조조의 깃발 아래로 들어왔다. 연주는 처음으로 조조의 땅이 되었다.' },
+    { speaker: null, text: '그 소식을 듣고, 낭야에 피해 있던 아버지 조숭이 아들을 찾아 길을 나섰다.' },
+    { speaker: 'xiahouyuan', text: '…맹덕. 서주 경계에서 태공의 행렬이 습격을 받았습니다. 한 사람도 남지 않았습니다.' },
+    { speaker: 'caocao', text: '누구냐.' },
+    { speaker: 'xiahouyuan', text: '도겸의 부장이 이끄는 군사였다 합니다. 재물을 노렸다는 말도 있습니다.' },
+    { speaker: 'xunyu', text: '주공, 사람을 보내 사실을 먼저 확인하십시오. 지금 군을 내면 명분이 흐려집니다.' },
+    { speaker: 'caocao', text: '…명분.' },
+    { speaker: 'caocao', text: '아버지의 뼈가 서주 길가에 흩어져 있다. 그 이상의 명분이 필요한가.' },
+  ],
+
+  // s22 — 여포·진궁의 연주 급습. 뒤가 무너진 상황 (복양 전투 직전)
+  puyangBetrayal: [
+    { speaker: null, text: '서주의 성들이 차례로 열렸다. 그러나 승보가 오는 길로 급보가 함께 올라왔다.' },
+    { speaker: 'xunyu', text: '연주입니다. 장막이 배신했습니다 — 여포를 연주목으로 맞아들였습니다.' },
+    { speaker: 'caocao', text: '여포. 호로관의 그 사내가 이제 남의 땅을 얻어 앉았군.' },
+    { speaker: 'guojia', text: '판을 짠 것은 여포가 아니라 진궁입니다. 우리 군이 서주에 묶인 틈을 정확히 노렸습니다.' },
+    { speaker: 'xiahoudun', text: '뒤가 비었소. 서주를 놓고 돌아가야 하오.' },
+    { speaker: 'caocao', text: '돌아간다. 땅은 다시 얻을 수 있으나 근거지를 잃으면 군이 굶는다.' },
+    { speaker: 'xunyu', text: '여포는 복양에 들어 성을 등지고 있습니다. 시가지에서 기병을 상대하게 됩니다.' },
+    { speaker: 'caocao', text: '좋다. 좁은 거리에서는 적토마도 달릴 곳이 없다. 복양으로!' },
+  ],
+
+  // s23 — 유비의 구원 요청 + 허저 합류
+  xuzhouRescue: [
+    { speaker: null, text: '복양에서 여포를 밀어냈다. 그러나 연주의 성 몇은 아직 여포의 깃발을 걸고 있었다.' },
+    { speaker: 'xiahouyuan', text: '남쪽에서 사자가 왔습니다. 서주의 유비입니다 — 고순의 정예에 갇혔다 합니다.' },
+    { speaker: 'guojia', text: '함진영입니다. 여포군에서 가장 두꺼운 부대가 유비군의 퇴로를 끊었습니다.' },
+    { speaker: 'caocao', text: '유비라. 어제의 적을 오늘 구하러 가는 것이 우습긴 하나 — 고순을 잡을 기회다.' },
+    { speaker: null, text: '그때 진문 앞에, 소 한 마리를 거꾸로 끌고 온 거인이 무릎을 꿇었다.' },
+    { speaker: 'xuChu', text: '갈파의 허저입니다. 도적을 막느라 향리를 지켰을 뿐, 섬길 주인을 아직 못 찾았습니다.' },
+    { speaker: 'caocao', text: '내 곁에 서라. 이제부터 내 등은 네가 맡는다.' },
+    { speaker: 'xuChu', text: '이 몸이 서 있는 동안은 주공의 등에 화살 한 대도 닿지 않습니다.' },
+  ],
+
+  // s24 — 하비 수공
+  xiapiFlood: [
+    { speaker: null, text: '고순은 꺾였고, 여포는 남은 병력을 모아 하비성으로 물러났다.' },
+    { speaker: 'xunyu', text: '하비는 성벽이 두껍고 양식이 넉넉합니다. 정공으로는 반년이 걸립니다.' },
+    { speaker: 'guojia', text: '반년을 줄 수 없습니다. 여포군은 안에서 이미 갈라지고 있습니다 — 지금이 마지막 밀 때입니다.' },
+    { speaker: 'caocao', text: '성 북쪽으로 기수와 사수가 흐른다고 했지.' },
+    { speaker: 'xunyu', text: '…물길을 끊어 성으로 돌리자는 말씀입니까.' },
+    { speaker: 'caocao', text: '성을 부수는 것은 사람이 아니라 물이다. 제방을 터라.' },
+    { speaker: null, text: '두 강의 물이 하비의 성벽 아래로 밀려들었다. 진입로는 물길 사이 좁은 길 하나로 줄었다.' },
+    { speaker: 'xuChu', text: '길이 하나라면 제가 앞에 섭니다. 성문까지 열어 드리겠습니다.' },
+  ],
+
+  // s25 — 제2부 종장. 여포의 최후 + 장료 합류
+  chapter2End: [
+    { speaker: null, text: '물에 잠긴 하비의 성문이 안에서 열렸다. 포박된 여포가 조조 앞에 끌려 나왔다.' },
+    { speaker: 'lüBu', text: '조공. 나를 살려 부린다면 천하에 당할 자가 없을 것이오.' },
+    { speaker: 'caocao', text: '…네 말이 옳다. 그러나 너는 섬긴 주인마다 등을 찔렀다.' },
+    { speaker: 'caocao', text: '데려가라. 진궁도 함께다.' },
+    { speaker: null, text: '뒤이어 끌려온 장수는 무릎을 꿇지 않고 조조를 바라보았다.' },
+    { speaker: 'zhangLiao', text: '장료다. 죽음이 두려워 말을 고르지는 않겠다. 벨 것이면 지금 베라.' },
+    { speaker: 'caocao', text: '…과연. 이 자의 결박을 풀어라. 오늘 하비에서 내가 얻은 것은 성이 아니라 사람이다.' },
+    { speaker: null, text: '— 제2부 「연주에서 서주로」 완 —' },
+  ],
 }

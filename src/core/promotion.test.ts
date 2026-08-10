@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest'
 import { validateCampaign } from '../app/persistence'
 import { CLASSES } from '../data/classes'
+import { CONSUMABLES, shopConsumables } from '../data/consumables'
 import { EQUIPMENT } from '../data/equipment'
 import { OFFICERS } from '../data/officers'
 import { STAGES } from '../data/stages'
@@ -458,10 +459,10 @@ describe('createBattle — 로스터 병과 오버라이드', () => {
 // ---------- 인수 획득 ----------
 
 describe('rewardSeal — 인수는 특정 전투 승리에서만 나온다', () => {
-  it('n11/n12/n13에만 rewardSeal이 붙어 있다', () => {
+  it('1부 n11/n12/n13 + 2부 최종전 n24에만 rewardSeal이 붙어 있다', () => {
     const battles = CAMPAIGN_NODES.filter((n) => n.type === 'battle')
     const sealed = battles.filter((n) => n.type === 'battle' && n.rewardSeal).map((n) => n.id)
-    expect(sealed).toEqual(['n11', 'n12', 'n13'])
+    expect(sealed).toEqual(['n11', 'n12', 'n13', 'n24'])
   })
 
   it('applyVictory가 인수를 1개 늘린다', () => {
@@ -478,15 +479,17 @@ describe('rewardSeal — 인수는 특정 전투 승리에서만 나온다', () 
     expect(consumableCount(after.consumables, 'insu')).toBe(2)
   })
 
-  it('추격 루트를 끝까지 타면 인수 3개 — 6명 중 3명을 승급시킬 수 있다', () => {
+  it('추격 루트를 끝까지 타면 전투 보상 인수 4개 (2부부터는 상점 구매도 열린다)', () => {
     const sealed = CAMPAIGN_NODES.filter((n) => n.type === 'battle' && n.rewardSeal)
-    expect(sealed).toHaveLength(3)
+    expect(sealed).toHaveLength(4)
+    // 2부 진입 시점부터 인수가 상점에 오르므로 승급 자원은 보상 4개 + 군자금 구매분이다
+    expect(shopConsumables({ nodeId: 's20' }).map((c) => c.id)).toContain('insu')
   })
 
-  it('회군 루트(n13 스킵)에서는 인수가 2개뿐이다', () => {
+  it('회군 루트(n13 스킵)에서는 전투 보상 인수가 3개뿐이다', () => {
     let campaign = newCampaign()
     let guard = 0
-    while (currentNode(campaign)?.type !== 'end' && guard++ < 50) {
+    while (currentNode(campaign)?.type !== 'end' && guard++ < 80) {
       const node = currentNode(campaign)!
       if (node.type === 'story') campaign = completeStory(campaign)
       else if (node.type === 'choice') campaign = completeChoice(campaign, 1) // 회군
@@ -498,7 +501,7 @@ describe('rewardSeal — 인수는 특정 전투 승리에서만 나온다', () 
       } else break
     }
     expect(campaign.clearedStages).not.toContain('stage06')
-    expect(consumableCount(campaign.consumables, 'insu')).toBe(2)
+    expect(consumableCount(campaign.consumables, 'insu')).toBe(3)
   })
 })
 
@@ -576,7 +579,7 @@ function deploymentFor(stageDef: StageDef, roster: RosterEntry[]): string[] | un
   return [...forced, ...rest].slice(0, stageDef.deployMax ?? stageDef.playerSlots.length)
 }
 
-describe('풀 캠페인 레벨 커브 (추격 루트 완주)', () => {
+describe('풀 캠페인 레벨 커브 (추격 루트 완주 — 1부 + 2부)', () => {
   it('전 노드를 AI로 완주하면 로스터가 이월되고 최고 레벨이 보고된다', () => {
     let campaign = newCampaign()
     const results: string[] = []
@@ -584,9 +587,15 @@ describe('풀 캠페인 레벨 커브 (추격 루트 완주)', () => {
     let healCasts = 0
     let buffCasts = 0
     let guard = 0
+    // v1.0 2부 계측 — 인수 수급(전투 보상)과 상점 진열 시점
+    let sealsFromBattle = 0
+    let shopOpenedAt: string | null = null
 
-    while (currentNode(campaign)?.type !== 'end' && guard++ < 60) {
+    while (currentNode(campaign)?.type !== 'end' && guard++ < 100) {
       const node = currentNode(campaign)!
+      if (shopOpenedAt === null && shopConsumables(campaign).some((c) => c.id === 'insu')) {
+        shopOpenedAt = node.id
+      }
       if (node.type === 'story') {
         campaign = completeStory(campaign)
       } else if (node.type === 'choice') {
@@ -600,24 +609,33 @@ describe('풀 캠페인 레벨 커브 (추격 루트 완주)', () => {
         const bonusFired = state.log.some((l) => l.type === 'bonus')
         healCasts += state.log.filter((l) => l.type === 'heal').length
         buffCasts += state.log.filter((l) => l.type === 'buff' || l.type === 'debuff').length
+        if (node.rewardSeal) sealsFromBattle += 1
         results.push(`${node.id}(${stageDef.id}): ${state.result}${bonusFired ? '+보너스' : ''}`)
         campaign = applyVictory(campaign, state)
       } else break
     }
 
     expect(currentNode(campaign)?.type).toBe('end')
-    expect(campaign.clearedStages).toEqual(['stage01', 'stage02', 'stage03', 'stage04', 'stage05', 'stage06'])
-    expect(consumableCount(campaign.consumables, 'insu')).toBe(3)
+    expect(campaign.clearedStages).toEqual([
+      'stage01', 'stage02', 'stage03', 'stage04', 'stage05', 'stage06',
+      'stage07', 'stage08', 'stage09', 'stage10', 'stage11',
+    ])
+    expect(consumableCount(campaign.consumables, 'insu')).toBe(4)
+    // 2부 합류 2명이 로스터에 얹힌다 (허저 s23 / 장료 s25)
+    expect(campaign.roster.map((r) => r.officerId)).toContain('xuChu')
+    expect(campaign.roster.map((r) => r.officerId)).toContain('zhangLiao')
 
     const levels = campaign.roster.map((r) => `${OFFICERS[r.officerId].name} Lv${r.level}`)
     const top = Math.max(...campaign.roster.map((r) => r.level))
     const promotable = campaign.roster.filter((r) => r.level >= PROMOTION_LEVEL).length
+    const insuBuyable = Math.floor(campaign.gold / CONSUMABLES.insu.price!)
     console.log(
       [
-        '[v0.9 레벨 커브 시뮬] 추격 루트 완주',
+        '[v1.0 레벨 커브 시뮬] 추격 루트 완주 (1부 6전투 + 2부 5전투)',
         `  전투 결과: ${results.join(' / ')}`,
         `  최종 로스터: ${levels.join(', ')}`,
         `  최고 레벨 ${top} / 승급 기준 Lv${PROMOTION_LEVEL} 도달 ${promotable}명 / 인수 ${consumableCount(campaign.consumables, 'insu')}개`,
+        `  인수 수급: 전투 보상 ${sealsFromBattle}개 + 상점 해금 ${shopOpenedAt ?? '없음'}부터 (잔여 군자금 ${campaign.gold} → 추가 구매 가능 ${insuBuyable}개)`,
         `  AI 지원 책략: 회복 ${healCasts}회 / 강화·방해 ${buffCasts}회`,
         top >= PROMOTION_LEVEL
           ? '  → Lv15 도달: 승급이 캠페인 안에서 열린다'

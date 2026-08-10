@@ -162,6 +162,9 @@ export const FRUIT_STAT_BONUS = 2
 // 선택지/클리어 방식에 따른 스테이지 스킵이 존재한다 (campaign-ux.md 1부 §3.3).
 // v0.7에서 제1부(반동탁 연합) 구간과 선택지 분기(c01)를 얹었다:
 //   c01에서 "그만둔다"(회군)를 고르면 동탁 추격전(n13) 전투 노드를 통째로 건너뛴다 — 원작 03 스킵 재현.
+// v1.0에서 제2부(청주~하비, 원작 1장 후반)를 5전투로 압축해 얹었다:
+//   c02는 노드를 가르지 않고 게이지만 움직인다(같은 전투로 합류) — 원작 서주 대학살 소재.
+//   합류(join)는 노드 필드로 선언하고 completeStory/applyVictory가 joinOfficers로 소화한다.
 // battle 노드 id(n01/n02)는 v0.3 세이브 호환을 위해 유지한다.
 export const CAMPAIGN_NODES: CampaignNode[] = [
   { id: 's00', type: 'story', title: '의용군 결성', scriptId: 'intro', next: 'n01' },
@@ -191,8 +194,44 @@ export const CAMPAIGN_NODES: CampaignNode[] = [
   },
   { id: 'n13', type: 'battle', stageId: 'stage06', rewardGold: 1000, rewardSeal: true, next: 's13' },
   { id: 's12', type: 'story', title: '회군', scriptId: 'retreat', next: 's13' },
-  { id: 's13', type: 'story', title: '1부 종장', scriptId: 'chapterEnd', next: 'fin' },
-  { id: 'fin', type: 'end', title: '제1부 완' },
+  { id: 's13', type: 'story', title: '1부 종장', scriptId: 'chapterEnd', next: 's20' },
+  // ---- 제2부 「연주에서 서주로」 — 청주 평정 ~ 하비 (원작 1장 후반을 5전투로 압축) ----
+  // chapterOf가 이 s20을 경계로 1부/2부를 가른다 → 인수 상점 진열이 여기서 열린다 (items.md §5).
+  { id: 's20', type: 'story', title: '청주 격문', scriptId: 'chapter2Intro', next: 'n20' },
+  { id: 'n20', type: 'battle', stageId: 'stage07', rewardGold: 900, next: 's21' },
+  { id: 's21', type: 'story', title: '아버지의 죽음', scriptId: 'fatherDeath', next: 'c02' },
+  {
+    id: 'c02',
+    type: 'choice',
+    title: '원수는 누구인가',
+    prompt:
+      '아버지 조숭이 서주 경계에서 도겸의 군사에게 살해됐다. 군은 이미 복수를 외치며 창을 갈고 있다.',
+    speaker: 'caocao',
+    // 원작 서주 대학살 소재 — 실제 역사의 조조는 서주에서 백성을 도륙했다(사실 루트).
+    // 두 갈래 모두 같은 전투(n21)로 합류하고 게이지만 갈린다 (campaign-ux.md 1부 §5).
+    options: [
+      { text: '아버지의 원수다. 서주를 쓸어버린다.', gaugeDelta: 10, next: 'n21' },
+      { text: '원수는 도겸뿐. 백성은 건드리지 않는다.', gaugeDelta: -10, next: 'n21' },
+    ],
+  },
+  { id: 'n21', type: 'battle', stageId: 'stage08', rewardGold: 1100, next: 's22' },
+  { id: 's22', type: 'story', title: '복양의 배신', scriptId: 'puyangBetrayal', next: 'n22' },
+  { id: 'n22', type: 'battle', stageId: 'stage09', rewardGold: 1300, next: 's23' },
+  // 허저 합류 — story 노드의 join을 completeStory가 소화한다
+  {
+    id: 's23',
+    type: 'story',
+    title: '서주 구원 요청',
+    scriptId: 'xuzhouRescue',
+    join: ['xuChu'],
+    next: 'n23',
+  },
+  { id: 'n23', type: 'battle', stageId: 'stage10', rewardGold: 1400, next: 's24' },
+  { id: 's24', type: 'story', title: '하비 수공', scriptId: 'xiapiFlood', next: 'n24' },
+  { id: 'n24', type: 'battle', stageId: 'stage11', rewardGold: 1800, rewardSeal: true, next: 's25' },
+  // 장료 합류 — 원작 명장면("장료는 죽음을 두려워하지 않는다") 직후 2차 병과 그대로 들어온다
+  { id: 's25', type: 'story', title: '2부 종장', scriptId: 'chapter2End', join: ['zhangLiao'], next: 'fin' },
+  { id: 'fin', type: 'end', title: '제2부 완' },
 ]
 
 /** 초기 로스터 — 서장 클리어 후 6명 일괄 합류 커브를 압축한 구성 (campaign-ux.md 1부 §7) */
@@ -272,12 +311,13 @@ export function stageForNode(node: CampaignNode): StageDef {
 
 /**
  * story 노드 소화 → 다음 노드로 전진 (원본 불변).
+ * 노드에 join이 있으면 그 장수들을 로스터에 편입한 뒤 전진한다 (joinOfficers는 멱등).
  * battle 노드나 막다른 노드에서 호출되면 아무 일도 하지 않고 원본을 그대로 돌려준다.
  */
 export function completeStory(campaign: CampaignState): CampaignState {
   const node = currentNode(campaign)
   if (!node || node.type !== 'story' || node.next === null) return campaign
-  return {
+  const advanced: CampaignState = {
     version: 6,
     nodeId: node.next,
     roster: campaign.roster.map(cloneEntry),
@@ -288,6 +328,7 @@ export function completeStory(campaign: CampaignState): CampaignState {
     gauge: clampGauge(campaign.gauge),
     consumables: campaign.consumables.map((s) => ({ ...s })),
   }
+  return node.join ? joinOfficers(advanced, node.join) : advanced
 }
 
 /**
@@ -370,7 +411,7 @@ export function applyVictory(campaign: CampaignState, battleState: BattleState):
     ? [...campaign.clearedStages]
     : [...campaign.clearedStages, battleState.stageId]
 
-  return {
+  const advanced: CampaignState = {
     version: 6,
     // 막다른 노드(next null)나 전투 아닌 노드에서 불리면 제자리에 머문다
     nodeId: (node?.type === 'battle' || node?.type === 'story' ? node.next : null) ?? campaign.nodeId,
@@ -397,6 +438,10 @@ export function applyVictory(campaign: CampaignState, battleState: BattleState):
       node?.type === 'battle' && node.rewardSeal ? 1 : 0,
     ),
   }
+
+  // 전투 승리 합류 — 노드의 join을 소화한다 (joinOfficers는 멱등이라 재호출에 안전하다)
+  const join = node?.type === 'battle' || node?.type === 'story' ? node.join : undefined
+  return join ? joinOfficers(advanced, join) : advanced
 }
 
 // ---------- 승급 (Lv15 + 인수 — caocao.md §2.1~2.2) ----------

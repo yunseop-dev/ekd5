@@ -54,6 +54,29 @@ export const OFFICERS: Record<string, OfficerDef> = {
     level: 2,
   },
 
+  // ---- 아군 (제2부 합류) ----
+  // 원작은 합류 시점의 로스터 평균에 맞춘 레벨과 병과 기본 장비를 들고 온다 (campaign-ux.md §7.2).
+  // 무기는 계열이 강제된다 — 경보병 계열은 검(woodSword/bronzeSword…), 기병 계열은 창이다.
+  xuChu: {
+    id: 'xuChu',
+    name: '허저',
+    // 조조 친위대장. 무력 최상위 · 지력 최하위의 순수 방벽형 (s23 서주 구원 요청에서 합류)
+    stats: { str: 96, ldr: 72, int: 36, agi: 62, luck: 74 },
+    classId: 'heavyInfantry',
+    initialEquipment: { weapon: 'bronzeSword', armor: 'leatherArmor' },
+    level: 14,
+  },
+  zhangLiao: {
+    id: 'zhangLiao',
+    name: '장료',
+    // 원작 "기합류(=이미 승급된 채 합류) 장수는 클래스업 보너스가 없다"를 재현 —
+    // 기본 병과 자체가 2차(중기병)라 인수를 써도 더 오를 곳이 없다 (promotion.md §3).
+    stats: { str: 92, ldr: 90, int: 78, agi: 80, luck: 70 },
+    classId: 'heavyCavalry',
+    initialEquipment: { weapon: 'bronzeSpear', armor: 'bronzeArmor' },
+    level: 18,
+  },
+
   // ---- 적군 (황건적) ----
   // 잡병도 1단계 무기를 지닌다 (원작: 적 부대도 병과 기본 장비를 갖고 나온다).
   // 방어구는 주지 않는다 — 황건적은 오합지졸이라는 원작 묘사 + 초반 난이도 조정.
@@ -177,5 +200,82 @@ export const OFFICERS: Record<string, OfficerDef> = {
     classId: 'strategist',
     initialEquipment: { weapon: 'bambooFan', armor: 'clothRobe' },
     level: 7,
+  },
+
+  // ---- 적군 (제2부 · 황건 잔당 · 서주군 · 여포군) ----
+  // 제2부 적은 아군 도달 예상(Lv13~20)에 러버밴딩된 레벨을 갖는다.
+  // 잡병(yellow*/west*)은 기존 정의를 스테이지 level 오버라이드로 재사용한다.
+  guanHai: {
+    id: 'guanHai',
+    name: '관해',
+    // 청주 황건 잔당의 두목 — 물량을 이끄는 두목급이라 잡병보다 한 급 위다
+    stats: { str: 80, ldr: 66, int: 30, agi: 56, luck: 48 },
+    classId: 'heavyInfantry',
+    initialEquipment: { weapon: 'woodSword', armor: 'leatherArmor' },
+    level: 12,
+  },
+  caoBao: {
+    id: 'caoBao',
+    name: '조표',
+    // 도겸의 장수. 서주 수성전의 실질적인 지휘관
+    stats: { str: 76, ldr: 64, int: 40, agi: 66, luck: 44 },
+    classId: 'lightCavalry',
+    initialEquipment: { weapon: 'bronzeSpear', armor: 'leatherArmor' },
+    level: 13,
+  },
+  taoQian: {
+    id: 'taoQian',
+    name: '도겸',
+    // 서주목. 노쇠해 싸울 힘이 없다 — 통솔·지력만 남은 약체 보스급 비(非)보스
+    stats: { str: 40, ldr: 70, int: 72, agi: 44, luck: 60 },
+    classId: 'lord',
+    initialEquipment: { weapon: 'woodSword', armor: 'leatherArmor' },
+    level: 14,
+  },
+  chenGong: {
+    id: 'chenGong',
+    name: '진궁',
+    // 여포의 모사. 병과가 2차(참모)라 화룡을 포함한 책략 전부를 실제로 쓴다
+    stats: { str: 30, ldr: 66, int: 94, agi: 62, luck: 66 },
+    classId: 'counselor',
+    initialEquipment: { weapon: 'whiteFeatherFan', armor: 'silkRobe' },
+    level: 18,
+  },
+  gaoShun: {
+    id: 'gaoShun',
+    name: '고순',
+    // 함진영(陷陣營)을 이끄는 여포군 최정예. 방어 특화 2차 병과(중보병)
+    stats: { str: 86, ldr: 88, int: 56, agi: 60, luck: 58 },
+    classId: 'guardInfantry',
+    initialEquipment: { weapon: 'bronzeSword', armor: 'bronzeArmor' },
+    level: 17,
+  },
+
+  // ---- 우군 (유비군 — stage10 서주 구원의 ally 진영) ----
+  // 조작 대상이 아니라 AI로 움직인다. 원작 우군처럼 아군과 함께 싸우되 지휘를 받지 않는다.
+  liuBei: {
+    id: 'liuBei',
+    name: '유비',
+    stats: { str: 72, ldr: 88, int: 76, agi: 66, luck: 92 },
+    classId: 'lord',
+    initialEquipment: { weapon: 'woodSword', armor: 'leatherArmor' },
+    level: 13,
+  },
+  guanYu: {
+    id: 'guanYu',
+    // 원작에서 "이미 승급 상태로 등장"하는 급 — 병과 자체가 2차다
+    name: '관우',
+    stats: { str: 96, ldr: 90, int: 70, agi: 74, luck: 74 },
+    classId: 'guardInfantry',
+    initialEquipment: { weapon: 'bronzeSword', armor: 'bronzeArmor' },
+    level: 15,
+  },
+  zhangFei: {
+    id: 'zhangFei',
+    name: '장비',
+    stats: { str: 98, ldr: 74, int: 42, agi: 78, luck: 62 },
+    classId: 'heavyCavalry',
+    initialEquipment: { weapon: 'bronzeSpear', armor: 'bronzeArmor' },
+    level: 15,
   },
 }
