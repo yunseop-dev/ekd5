@@ -29,7 +29,6 @@ const STATUS_BADGE: Record<StatusId, string> = {
   confusion: '乱',
   immobile: '縛',
   seal: '封',
-  charm: '魅',
 }
 
 /** 배지 표시 상한 — 넘치면 잘라서 토큰이 뭉개지지 않게 한다 */

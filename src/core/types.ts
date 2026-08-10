@@ -216,7 +216,9 @@ export interface StrategyDef {
 
 // ---------- 상태이상 ----------
 
-export type StatusId = 'poison' | 'seal' | 'confusion' | 'immobile' | 'charm'
+// 원작은 정확히 4종 (비트필드 0x02 부동/0x04 금책/0x08 혼란/0x10 독).
+// '매혹'은 조조전 Online 오염으로 판명되어 제거했다 (docs/research/statuses.md §1)
+export type StatusId = 'poison' | 'seal' | 'confusion' | 'immobile'
 
 export interface StatusEffect {
   id: StatusId

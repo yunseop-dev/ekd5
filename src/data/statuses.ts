@@ -34,12 +34,6 @@ export const STATUSES: Record<StatusId, StatusDef> = {
     name: '금책',
     desc: '책략을 쓸 수 없다. 양치약으로 치료.',
   },
-  // 매혹 — 부여 수단(책략)은 3부 예정. 해제(만능약)와 표시를 위해 정의만 둔다.
-  charm: {
-    id: 'charm',
-    name: '매혹',
-    desc: '부대가 적에게 홀렸다. 만능약으로 치료.',
-  },
 }
 
 /** UI 라벨 헬퍼 — 미등록 id 내성 */
