@@ -127,19 +127,22 @@
   justify-content: center;
 }
 
-/* 지형 팔레트 (battle.css .tile.t-* 와 동일 값) */
-.dp-tile.dt-plain { background: #a8bf6e; }
-.dp-tile.dt-grass { background: #8fb95e; }
-.dp-tile.dt-forest { background: #4e7a3d; }
-.dp-tile.dt-mountain { background: #8a7355; }
-.dp-tile.dt-wasteland { background: #c2a86b; }
-.dp-tile.dt-river { background: #4c7fb5; }
-.dp-tile.dt-bridge { background: #a3865a; }
-.dp-tile.dt-fort { background: #7d6a8f; }
-.dp-tile.dt-village { background: #d9b06c; }
-.dp-tile.dt-castle { background: #9b9b9b; }
-.dp-tile.dt-wall { background: #55504a; }
-.dp-tile.dt-gate { background: #6d5c3f; }
+/* 지형 팔레트 — 값은 battle.css :root 의 --t-* 단일 출처를 그대로 참조한다.
+   (전투 보드와 미리보기가 같은 색을 각자 하드코딩하던 문제를 없앴다) */
+.dp-tile.dt-plain { background: var(--t-plain); }
+.dp-tile.dt-grass { background: var(--t-grass); }
+.dp-tile.dt-forest { background: var(--t-forest); }
+.dp-tile.dt-mountain { background: var(--t-mountain); }
+.dp-tile.dt-wasteland { background: var(--t-wasteland); }
+.dp-tile.dt-river { background: var(--t-river); }
+.dp-tile.dt-ford { background: var(--t-ford); }
+.dp-tile.dt-bridge { background: var(--t-bridge); }
+.dp-tile.dt-fort { background: var(--t-fort); }
+.dp-tile.dt-village { background: var(--t-village); }
+.dp-tile.dt-castle { background: var(--t-castle); }
+.dp-tile.dt-wall { background: var(--t-wall); }
+.dp-tile.dt-gate { background: var(--t-gate); }
+.dp-tile.dt-gateClosed { background: var(--t-gate-closed); }
 
 /* 출진 슬롯 마커 */
 .dp-slot {

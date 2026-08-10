@@ -48,6 +48,7 @@ import { BattleBoard, CLASS_ICON } from './BattleBoard'
 import { BattleLog } from './BattleLog'
 import { EventOverlay } from './EventOverlay'
 import { ForecastPanel } from './ForecastPanel'
+import { euroRo } from './josa'
 import { TerrainInfoPanel } from './TerrainInfoPanel'
 import { UnitInfoPanel } from './UnitInfoPanel'
 import './battle.css'
@@ -94,6 +95,21 @@ export interface Floater {
 /** 연출 속도: 1=보통, 2=빠름, 0=생략 */
 type PlaySpeed = 1 | 2 | 0
 const AI_STEP_MS = 700
+
+/** 화살표 키 → 커서 이동량 (원작 방향키 조작) */
+const ARROW_STEP: Record<string, Vec2 | undefined> = {
+  ArrowUp: { x: 0, y: -1 },
+  ArrowDown: { x: 0, y: 1 },
+  ArrowLeft: { x: -1, y: 0 },
+  ArrowRight: { x: 1, y: 0 },
+}
+
+/** 입력 필드에 포커스가 있으면 게임 조작으로 삼지 않는다 (에디터 플레이테스트 등) */
+function typingInField(): boolean {
+  const el = document.activeElement
+  if (!(el instanceof HTMLElement)) return false
+  return el.isContentEditable || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'
+}
 
 const PHASE_LABEL: Record<Faction, string> = {
   player: '아군 페이즈',
@@ -155,13 +171,6 @@ const CATEGORY_ICON: Record<string, string> = {
 }
 const classIcon = (cls: UnitClassDef): string =>
   CLASS_ICON[cls.id] ?? CATEGORY_ICON[cls.category] ?? '?'
-
-/** "중기병으로" / "군사로" — 받침(ㄹ 제외) 여부로 조사를 고른다 */
-function euroRo(word: string): string {
-  const code = word.charCodeAt(word.length - 1) - 0xac00
-  const jong = code >= 0 && code <= 11171 ? code % 28 : 0
-  return `${word}${jong === 0 || jong === 8 ? '로' : '으로'}`
-}
 
 const GROWTH_KEYS = ['atk', 'def', 'mind', 'agi', 'morale'] as const
 const GROWTH_LABEL: Record<(typeof GROWTH_KEYS)[number], string> = {
@@ -271,7 +280,11 @@ interface Props {
 export function BattleScreen({ stage, seed, onExit, onRestart, roster, deployment, consumables, onFinish }: Props) {
   const [state, setState] = useState<BattleState>(() => startBattle(stage, seed, roster, deployment, consumables))
   const [sel, setSel] = useState<Selection | null>(null)
-  const [hover, setHover] = useState<Vec2 | null>(null)
+  /**
+   * 명시 커서 — 원작처럼 빈 타일에도 상시 떠 있다. 마우스 진입이 갱신하지만
+   * **보드를 벗어나도 지우지 않는다**: 화살표 키 조작이 같은 위치를 이어받기 때문이다.
+   */
+  const [cursor, setCursor] = useState<Vec2 | null>(null)
   const [speed, setSpeed] = useState<PlaySpeed>(1)
   const [confirmEnd, setConfirmEnd] = useState(false)
   /** 인수 승급 확인 오버레이 (도구 대상 지정에서 승급 가능한 유닛을 찍었을 때) */
@@ -287,7 +300,12 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
   const prevPhaseKey = useRef<string | null>(null)
 
   const selectedUnit = sel ? state.units.find((u) => u.id === sel.unitId) : undefined
-  const hoverUnit = hover ? unitAt(state, hover) : undefined
+  const cursorUnit = cursor ? unitAt(state, cursor) : undefined
+  /** 커서 밑 지형 — 커서가 맵 밖일 수는 없지만(clamp) 맵 교체 대비로 범위를 확인한다 */
+  const cursorTerrain =
+    cursor && cursor.y >= 0 && cursor.y < state.map.height && cursor.x >= 0 && cursor.x < state.map.width
+      ? TERRAIN[state.map.tiles[cursor.y][cursor.x]]
+      : undefined
   const aiActiveUnit = aiActiveId ? state.units.find((u) => u.id === aiActiveId) : undefined
   const inspectUnit = inspectId ? state.units.find((u) => u.id === inspectId) : undefined
 
@@ -522,14 +540,14 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
    */
   const aoeCells = useMemo(() => {
     const set = new Set<string>()
-    if (!selStrategy || !selectedUnit || !hover) return set
-    if (!strategyTargetOk(selStrategy, selectedUnit, unitAt(state, hover))) return set
-    for (const p of strategyAreaCells(selStrategy.area, hover)) {
+    if (!selStrategy || !selectedUnit || !cursor) return set
+    if (!strategyTargetOk(selStrategy, selectedUnit, unitAt(state, cursor))) return set
+    for (const p of strategyAreaCells(selStrategy.area, cursor)) {
       if (p.x < 0 || p.y < 0 || p.x >= state.map.width || p.y >= state.map.height) continue
       set.add(keyOf(p))
     }
     return set
-  }, [selStrategy, selectedUnit, hover, state])
+  }, [selStrategy, selectedUnit, cursor, state])
 
   /** 들여다보는 유닛의 이동 가능 칸 (자기 위치 포함) */
   const inspectMoveCells = useMemo(() => {
@@ -744,6 +762,52 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
     setConfirmEnd(true)
   }
 
+  // ---------- 키보드 조작 (원작 방향키 + 결정/취소) ----------
+
+  /** 확인창·배너·결과창이 떠 있는가. 이벤트 오버레이는 isPlayerTurn이 이미 걸러낸다 */
+  const overlayOpen = promoteConfirm !== null || confirmEnd || banner !== null || resultShown
+
+  /**
+   * 화살표 = 커서 이동, Enter/Space = 클릭, Escape = 우클릭(취소).
+   * 클릭/우클릭 경로를 그대로 재사용하므로 조작 FSM에 새 분기가 생기지 않는다.
+   */
+  useEffect(() => {
+    if (!isPlayerTurn || overlayOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (typingInField()) return
+      if (e.altKey || e.ctrlKey || e.metaKey) return
+      const step = ARROW_STEP[e.key]
+      if (step) {
+        e.preventDefault()
+        setCursor((prev) => {
+          // 커서가 없던 상태의 첫 입력은 기준점을 띄우기만 한다 (원작도 커서가 먼저 나타난다)
+          const base = prev ?? selectedUnit?.pos ?? livingUnits(state, 'player')[0]?.pos ?? { x: 0, y: 0 }
+          if (!prev) return base
+          return {
+            x: Math.min(state.map.width - 1, Math.max(0, base.x + step.x)),
+            y: Math.min(state.map.height - 1, Math.max(0, base.y + step.y)),
+          }
+        })
+        return
+      }
+      if (e.key === 'Enter' || e.key === ' ') {
+        // 버튼에 포커스가 있으면 브라우저가 그 버튼을 누른다 — 셀 클릭까지 겹쳐 실행하지 않는다
+        if (document.activeElement instanceof HTMLButtonElement) return
+        e.preventDefault()
+        if (cursor) handleCellClick(cursor)
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        handleRightClick()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // handleCellClick/handleRightClick은 state·sel·inspectId에서 파생된다 —
+    // 그 값이 바뀌면 리스너를 새 클로저로 다시 걸어야 한다
+  }, [isPlayerTurn, overlayOpen, cursor, state, sel, selectedUnit, inspectId])
+
   // ---------- 렌더 ----------
 
   const enemiesInRange =
@@ -756,8 +820,8 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
     )
 
   const forecastTarget =
-    sel?.mode === 'attackTarget' && selectedUnit && hoverUnit && isHostile(selectedUnit, hoverUnit)
-      ? hoverUnit
+    sel?.mode === 'attackTarget' && selectedUnit && cursorUnit && isHostile(selectedUnit, cursorUnit)
+      ? cursorUnit
       : undefined
 
   /** 선택 유닛이 쓸 수 있는 책략 목록 + 개별 사용 가능 판정 */
@@ -869,10 +933,11 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
         inspectThreatCells={inspectThreatCells}
         inspectUnitId={inspectId}
         selectedUnitId={sel?.unitId ?? null}
+        cursorPos={cursor}
         activeUnitId={aiActiveId}
         floaters={floaters}
         onCellClick={handleCellClick}
-        onCellHover={setHover}
+        onCellHover={setCursor}
         onCellRightClick={handleRightClick}
       />
 
@@ -982,11 +1047,11 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
           <ForecastPanel state={state} attacker={selectedUnit} defender={forecastTarget} />
         )}
 
-        {(hoverUnit ?? selectedUnit ?? inspectUnit ?? aiActiveUnit) && (
-          <UnitInfoPanel state={state} unit={(hoverUnit ?? selectedUnit ?? inspectUnit ?? aiActiveUnit)!} />
+        {(cursorUnit ?? selectedUnit ?? inspectUnit ?? aiActiveUnit) && (
+          <UnitInfoPanel state={state} unit={(cursorUnit ?? selectedUnit ?? inspectUnit ?? aiActiveUnit)!} />
         )}
 
-        {hover && <TerrainInfoPanel terrain={TERRAIN[state.map.tiles[hover.y][hover.x]]} />}
+        {cursorTerrain && <TerrainInfoPanel terrain={cursorTerrain} />}
 
         <BattleLog log={state.log} />
       </aside>
