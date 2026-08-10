@@ -364,6 +364,14 @@ function subjectParticle(word: string): string {
   return (code - 0xac00) % 28 === 0 ? '가' : '이'
 }
 
+/** 한글 방향 조사 — 받침 없거나 ㄹ이면 '로', 그 외 '으로' (로그 문장용) */
+function directionParticle(word: string): string {
+  const code = word.charCodeAt(word.length - 1)
+  if (Number.isNaN(code) || code < 0xac00 || code > 0xd7a3) return '(으)로'
+  const jong = (code - 0xac00) % 28
+  return jong === 0 || jong === 8 ? '로' : '으로'
+}
+
 /**
  * 무구성장 — 타격 1회당 장비 경험치를 얹고 레벨업을 처리한다 (state 직접 수정).
  * 무기는 공격이 명중했을 때, 방어구는 피격당했을 때 성장한다(원작: 빗나가면 거의 못 얻는다).
@@ -799,7 +807,7 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
           log(
             state,
             'promote',
-            `${nameOf(target)}${subjectParticle(nameOf(target))} ${newCls.name}으로 승급! HP·책략치 완전회복`,
+            `${nameOf(target)}${subjectParticle(nameOf(target))} ${newCls.name}${directionParticle(newCls.name)} 승급! HP·책략치 완전회복`,
             { targetId: target.id, amount: healed },
           )
           break

@@ -656,10 +656,14 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
   const promo = selectedUnit ? promotionInfoOf(selectedUnit) : null
   const promoteDef = promoteItemId ? CONSUMABLES[promoteItemId] : undefined
 
-  /** 도구 1개의 사용 가능 여부 + 사유 (인수는 승급 조건, 회복류는 항상 가능) */
+  /** 도구 1개의 사용 가능 여부 + 사유 (인수는 승급 조건, 회복류는 낭비 방지 — 코어는 거부하지 않는다) */
   const itemBlockReason = (def: ConsumableDef): string | null => {
     if (!selectedUnit) return '선택된 부대가 없다'
     if (def.effect.kind === 'promotion') return promo?.ok ? null : (promo?.reason ?? '승급할 수 없다')
+    if (def.effect.kind === 'heal' && def.range === 0 && selectedUnit.hp >= selectedUnit.maxHp)
+      return 'HP가 이미 가득하다'
+    if (def.effect.kind === 'mpRestore' && def.range === 0 && selectedUnit.mp >= selectedUnit.maxMp)
+      return 'MP가 이미 가득하다'
     return null
   }
 
