@@ -4,10 +4,11 @@
 
 import { openDB, type IDBPDatabase } from 'idb'
 import type { CampaignState, RosterEntry } from '../core/campaign'
-import { canEquipClass, clampGauge, currentNode, GAUGE_INITIAL, INITIAL_GOLD } from '../core/campaign'
-import type { EquipInstance, EquipmentMap, EquipSlot, OfficerStats } from '../core/types'
+import { addConsumable, canEquipClass, clampGauge, currentNode, GAUGE_INITIAL, INITIAL_GOLD } from '../core/campaign'
+import type { ConsumableStack, EquipInstance, EquipmentMap, EquipSlot, OfficerStats } from '../core/types'
 import { EQUIP_EXP_PER_LEVEL, EQUIP_MAX_LEVEL_NORMAL, EQUIP_MAX_LEVEL_TREASURE } from '../core/types'
 import { CLASSES } from '../data/classes'
+import { CONSUMABLES } from '../data/consumables'
 import { EQUIPMENT } from '../data/equipment'
 import { OFFICERS } from '../data/officers'
 import { STAGES } from '../data/stages'
@@ -100,18 +101,19 @@ function normalizeStatBonus(value: unknown): Partial<OfficerStats> {
 
 /**
  * 저장된 JSON은 신뢰할 수 없다 (수동 편집/구버전) — 구조 검사 후에만 통과.
- * v1(장비/군자금 이전)·v2(무구성장 이전)·v3(선택지/게이지 이전)·v4(승급 이전) 세이브는
- * 거부하지 않고 v5로 **승계 마이그레이션**한다:
+ * v1(장비/군자금 이전)·v2(무구성장 이전)·v3(선택지/게이지 이전)·v4(승급 이전)·v5(도구 이전)
+ * 세이브는 거부하지 않고 v6로 **승계 마이그레이션**한다:
  *  - v1 → 군자금 = 초기치, 창고 = 빈 목록, 각 부대의 장비 = 빈 슬롯. 성장치(레벨/경험치)는 살린다.
  *  - v2 → 장비/창고의 문자열 id를 Lv1 인스턴스로, 열매 목록·능력치 보정은 빈 값으로 채운다.
  *  - v3 → 사실-가상 게이지를 중립(50)으로 채운다. 선택지를 한 번도 지나지 않은 세이브와 같은 상태.
  *  - v4 → 인수 보유 수를 0으로 채운다. 승급한 부대가 없는 세이브와 같은 상태.
+ *  - v5 → 숫자 필드였던 seals(인수 N개)를 도구 스택 insu ×N으로 옮긴다. 도구 스톡은 빈 목록에서 시작.
  * 병과 착용 제한 정화는 버전과 무관하게 항상 수행한다(승급 병과 반영 — 계열 기준).
  */
 export function validateCampaign(data: unknown): CampaignState | null {
   if (typeof data !== 'object' || data === null) return null
   const raw = data as Record<string, unknown>
-  const KNOWN_VERSIONS = [1, 2, 3, 4, 5]
+  const KNOWN_VERSIONS = [1, 2, 3, 4, 5, 6]
   if (typeof raw.version !== 'number' || !KNOWN_VERSIONS.includes(raw.version)) return null
   const legacy = raw.version === 1 // v1 = 장비/경제 도입 이전
   if (typeof raw.nodeId !== 'string') return null
@@ -141,9 +143,22 @@ export function validateCampaign(data: unknown): CampaignState | null {
   // 손상된 값(문자열/NaN)은 세이브를 거부하지 않고 중립으로 되돌린다 — 게이지 하나로 세이브를 버릴 이유가 없다.
   const gauge = typeof raw.gauge === 'number' ? clampGauge(raw.gauge) : GAUGE_INITIAL
 
-  // v5 전용 필드 — 없으면 0(인수 미보유)으로 승계. 음수/소수/비정상 값은 0으로 되돌린다.
-  const seals =
-    typeof raw.seals === 'number' && Number.isFinite(raw.seals) ? Math.max(0, Math.trunc(raw.seals)) : 0
+  // v6 도구 스톡 — 손상된 스택은 세이브를 거부하지 않고 해당 항목만 떨어낸다 (미등록 id 포함).
+  let consumables: ConsumableStack[] = []
+  if (Array.isArray(raw.consumables)) {
+    for (const item of raw.consumables) {
+      if (typeof item !== 'object' || item === null) continue
+      const stack = item as Record<string, unknown>
+      if (typeof stack.itemId !== 'string' || !CONSUMABLES[stack.itemId]) continue
+      if (typeof stack.count !== 'number' || !Number.isFinite(stack.count)) continue
+      const count = Math.trunc(stack.count)
+      if (count > 0) consumables = addConsumable(consumables, stack.itemId, count)
+    }
+  }
+  // v5 이하의 seals(인수 N개) → insu 스택으로 이관
+  if (typeof raw.seals === 'number' && Number.isFinite(raw.seals)) {
+    consumables = addConsumable(consumables, 'insu', Math.max(0, Math.trunc(raw.seals)))
+  }
 
   const roster: RosterEntry[] = []
   for (const item of raw.roster) {
@@ -180,7 +195,7 @@ export function validateCampaign(data: unknown): CampaignState | null {
   }
 
   return {
-    version: 5,
+    version: 6,
     nodeId: raw.nodeId,
     roster,
     clearedStages: raw.clearedStages as string[],
@@ -188,7 +203,7 @@ export function validateCampaign(data: unknown): CampaignState | null {
     inventory,
     fruits,
     gauge,
-    seals,
+    consumables,
   }
 }
 

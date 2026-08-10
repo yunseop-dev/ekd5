@@ -25,11 +25,12 @@ import {
   strategyHitRate,
 } from './formulas'
 import type { MoveContext, MovementRange, Occupancy } from './movement'
-import { keyOf, manhattan, movementRange } from './movement'
+import { keyOf, manhattan, movementRange, strategyAreaCells } from './movement'
 import { nextInt, roll } from './rng'
 import type {
   BattleAction,
   BattleState,
+  ConsumableStack,
   EquipInstance,
   EquipmentDef,
   EquipSlot,
@@ -263,6 +264,7 @@ export function createBattle(
   seed: number,
   roster?: RosterEntry[],
   deployment?: string[],
+  consumables?: ConsumableStack[],
 ): BattleState {
   // 출진 명단이 오면 stage.units의 player 정의는 무시하고 슬롯 배치로 대체한다.
   // 적/우군은 언제나 stage.units에서 생성.
@@ -316,6 +318,8 @@ export function createBattle(
     result: 'ongoing',
     log: [{ type: 'battleStart', message: `${stage.name} — 전투 개시` }],
     spawnedReinforcements: [],
+    // 캠페인 스톡의 전투 로컬 사본 — 자유 전투처럼 스톡이 없으면 빈 목록 (도구 메뉴 숨김)
+    consumables: consumables?.map((s) => ({ ...s })) ?? [],
   }
 }
 
@@ -573,8 +577,9 @@ export function startBattle(
   seed: number,
   roster?: RosterEntry[],
   deployment?: string[],
+  consumables?: ConsumableStack[],
 ): BattleState {
-  return attachStage(createBattle(stage, seed, roster, deployment), stage)
+  return attachStage(createBattle(stage, seed, roster, deployment, consumables), stage)
 }
 
 export function applyAction(prev: BattleState, action: BattleAction): BattleState {
@@ -643,16 +648,7 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
       // 화계는 우천 시 사용 불가
       if (strategy.element === 'fire' && state.weather === 'rain') return prev
 
-      const targetCells: Vec2[] =
-        strategy.area === 'cross'
-          ? [
-              action.target,
-              { x: action.target.x, y: action.target.y - 1 },
-              { x: action.target.x, y: action.target.y + 1 },
-              { x: action.target.x - 1, y: action.target.y },
-              { x: action.target.x + 1, y: action.target.y },
-            ]
-          : [action.target]
+      const targetCells: Vec2[] = strategyAreaCells(strategy.area, action.target)
 
       const primaryTarget = unitAt(state, action.target)
       if (!primaryTarget) return prev

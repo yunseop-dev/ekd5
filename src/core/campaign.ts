@@ -9,6 +9,7 @@ import { STAGES } from '../data/stages'
 // 착용 제한 판정은 병과의 lineage(계열 루트) 기준 — 승급해도 계열 무기를 계속 쓴다 (CLASSES 참조 필요)
 import type {
   BattleState,
+  ConsumableStack,
   EquipInstance,
   EquipmentInput,
   EquipmentMap,
@@ -97,7 +98,7 @@ export function clampGauge(value: number): number {
 }
 
 export interface CampaignState {
-  version: 5
+  version: 6
   nodeId: string
   roster: RosterEntry[]
   clearedStages: string[]
@@ -112,8 +113,31 @@ export interface CampaignState {
    * 합 100 고정이므로 가상 쪽 값은 100 - gauge로 얻는다.
    */
   gauge: number
-  /** 보유 인수(印綬) 수 — 승급 1회당 1개 소비 (caocao.md §2.1) */
-  seals: number
+  /** 도구(소모품) 스톡 — 인수(insu) 포함. 전투로 반입되어 소비되고 승리 시 잔량이 회수된다 */
+  consumables: ConsumableStack[]
+}
+
+/** 스택 목록에서 특정 도구의 보유 수 */
+export function consumableCount(list: ConsumableStack[], itemId: string): number {
+  return list.find((s) => s.itemId === itemId)?.count ?? 0
+}
+
+/** 도구 n개 추가한 새 목록 (불변). n<=0이면 복제만 */
+export function addConsumable(list: ConsumableStack[], itemId: string, n: number): ConsumableStack[] {
+  const next = list.map((s) => ({ ...s }))
+  if (n <= 0) return next
+  const stack = next.find((s) => s.itemId === itemId)
+  if (stack) stack.count += n
+  else next.push({ itemId, count: n })
+  return next
+}
+
+/** 도구 n개 제거한 새 목록 (불변). 0이 되는 스택은 목록에서 뺀다. 부족하면 null */
+export function removeConsumable(list: ConsumableStack[], itemId: string, n: number): ConsumableStack[] | null {
+  if (consumableCount(list, itemId) < n) return null
+  return list
+    .map((s) => (s.itemId === itemId ? { ...s, count: s.count - n } : { ...s }))
+    .filter((s) => s.count > 0)
 }
 
 /** 초기 군자금 — 서장 1단계 상점에서 tier1 장비 1~2점을 살 수 있는 수준 (설계값) */
@@ -164,7 +188,7 @@ export const PLAYER_OFFICER_IDS = ['caocao', 'xiahoudun', 'dianwei', 'xiahouyuan
 
 export function newCampaign(): CampaignState {
   return {
-    version: 5,
+    version: 6,
     nodeId: CAMPAIGN_NODES[0].id,
     roster: PLAYER_OFFICER_IDS.map((officerId) => ({
       officerId,
@@ -179,7 +203,7 @@ export function newCampaign(): CampaignState {
     inventory: [],
     fruits: [],
     gauge: GAUGE_INITIAL,
-    seals: 0,
+    consumables: [],
   }
 }
 
@@ -203,7 +227,7 @@ export function completeStory(campaign: CampaignState): CampaignState {
   const node = currentNode(campaign)
   if (!node || node.type !== 'story' || node.next === null) return campaign
   return {
-    version: 5,
+    version: 6,
     nodeId: node.next,
     roster: campaign.roster.map(cloneEntry),
     clearedStages: [...campaign.clearedStages],
@@ -211,7 +235,7 @@ export function completeStory(campaign: CampaignState): CampaignState {
     inventory: cloneInventory(campaign.inventory),
     fruits: [...campaign.fruits],
     gauge: clampGauge(campaign.gauge),
-    seals: campaign.seals,
+    consumables: campaign.consumables.map((s) => ({ ...s })),
   }
 }
 
@@ -226,7 +250,7 @@ export function completeChoice(campaign: CampaignState, optionIndex: number): Ca
   const option = node.options[optionIndex]
   if (!option) return campaign
   return {
-    version: 5,
+    version: 6,
     nodeId: option.next,
     roster: campaign.roster.map(cloneEntry),
     clearedStages: [...campaign.clearedStages],
@@ -234,7 +258,7 @@ export function completeChoice(campaign: CampaignState, optionIndex: number): Ca
     inventory: cloneInventory(campaign.inventory),
     fruits: [...campaign.fruits],
     gauge: clampGauge(campaign.gauge + option.gaugeDelta),
-    seals: campaign.seals,
+    consumables: campaign.consumables.map((s) => ({ ...s })),
   }
 }
 
@@ -290,7 +314,7 @@ export function applyVictory(campaign: CampaignState, battleState: BattleState):
     : [...campaign.clearedStages, battleState.stageId]
 
   return {
-    version: 5,
+    version: 6,
     // 막다른 노드(next null)나 전투 아닌 노드에서 불리면 제자리에 머문다
     nodeId: (node?.type === 'battle' || node?.type === 'story' ? node.next : null) ?? campaign.nodeId,
     roster: campaign.roster.map((entry) => {
@@ -305,8 +329,13 @@ export function applyVictory(campaign: CampaignState, battleState: BattleState):
     inventory: [...cloneInventory(campaign.inventory), ...lootFor(battleState).map(toEquipInstance)],
     fruits: [...campaign.fruits],
     gauge: clampGauge(campaign.gauge),
+    // 도구는 전투 로컬 사본의 잔량이 정본이 된다 (전투 중 소비 반영).
     // 인수는 노드에 박힌 보상 — 원작대로 특정 전투(사수관/호로관/추격전)에서만 나온다
-    seals: campaign.seals + (node?.type === 'battle' && node.rewardSeal ? 1 : 0),
+    consumables: addConsumable(
+      battleState.consumables,
+      'insu',
+      node?.type === 'battle' && node.rewardSeal ? 1 : 0,
+    ),
   }
 }
 
@@ -329,7 +358,7 @@ export function canPromote(campaign: CampaignState, officerId: string): boolean 
   const entry = campaign.roster.find((r) => r.officerId === officerId)
   if (!entry) return false
   if (entry.level < PROMOTION_LEVEL) return false
-  if (campaign.seals <= 0) return false
+  if (consumableCount(campaign.consumables, 'insu') <= 0) return false
   return CLASSES[classIdOf(entry)]?.promotesTo !== undefined
 }
 
@@ -350,7 +379,7 @@ export function promoteOfficer(campaign: CampaignState, officerId: string): Camp
     ),
     inventory: cloneInventory(campaign.inventory),
     fruits: [...campaign.fruits],
-    seals: campaign.seals - 1,
+    consumables: removeConsumable(campaign.consumables, 'insu', 1)!,
   }
 }
 

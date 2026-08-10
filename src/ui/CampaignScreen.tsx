@@ -9,6 +9,7 @@ import {
   PROMOTION_LEVEL,
   canPromote,
   classIdOf,
+  consumableCount,
   currentNode,
   isCampaignFinished,
   promoteOfficer,
@@ -124,7 +125,7 @@ function promotionInfo(campaign: CampaignState, entry: RosterEntry, cls: UnitCla
   const targetId = promotionTargetId(cls)
   const target = targetId ? (CLASSES[targetId] ?? null) : null
   const ok = canPromote(campaign, entry.officerId)
-  const seals = campaign.seals ?? 0
+  const seals = consumableCount(campaign.consumables ?? [], 'insu')
   let reason: string | null = null
   if (!ok) {
     if (!target) reason = '최종 병과 — 더 오를 곳이 없다'
@@ -266,7 +267,7 @@ export function CampaignScreen({ campaign, savedAt, onSortie, onTitle, onUpdate 
   const selOfficer = selected ? OFFICERS[selected.officerId] : null
   // v0.8: 표시 병과는 승급 결과(RosterEntry.classId)를 따른다 — 원 병과가 아니다.
   const selClass = selected ? (CLASSES[classIdOf(selected)] ?? null) : null
-  const seals = campaign.seals ?? 0
+  const seals = consumableCount(campaign.consumables ?? [], 'insu')
   const promo = selected && selClass ? promotionInfo(campaign, selected, selClass) : null
 
   // 선택이 바뀌면 열려 있던 확인창은 닫는다 (다른 장수에게 잘못 확정되는 사고 방지)

@@ -2,7 +2,7 @@
 // 데이터와 결합하지 않도록 코스트·점유 판정은 콜백으로 주입받는다.
 // 참고: Red Blob Games — Dijkstra movement range (docs/research/tech.md §3)
 
-import type { Vec2 } from './types'
+import type { StrategyArea, Vec2 } from './types'
 
 export const keyOf = (p: Vec2): string => `${p.x},${p.y}`
 
@@ -114,6 +114,32 @@ export function attackableCells(
     }
   }
   return cells
+}
+
+/**
+ * 책략 영향 범위 — 중심 칸 기준의 상대 형태 (코어 리듀서·AI·UI 프리뷰 공용).
+ * 맵 경계 클립은 하지 않는다 — 호출부가 걸러 쓴다 (unitAt은 밖 좌표에 undefined를 돌려줘 안전).
+ */
+export function strategyAreaCells(area: StrategyArea, center: Vec2): Vec2[] {
+  switch (area) {
+    case 'single':
+      return [center]
+    case 'cross':
+      return [
+        center,
+        { x: center.x, y: center.y - 1 },
+        { x: center.x, y: center.y + 1 },
+        { x: center.x - 1, y: center.y },
+        { x: center.x + 1, y: center.y },
+      ]
+    case 'square': {
+      const cells: Vec2[] = []
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) cells.push({ x: center.x + dx, y: center.y + dy })
+      }
+      return cells
+    }
+  }
 }
 
 /** 이동 가능 전체 칸에서 공격 가능한 칸의 합집합 (UI 빨간 오버레이용) */

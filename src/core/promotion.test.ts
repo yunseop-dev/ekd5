@@ -19,6 +19,7 @@ import {
   canPromote,
   classIdOf,
   completeChoice,
+  consumableCount,
   completeStory,
   currentNode,
   equipItem,
@@ -46,7 +47,7 @@ function withRoster(
 
 /** Lv15 + 인수 1개를 갖춘 승급 직전 상태 */
 function readyToPromote(officerId: string, level = PROMOTION_LEVEL): CampaignState {
-  return { ...withRoster(newCampaign(), officerId, { level }), seals: 1 }
+  return { ...withRoster(newCampaign(), officerId, { level }), consumables: [{ itemId: 'insu', count: 1 }] }
 }
 
 const entryOf = (campaign: CampaignState, officerId: string): RosterEntry =>
@@ -213,7 +214,7 @@ describe('canPromote — 승급 조건 매트릭스', () => {
   })
 
   it('인수가 없으면 false', () => {
-    expect(canPromote({ ...readyToPromote('xiahoudun'), seals: 0 }, 'xiahoudun')).toBe(false)
+    expect(canPromote({ ...readyToPromote('xiahoudun'), consumables: [] }, 'xiahoudun')).toBe(false)
   })
 
   it('상위 병과가 없으면(이미 2차) false — 인수를 낭비하지 않는다', () => {
@@ -222,8 +223,8 @@ describe('canPromote — 승급 조건 매트릭스', () => {
   })
 
   it('로스터에 없는 장수는 false', () => {
-    expect(canPromote({ ...newCampaign(), seals: 5 }, 'lüBu')).toBe(false)
-    expect(canPromote({ ...newCampaign(), seals: 5 }, 'nobody')).toBe(false)
+    expect(canPromote({ ...newCampaign(), consumables: [{ itemId: 'insu', count: 5 }] }, 'lüBu')).toBe(false)
+    expect(canPromote({ ...newCampaign(), consumables: [{ itemId: 'insu', count: 5 }] }, 'nobody')).toBe(false)
   })
 
   it('전 아군 6명이 Lv15 + 인수면 모두 승급 대상 (1차 6종 전부 트리를 갖는다)', () => {
@@ -237,7 +238,7 @@ describe('promoteOfficer', () => {
   it('인수 1개를 쓰고 병과를 상위로 바꾼다', () => {
     const before = readyToPromote('xiahoudun')
     const after = promoteOfficer(before, 'xiahoudun')
-    expect(after.seals).toBe(0)
+    expect(consumableCount(after.consumables, 'insu')).toBe(0)
     expect(entryOf(after, 'xiahoudun').classId).toBe('heavyCavalry')
     expect(classIdOf(entryOf(after, 'xiahoudun'))).toBe('heavyCavalry')
   })
@@ -275,21 +276,21 @@ describe('promoteOfficer', () => {
   it('조건 미충족이면 원본을 그대로 돌려준다 (참조 동일)', () => {
     const lowLevel = readyToPromote('xiahoudun', 14)
     expect(promoteOfficer(lowLevel, 'xiahoudun')).toBe(lowLevel)
-    const noSeal = { ...readyToPromote('xiahoudun'), seals: 0 }
+    const noSeal = { ...readyToPromote('xiahoudun'), consumables: [] }
     expect(promoteOfficer(noSeal, 'xiahoudun')).toBe(noSeal)
     const absent = readyToPromote('xiahoudun')
     expect(promoteOfficer(absent, 'nobody')).toBe(absent)
     // 2차에서 한 번 더 → 인수가 남아 있어도 아무 일 없음
-    const twice = { ...promoteOfficer(readyToPromote('xiahoudun'), 'xiahoudun'), seals: 3 }
+    const twice = { ...promoteOfficer(readyToPromote('xiahoudun'), 'xiahoudun'), consumables: [{ itemId: 'insu', count: 3 }] }
     expect(promoteOfficer(twice, 'xiahoudun')).toBe(twice)
   })
 
   it('인수 2개면 두 명을 각각 승급시킬 수 있다', () => {
-    let campaign = { ...withRoster(newCampaign(), 'xiahoudun', { level: 15 }), seals: 2 }
+    let campaign = { ...withRoster(newCampaign(), 'xiahoudun', { level: 15 }), consumables: [{ itemId: 'insu', count: 2 }] }
     campaign = withRoster(campaign, 'guojia', { level: 20 })
     campaign = promoteOfficer(campaign, 'xiahoudun')
     campaign = promoteOfficer(campaign, 'guojia')
-    expect(campaign.seals).toBe(0)
+    expect(consumableCount(campaign.consumables, 'insu')).toBe(0)
     expect(entryOf(campaign, 'xiahoudun').classId).toBe('heavyCavalry')
     expect(entryOf(campaign, 'guojia').classId).toBe('counselor')
   })
@@ -400,14 +401,15 @@ describe('rewardSeal — 인수는 특정 전투 승리에서만 나온다', () 
   it('applyVictory가 인수를 1개 늘린다', () => {
     const campaign = { ...newCampaign(), nodeId: 'n11' }
     const after = applyVictory(campaign, startBattle(stage('stage04'), 1, campaign.roster))
-    expect(after.seals).toBe(1)
+    expect(consumableCount(after.consumables, 'insu')).toBe(1)
     expect(after.gold).toBe(campaign.gold + 700)
   })
 
   it('rewardSeal이 없는 전투는 인수를 주지 않는다', () => {
-    const campaign = { ...newCampaign(), nodeId: 'n01', seals: 2 }
-    const after = applyVictory(campaign, startBattle(stage('stage01'), 1, campaign.roster))
-    expect(after.seals).toBe(2)
+    const campaign = { ...newCampaign(), nodeId: 'n01', consumables: [{ itemId: 'insu', count: 2 }] }
+    // 캠페인 전투는 항상 스톡을 반입한다 (App 계약) — applyVictory는 전투 사본 잔량을 정본으로 회수한다
+    const after = applyVictory(campaign, startBattle(stage('stage01'), 1, campaign.roster, undefined, campaign.consumables))
+    expect(consumableCount(after.consumables, 'insu')).toBe(2)
   })
 
   it('추격 루트를 끝까지 타면 인수 3개 — 6명 중 3명을 승급시킬 수 있다', () => {
@@ -423,28 +425,31 @@ describe('rewardSeal — 인수는 특정 전투 승리에서만 나온다', () 
       if (node.type === 'story') campaign = completeStory(campaign)
       else if (node.type === 'choice') campaign = completeChoice(campaign, 1) // 회군
       else if (node.type === 'battle') {
-        campaign = applyVictory(campaign, startBattle(stageForNode(node), 1, campaign.roster))
+        campaign = applyVictory(
+          campaign,
+          startBattle(stageForNode(node), 1, campaign.roster, undefined, campaign.consumables),
+        )
       } else break
     }
     expect(campaign.clearedStages).not.toContain('stage06')
-    expect(campaign.seals).toBe(2)
+    expect(consumableCount(campaign.consumables, 'insu')).toBe(2)
   })
 })
 
 // ---------- 세이브 승계 ----------
 
-describe('validateCampaign — v4 → v5 승계', () => {
+describe('validateCampaign — v4~v5 → v6 승계', () => {
   it('v4 세이브는 인수 0으로 승계된다', () => {
-    const { seals: _drop, ...v4 } = newCampaign()
+    const { consumables: _drop, ...v4 } = newCampaign()
     const restored = validateCampaign({ ...v4, version: 4 })!
-    expect(restored.version).toBe(5)
-    expect(restored.seals).toBe(0)
+    expect(restored.version).toBe(6)
+    expect(consumableCount(restored.consumables, 'insu')).toBe(0)
     expect(restored.roster).toEqual(newCampaign().roster)
   })
 
   it('v5 라운드트립은 인수와 승급 병과를 보존한다', () => {
     const promoted = promoteOfficer(readyToPromote('xiahoudun'), 'xiahoudun')
-    const campaign = { ...promoted, seals: 2 }
+    const campaign = { ...promoted, consumables: [{ itemId: 'insu', count: 2 }] }
     expect(validateCampaign(JSON.parse(JSON.stringify(campaign)))).toEqual(campaign)
   })
 
@@ -460,10 +465,10 @@ describe('validateCampaign — v4 → v5 승계', () => {
 
   it('망가진 인수 값은 세이브를 버리지 않고 0 이상 정수로 조인다', () => {
     const base = newCampaign()
-    expect(validateCampaign({ ...base, seals: -3 })!.seals).toBe(0)
-    expect(validateCampaign({ ...base, seals: 2.9 })!.seals).toBe(2)
-    expect(validateCampaign({ ...base, seals: 'many' })!.seals).toBe(0)
-    expect(validateCampaign({ ...base, seals: Number.NaN })!.seals).toBe(0)
+    expect(consumableCount(validateCampaign({ ...base, seals: -3 })!.consumables, 'insu')).toBe(0)
+    expect(consumableCount(validateCampaign({ ...base, seals: 2.9 })!.consumables, 'insu')).toBe(2)
+    expect(consumableCount(validateCampaign({ ...base, seals: 'many' })!.consumables, 'insu')).toBe(0)
+    expect(consumableCount(validateCampaign({ ...base, seals: Number.NaN })!.consumables, 'insu')).toBe(0)
   })
 
   it('승급한 부대의 계열 무기는 세이브 정화에서 살아남는다', () => {
@@ -520,7 +525,7 @@ describe('풀 캠페인 레벨 커브 (추격 루트 완주)', () => {
       } else if (node.type === 'battle') {
         const stageDef = stageForNode(node)
         const state = simulate(
-          startBattle(stageDef, 42, campaign.roster, deploymentFor(stageDef, campaign.roster)),
+          startBattle(stageDef, 42, campaign.roster, deploymentFor(stageDef, campaign.roster), campaign.consumables),
           600,
         )
         const bonusFired = state.log.some((l) => l.type === 'bonus')
@@ -531,7 +536,7 @@ describe('풀 캠페인 레벨 커브 (추격 루트 완주)', () => {
 
     expect(currentNode(campaign)?.type).toBe('end')
     expect(campaign.clearedStages).toEqual(['stage01', 'stage02', 'stage03', 'stage04', 'stage05', 'stage06'])
-    expect(campaign.seals).toBe(3)
+    expect(consumableCount(campaign.consumables, 'insu')).toBe(3)
 
     const levels = campaign.roster.map((r) => `${OFFICERS[r.officerId].name} Lv${r.level}`)
     const top = Math.max(...campaign.roster.map((r) => r.level))
@@ -541,7 +546,7 @@ describe('풀 캠페인 레벨 커브 (추격 루트 완주)', () => {
         '[v0.8 레벨 커브 시뮬] 추격 루트 완주',
         `  전투 결과: ${results.join(' / ')}`,
         `  최종 로스터: ${levels.join(', ')}`,
-        `  최고 레벨 ${top} / 승급 기준 Lv${PROMOTION_LEVEL} 도달 ${promotable}명 / 인수 ${campaign.seals}개`,
+        `  최고 레벨 ${top} / 승급 기준 Lv${PROMOTION_LEVEL} 도달 ${promotable}명 / 인수 ${consumableCount(campaign.consumables, 'insu')}개`,
         top >= PROMOTION_LEVEL
           ? '  → Lv15 도달: 승급이 캠페인 안에서 열린다'
           : `  → Lv15 미달(${PROMOTION_LEVEL - top} 부족): bonusExp 상향 등 커브 조정 필요`,

@@ -140,6 +140,27 @@ export interface EquipInstance {
   exp: number
 }
 
+// ---------- 도구 (전투 중 소모품) ----------
+
+/** 도구 정의 — 회복·MP·승급(인수) 등 전투 중 1회성 효과. 수치는 docs/research/items.md 기준 */
+export interface ConsumableDef {
+  id: string
+  name: string
+  desc: string
+  price: number | null // 상점 가격 (null = 비매품)
+  range: number // 사용 사거리 — 0이면 자기 자신 전용
+  effect:
+    | { kind: 'heal'; amount: number }
+    | { kind: 'mpRestore'; amount: number }
+    | { kind: 'promotion' } // 인수 — 즉시 승급 + HP/MP 완전회복 (원작)
+}
+
+/** 도구 보유 스택 — 소모품은 인스턴스 상태가 없어 수량으로만 관리한다 */
+export interface ConsumableStack {
+  itemId: string
+  count: number
+}
+
 /** 슬롯 → 장비 인스턴스. 비어 있는 슬롯은 키 자체가 없다 (런타임/세이브 표현) */
 export type EquipmentMap = Partial<Record<EquipSlot, EquipInstance>>
 
@@ -167,6 +188,9 @@ export type StrategyKind = 'damage' | 'heal' | 'buff' | 'debuff'
 
 export type BuffStat = 'atk' | 'def' | 'mind' | 'agi' | 'morale'
 
+/** 책략 영향 범위 — single 1칸 / cross 십자 5칸 / square ㅁ자 3×3 */
+export type StrategyArea = 'single' | 'cross' | 'square'
+
 export interface StrategyDef {
   id: string
   name: string
@@ -174,7 +198,7 @@ export interface StrategyDef {
   element: StrategyElement
   mpCost: number
   range: number // 사거리 (Infinity 허용: 모래폭풍)
-  area: 'single' | 'cross' // 단일 / 십자(대상+상하좌우)
+  area: StrategyArea
   power?: number // 위력 계수 % (주작=100 기준) — damage 전용
   healAmount?: number // heal 전용 (고정량)
   buff?: { stat: BuffStat; amount: number; duration: number } // buff/debuff 전용
@@ -309,6 +333,8 @@ export interface BattleState {
   result: BattleResult
   log: LogEvent[]
   spawnedReinforcements: number[] // 이미 발동한 증원 인덱스
+  /** 도구(소모품) — 캠페인 스톡의 전투 로컬 사본. 리듀서가 차감하고 승리 시 캠페인이 회수한다 */
+  consumables: ConsumableStack[]
 }
 
 // ---------- 액션 ----------
@@ -317,6 +343,7 @@ export type BattleAction =
   | { type: 'move'; unitId: string; to: Vec2 }
   | { type: 'attack'; unitId: string; targetId: string }
   | { type: 'strategy'; unitId: string; strategyId: string; target: Vec2 }
+  | { type: 'useItem'; unitId: string; itemId: string; target: Vec2 } // range 0 도구는 자기 위치를 넣는다
   | { type: 'wait'; unitId: string }
   | { type: 'endPhase' }
 

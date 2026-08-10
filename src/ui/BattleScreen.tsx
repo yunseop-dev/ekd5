@@ -14,7 +14,7 @@ import {
 import type { RosterEntry } from '../core/campaign'
 import { growthSummary } from '../core/campaign'
 import { attackableCells, attackRangeUnion, keyOf, manhattan } from '../core/movement'
-import type { BattleState, Faction, StageDef, UnitState, Vec2 } from '../core/types'
+import type { BattleState, ConsumableStack, Faction, StageDef, UnitState, Vec2 } from '../core/types'
 import { OFFICERS } from '../data/officers'
 import { TERRAIN } from '../data/terrain'
 import { Banner, type BannerProps } from './Banner'
@@ -74,14 +74,15 @@ interface Props {
   seed: number
   onExit: () => void
   onRestart: () => void
-  /** 캠페인 모드: 로스터 이월 + 출진 명단 + 종료 시 결과 회수 */
+  /** 캠페인 모드: 로스터 이월 + 출진 명단 + 도구 스톡 반입 + 종료 시 결과 회수 */
   roster?: RosterEntry[]
   deployment?: string[]
+  consumables?: ConsumableStack[]
   onFinish?: (result: 'victory' | 'defeat', state: BattleState) => void
 }
 
-export function BattleScreen({ stage, seed, onExit, onRestart, roster, deployment, onFinish }: Props) {
-  const [state, setState] = useState<BattleState>(() => startBattle(stage, seed, roster, deployment))
+export function BattleScreen({ stage, seed, onExit, onRestart, roster, deployment, consumables, onFinish }: Props) {
+  const [state, setState] = useState<BattleState>(() => startBattle(stage, seed, roster, deployment, consumables))
   const [sel, setSel] = useState<Selection | null>(null)
   const [hover, setHover] = useState<Vec2 | null>(null)
   const [speed, setSpeed] = useState<PlaySpeed>(1)

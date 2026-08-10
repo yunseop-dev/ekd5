@@ -253,6 +253,7 @@ export function App() {
       seed={screen.seed}
       roster={screen.campaign.roster}
       deployment={screen.deployment}
+      consumables={screen.campaign.consumables}
       onFinish={handleFinish}
       onExit={() => setScreen({ s: 'camp', campaign: screen.campaign, savedAt: screen.savedAt })}
       onRestart={() => setScreen({ ...screen, seed: newSeed() })}

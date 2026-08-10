@@ -52,7 +52,7 @@ const unit = (state: BattleState, officerId: string): UnitState =>
 describe('newCampaign', () => {
   it('아군 6명이 장수 기본 레벨 / 경험치 0으로 편성된다', () => {
     const campaign = newCampaign()
-    expect(campaign.version).toBe(5)
+    expect(campaign.version).toBe(6)
     expect(campaign.roster.map((r) => r.officerId)).toEqual(PLAYER_OFFICER_IDS)
     for (const entry of campaign.roster) {
       expect(entry.level).toBe(OFFICERS[entry.officerId].level)
@@ -514,7 +514,7 @@ describe('validateCampaign', () => {
     expect(validateCampaign(null)).toBeNull()
     expect(validateCampaign(undefined)).toBeNull()
     expect(validateCampaign('{}')).toBeNull()
-    expect(validateCampaign({ ...base, version: 6 })).toBeNull()
+    expect(validateCampaign({ ...base, version: 7 })).toBeNull()
     expect(validateCampaign({ ...base, nodeId: 1 })).toBeNull()
     expect(validateCampaign({ ...base, roster: 'nope' })).toBeNull()
     expect(validateCampaign({ ...base, roster: [{ officerId: 'caocao', level: 3 }] })).toBeNull()
@@ -523,10 +523,10 @@ describe('validateCampaign', () => {
     expect(validateCampaign({ ...base, clearedStages: [1] })).toBeNull()
   })
 
-  it('v3 세이브는 게이지 중립(50)으로 v5에 승계된다', () => {
+  it('v3 세이브는 게이지 중립(50)으로 승계된다', () => {
     const { gauge: _drop, ...v3 } = newCampaign()
     const restored = validateCampaign({ ...v3, version: 3 })!
-    expect(restored.version).toBe(5)
+    expect(restored.version).toBe(6)
     expect(restored.gauge).toBe(GAUGE_INITIAL)
     // 나머지 필드는 손대지 않는다
     expect(restored.roster).toEqual(newCampaign().roster)
@@ -536,10 +536,10 @@ describe('validateCampaign', () => {
   it('v1/v2 세이브도 게이지 중립으로 승계된다', () => {
     const base = newCampaign()
     const v1 = validateCampaign({ version: 1, nodeId: 'n01', roster: [{ officerId: 'caocao', level: 5, exp: 0 }], clearedStages: [] })!
-    expect(v1.version).toBe(5)
+    expect(v1.version).toBe(6)
     expect(v1.gauge).toBe(GAUGE_INITIAL)
     const v2 = validateCampaign({ ...base, version: 2, fruits: undefined, gauge: undefined })!
-    expect(v2.version).toBe(5)
+    expect(v2.version).toBe(6)
     expect(v2.gauge).toBe(GAUGE_INITIAL)
   })
 
