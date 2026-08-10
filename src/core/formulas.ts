@@ -43,6 +43,15 @@ export function maxMp(cls: UnitClassDef, level: number): number {
   return cls.mpBase + cls.mpGrowth * level
 }
 
+/**
+ * 회복 책략의 회복량 — 원작은 고정값이 아니라 **base + floor(시전자 정신력 / mindDiv)** 다
+ * (소보급 40+정신/10, 대보급 70+정신/2 — docs/research/items.md §3).
+ * mindDiv 0(데이터 오류)은 1로 본다.
+ */
+export function strategyHealAmount(heal: { base: number; mindDiv: number }, mind: number): number {
+  return heal.base + Math.floor(mind / Math.max(1, heal.mindDiv))
+}
+
 // ---------- 명중 / 회심 / 2회 공격 ----------
 
 /**

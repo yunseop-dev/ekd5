@@ -2,7 +2,7 @@
 // core/ 규칙: 렌더러/브라우저 의존성 금지. 순수 TS + 데이터 참조만.
 
 import { CLASSES } from '../data/classes'
-import { CONSUMABLES } from '../data/consumables'
+import { CONSUMABLE_STOCK_MAX, CONSUMABLES } from '../data/consumables'
 import { EQUIPMENT } from '../data/equipment'
 import { FRUIT_ON_SELL, FRUITS } from '../data/fruits'
 import { OFFICERS } from '../data/officers'
@@ -496,11 +496,13 @@ export function sellItem(campaign: CampaignState, inventoryIndex: number): Campa
 /**
  * 도구(소모품) 구매 → 스톡 +1. 비매품(인수 등 price null)이거나 군자금이 부족하면 원본 그대로.
  * 장비와 달리 인스턴스 상태가 없어 수량 스택으로만 관리한다.
+ * 종류별 재고 상한은 255 — 원작 저장 구조가 1바이트 카운트다 (items.md §1).
  */
 export function buyConsumable(campaign: CampaignState, itemId: string): CampaignState {
   const def = CONSUMABLES[itemId]
   if (!def || def.price === null) return campaign
   if (campaign.gold < def.price) return campaign
+  if (consumableCount(campaign.consumables, itemId) >= CONSUMABLE_STOCK_MAX) return campaign
   return {
     ...campaign,
     roster: campaign.roster.map(cloneEntry),

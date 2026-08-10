@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { STRATEGIES } from '../data/strategies'
 import {
   applyAction,
   effectiveStats,
@@ -7,6 +8,7 @@ import {
   livingUnits,
   startBattle,
 } from './battle'
+import { strategyHealAmount } from './formulas'
 import type { BattleState, StageDef, TerrainId, UnitState } from './types'
 
 // 8×8 평지 맵 + 필요 유닛만 배치한 테스트 스테이지
@@ -248,7 +250,7 @@ describe('strategy 액션', () => {
     expect(next).toBe(state)
   })
 
-  it('치료: 아군 HP 회복 (최대치 초과 불가)', () => {
+  it('소보급: 아군 HP 회복 — 회복량 = base + 시전자 정신력/mindDiv (최대치 초과 불가)', () => {
     const stage = mkStage({
       units: [
         { officerId: 'caocao', faction: 'player', pos: { x: 1, y: 1 }, isLeader: true },
@@ -260,11 +262,14 @@ describe('strategy 액션', () => {
     // 조조를 다치게 만든다
     unit(state, 'caocao').hp -= 50
     const xunyu = unit(state, 'xunyu')
+    // 원작 공식: 소보급 = 40 + floor(정신력/10)
+    const expected = strategyHealAmount(STRATEGIES.sobogeup.heal!, effectiveStats(xunyu).mind)
+    expect(expected).toBeGreaterThan(STRATEGIES.sobogeup.heal!.base) // 정신력이 실제로 반영된다
     state = applyAction(state, {
-      type: 'strategy', unitId: xunyu.id, strategyId: 'chiryo', target: { x: 1, y: 1 },
+      type: 'strategy', unitId: xunyu.id, strategyId: 'sobogeup', target: { x: 1, y: 1 },
     })
     const caocao = unit(state, 'caocao')
-    expect(caocao.hp).toBe(caocao.maxHp - 50 + 80 > caocao.maxHp ? caocao.maxHp : caocao.maxHp - 50 + 80)
+    expect(caocao.hp).toBe(Math.min(caocao.maxHp, caocao.maxHp - 50 + expected))
   })
 
   it('버프(연병)가 실효 능력치에 반영되고 페이즈마다 턴이 줄어든다', () => {

@@ -23,6 +23,7 @@ import {
   maxMp,
   physicalDamage,
   strategyDamage,
+  strategyHealAmount,
   strategyHitRate,
 } from './formulas'
 import type { MoveContext, MovementRange, Occupancy } from './movement'
@@ -723,7 +724,10 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
           }
         } else if (strategy.kind === 'heal') {
           if (isHostile(caster, target)) continue
-          const healed = Math.min(strategy.healAmount!, target.maxHp - target.hp)
+          // 원작: 회복량 = base + floor(시전자 정신력 / mindDiv) — 고정값이 아니다 (items.md §3).
+          // 만피 대상에게 걸어 0 회복이 되는 것도 원작이 허용한다 (효과 0 캐스팅 + 경험치 획득).
+          const amount = strategyHealAmount(strategy.heal!, cStats.mind)
+          const healed = Math.min(amount, target.maxHp - target.hp)
           target.hp += healed
           log(state, 'heal', `${nameOf(caster)}의 ${strategy.name} → ${nameOf(target)}: ${healed} 회복`, {
             targetId: target.id,
@@ -776,6 +780,19 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
           log(state, 'item', `${nameOf(unit)}의 ${def.name} → ${nameOf(target)}: 책략치 ${regained} 회복`, {
             targetId: target.id,
             amount: regained,
+          })
+          break
+        }
+        case 'cureStatus': {
+          // 원작 해제약 — 매칭 상태이상만 떨어낸다('all' = 만능약).
+          // 해제할 것이 없어도 소모·행동 종료된다 (원작: 효과 0 사용 허용, 낭비 방지는 UI 몫).
+          const cure = def.effect.statuses
+          const before = target.statuses.length
+          target.statuses =
+            cure === 'all' ? [] : target.statuses.filter((s) => !cure.includes(s.id))
+          const cured = before - target.statuses.length
+          log(state, 'item', `${nameOf(unit)}의 ${def.name} → ${nameOf(target)}: 상태이상 ${cured}개 해제`, {
+            targetId: target.id,
           })
           break
         }

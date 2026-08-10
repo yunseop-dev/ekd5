@@ -1,6 +1,10 @@
 // 책략 정의 — MVP 서브셋.
-// MP/사거리/위력계수/한계명중은 리서치 확인치(docs/research/caocao.md §5),
-// 회복량·버프량은 원작 수치 미확보라 설계값.
+// v0.9에서 원작 데이터(docs/research/items.md §3 — biglobe effect.htm 범위 코드 완전 해독)에 맞춰 정합했다:
+//  - 사거리/영향 코드: イ~×(사거리 13종) + A~E(영향 5종). A=단일 / B=십자5 / C=ㅁ자9
+//  - **바람 계열만 ㅁ자(3×3)**, 화·수·지계는 십자. 1차 버프·디버프도 원작은 전부 십자다.
+//  - 회복량은 고정이 아니라 **base + floor(시전자 정신력 / mindDiv)**
+//  - 명칭도 원작명으로 교정: 치료 → 소보급 / 대치료 → 구원대 / 격려 → 고양
+// 버프량·지속턴은 원작 수치 미확보라 설계값 유지.
 
 import type { StrategyDef } from '../core/types'
 
@@ -17,7 +21,7 @@ export const STRATEGIES: Record<string, StrategyDef> = {
     power: 70,
     capHitRate: 100,
     targets: 'enemy',
-  },
+  }, // 원작 ルＡ 70%/100% — 일치 확인
   eophwa: {
     id: 'eophwa',
     name: '업화',
@@ -29,7 +33,7 @@ export const STRATEGIES: Record<string, StrategyDef> = {
     power: 90,
     capHitRate: 90,
     targets: 'enemy',
-  },
+  }, // 원작 チＡ 90%/90% — 일치 확인
   hwajin: {
     id: 'hwajin',
     name: '화진',
@@ -41,8 +45,8 @@ export const STRATEGIES: Record<string, StrategyDef> = {
     power: 50,
     capHitRate: 90,
     targets: 'enemy',
-  },
-  // 화룡 — 2차 병과(모사) 전용 광역 화계. 원작 화룡은 범위기.
+  }, // 원작 ルＢ 50%/90% — 일치 확인
+  // 화룡 — 2차 병과(참모) 전용 광역 화계. 원작 チＢ 위력 70 확정 (v0.9에서 60→70 교정)
   hwaryong: {
     id: 'hwaryong',
     name: '화룡',
@@ -51,11 +55,12 @@ export const STRATEGIES: Record<string, StrategyDef> = {
     mpCost: 20,
     range: 3,
     area: 'cross',
-    power: 60,
+    power: 70,
     capHitRate: 80,
     targets: 'enemy',
   },
-  // ---- 풍계 (날씨 무관) ----
+
+  // ---- 풍계 (날씨 무관) — 원작에서 바람 계열만 ㅁ자 범위를 갖는다 ----
   seonpung: {
     id: 'seonpung',
     name: '선풍',
@@ -67,43 +72,59 @@ export const STRATEGIES: Record<string, StrategyDef> = {
     power: 50,
     capHitRate: 100,
     targets: 'enemy',
+  }, // 원작 ルＡ 50%/100% — 일치 확인
+  // 풍진 — 원작 ルＣ(ㅁ자 3×3) 위력 40 / 한계명중 100. "풍진 한방에 9명" 실측 근거.
+  // 습득 레벨은 설계값 (원작 습득표 미확보)
+  pungjin: {
+    id: 'pungjin',
+    name: '풍진',
+    kind: 'damage',
+    element: 'wind',
+    mpCost: 12,
+    range: 4,
+    area: 'square',
+    power: 40,
+    capHitRate: 100,
+    targets: 'enemy',
   },
-  // ---- 회복 ----
-  chiryo: {
-    id: 'chiryo',
-    name: '치료',
+
+  // ---- 회복 (원작 補給 계열 — 회복량 = base + 정신력/mindDiv) ----
+  sobogeup: {
+    id: 'sobogeup',
+    name: '소보급',
     kind: 'heal',
     element: 'holy',
-    mpCost: 4,
-    range: 3,
+    mpCost: 6,
+    range: 4,
     area: 'single',
-    healAmount: 80,
+    heal: { base: 40, mindDiv: 10 },
     capHitRate: 100,
     targets: 'ally',
-  },
-  // 대치료 — 2차 병과(대풍수사) 전용 광역 회복
-  daechiryo: {
-    id: 'daechiryo',
-    name: '대치료',
+  }, // 원작 ルＡ MP6 40+정신/10
+  // 구원대 — 2차 병과(방술사) 전용 광역 회복. 원작 援隊 = ルＢ(십자5) MP12
+  guwondae: {
+    id: 'guwondae',
+    name: '구원대',
     kind: 'heal',
     element: 'holy',
     mpCost: 12,
-    range: 3,
+    range: 4,
     area: 'cross',
-    healAmount: 80,
+    heal: { base: 40, mindDiv: 10 },
     capHitRate: 100,
     targets: 'ally',
   },
-  // ---- 버프 / 디버프 ----
+
+  // ---- 버프 / 디버프 (원작 1차는 전부 ルＢ = 십자5, MP6, 사거리4) ----
   yeonbyeong: {
     id: 'yeonbyeong',
     name: '연병',
     kind: 'buff',
     element: 'none',
-    mpCost: 5,
-    range: 3,
-    area: 'single',
-    buff: { stat: 'agi', amount: 30, duration: 3 },
+    mpCost: 6,
+    range: 4,
+    area: 'cross',
+    buff: { stat: 'agi', amount: 30, duration: 3 }, // 증감폭·지속은 설계값
     capHitRate: 100,
     targets: 'ally',
   },
@@ -112,21 +133,22 @@ export const STRATEGIES: Record<string, StrategyDef> = {
     name: '둔병',
     kind: 'debuff',
     element: 'none',
-    mpCost: 5,
-    range: 3,
-    area: 'single',
+    mpCost: 6,
+    range: 4,
+    area: 'cross',
     buff: { stat: 'agi', amount: -30, duration: 3 },
     capHitRate: 90,
     targets: 'enemy',
   },
-  gyeokryeo: {
-    id: 'gyeokryeo',
-    name: '격려',
+  // 고양 — 원작명 昂揚 (구 '격려'). 사기 상승, ルＢ
+  goyang: {
+    id: 'goyang',
+    name: '고양',
     kind: 'buff',
     element: 'none',
-    mpCost: 4,
-    range: 3,
-    area: 'single',
+    mpCost: 6,
+    range: 4,
+    area: 'cross',
     buff: { stat: 'morale', amount: 30, duration: 3 },
     capHitRate: 100,
     targets: 'ally',

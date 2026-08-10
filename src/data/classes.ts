@@ -27,7 +27,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     mpBase: 20,
     mpGrowth: 2,
     strategies: [
-      { strategyId: 'gyeokryeo', learnLevel: 1 },
+      { strategyId: 'goyang', learnLevel: 1 },
       { strategyId: 'seonpung', learnLevel: 8 },
     ],
   },
@@ -114,6 +114,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
       { strategyId: 'seonpung', learnLevel: 3 },
       { strategyId: 'dunbyeong', learnLevel: 5 },
       { strategyId: 'hwajin', learnLevel: 8 },
+      { strategyId: 'pungjin', learnLevel: 10 }, // 풍계 ㅁ자(3×3) — 습득 레벨은 설계값
       { strategyId: 'eophwa', learnLevel: 12 },
     ],
   },
@@ -136,8 +137,8 @@ export const CLASSES: Record<string, UnitClassDef> = {
     mpBase: 30,
     mpGrowth: 3,
     strategies: [
-      { strategyId: 'chiryo', learnLevel: 1 },
-      { strategyId: 'gyeokryeo', learnLevel: 3 },
+      { strategyId: 'sobogeup', learnLevel: 1 },
+      { strategyId: 'goyang', learnLevel: 3 },
       { strategyId: 'yeonbyeong', learnLevel: 6 },
     ],
   },
@@ -168,7 +169,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     mpBase: 24, // 20 + 2×2
     mpGrowth: 2,
     strategies: [
-      { strategyId: 'gyeokryeo', learnLevel: 1 },
+      { strategyId: 'goyang', learnLevel: 1 },
       { strategyId: 'seonpung', learnLevel: 8 },
     ],
   },
@@ -251,6 +252,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
       { strategyId: 'seonpung', learnLevel: 3 },
       { strategyId: 'dunbyeong', learnLevel: 5 },
       { strategyId: 'hwajin', learnLevel: 8 },
+      { strategyId: 'pungjin', learnLevel: 10 }, // 풍계 ㅁ자(3×3) — 습득 레벨은 설계값
       { strategyId: 'eophwa', learnLevel: 12 },
       { strategyId: 'hwaryong', learnLevel: 15 }, // 승급 해금 — "한층 더 강력해진 공격계 책략"
     ],
@@ -273,10 +275,10 @@ export const CLASSES: Record<string, UnitClassDef> = {
     mpBase: 36, // 30 + 3×2
     mpGrowth: 3,
     strategies: [
-      { strategyId: 'chiryo', learnLevel: 1 },
-      { strategyId: 'gyeokryeo', learnLevel: 3 },
+      { strategyId: 'sobogeup', learnLevel: 1 },
+      { strategyId: 'goyang', learnLevel: 3 },
       { strategyId: 'yeonbyeong', learnLevel: 6 },
-      { strategyId: 'daechiryo', learnLevel: 15 }, // 승급 해금 — 광역 회복
+      { strategyId: 'guwondae', learnLevel: 15 }, // 승급 해금 — 광역 회복
     ],
   },
 }

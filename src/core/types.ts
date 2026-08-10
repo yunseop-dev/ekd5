@@ -142,16 +142,18 @@ export interface EquipInstance {
 
 // ---------- 도구 (전투 중 소모품) ----------
 
-/** 도구 정의 — 회복·MP·승급(인수) 등 전투 중 1회성 효과. 수치는 docs/research/items.md 기준 */
+/** 도구 정의 — 회복·MP·상태해제·승급(인수) 등 전투 중 1회성 효과. 수치는 docs/research/items.md 기준 */
 export interface ConsumableDef {
   id: string
   name: string
   desc: string
   price: number | null // 상점 가격 (null = 비매품)
-  range: number // 사용 사거리 — 0이면 자기 자신 전용
+  range: number // 체비쇼프 거리 (1 = 자기 + 인접 8방) — 원작 도구 게이트 (items.md §1)
   effect:
     | { kind: 'heal'; amount: number }
     | { kind: 'mpRestore'; amount: number }
+    // 상태이상 해제 — 'all'은 전부 해제(만능약). 원작 해제약 4종 + 만능약
+    | { kind: 'cureStatus'; statuses: StatusId[] | 'all' }
     | { kind: 'promotion' } // 인수 — 즉시 승급 + HP/MP 완전회복 (원작)
 }
 
@@ -200,7 +202,11 @@ export interface StrategyDef {
   range: number // 사거리 (Infinity 허용: 모래폭풍)
   area: StrategyArea
   power?: number // 위력 계수 % (주작=100 기준) — damage 전용
-  healAmount?: number // heal 전용 (고정량)
+  /**
+   * heal 전용 — 원작 회복량은 고정이 아니라 **base + floor(시전자 정신력 / mindDiv)** 다
+   * (소보급 40+정신/10, 대보급 70+정신/2 — docs/research/items.md §3).
+   */
+  heal?: { base: number; mindDiv: number }
   buff?: { stat: BuffStat; amount: number; duration: number } // buff/debuff 전용
   capHitRate: number // 한계 명중률 % (100/90/80/60/50/33). buff/heal은 100
   targets: 'enemy' | 'ally' | 'self'

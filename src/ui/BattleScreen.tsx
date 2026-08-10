@@ -193,6 +193,12 @@ function itemEffective(def: ConsumableDef, target: UnitState): boolean {
       return target.hp < target.maxHp
     case 'mpRestore':
       return target.mp < target.maxMp
+    case 'cureStatus': {
+      const cure = def.effect.statuses
+      return cure === 'all'
+        ? target.statuses.length > 0
+        : target.statuses.some((s) => cure.includes(s.id))
+    }
     case 'promotion':
       return canPromoteUnit(target)
   }
@@ -711,6 +717,8 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
         return 'HP가 줄어든 부대가 사거리 안에 없다'
       case 'mpRestore':
         return 'MP가 줄어든 부대가 사거리 안에 없다'
+      case 'cureStatus':
+        return '해당 상태이상인 부대가 사거리 안에 없다'
       case 'promotion': {
         // 사거리 안에 자기 혼자면 자기 사유를 그대로 보여준다 (Lv15 필요 / 최종 병과)
         const near = livingUnits(state).filter(

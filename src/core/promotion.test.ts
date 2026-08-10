@@ -160,28 +160,28 @@ describe('병과 데이터 — 계열(lineage)과 승급 트리', () => {
   })
 })
 
-describe('신규 책략 — 화룡 / 대치료', () => {
-  it('화룡은 MP20 사거리3의 광역 화계(위력 60 / 한계명중 80)', () => {
+describe('2차 전용 책략 — 화룡 / 구원대 (원작 수치, items.md §3)', () => {
+  it('화룡은 MP20 사거리3의 십자 화계(위력 70 / 한계명중 80 — チＢ)', () => {
     expect(STRATEGIES.hwaryong).toMatchObject({
       kind: 'damage',
       element: 'fire',
       mpCost: 20,
       range: 3,
       area: 'cross',
-      power: 60,
+      power: 70,
       capHitRate: 80,
       targets: 'enemy',
     })
   })
 
-  it('대치료는 MP12 사거리3의 광역 회복(80 / 한계명중 100)', () => {
-    expect(STRATEGIES.daechiryo).toMatchObject({
+  it('구원대는 MP12 사거리4의 십자 회복(40+정신/10 — ルＢ)', () => {
+    expect(STRATEGIES.guwondae).toMatchObject({
       kind: 'heal',
       element: 'holy',
       mpCost: 12,
-      range: 3,
+      range: 4,
       area: 'cross',
-      healAmount: 80,
+      heal: { base: 40, mindDiv: 10 },
       capHitRate: 100,
       targets: 'ally',
     })
@@ -189,9 +189,38 @@ describe('신규 책략 — 화룡 / 대치료', () => {
 
   it('2차 병과만 Lv15에 익힌다 (1차 목록에는 없다)', () => {
     expect(CLASSES.counselor.strategies).toContainEqual({ strategyId: 'hwaryong', learnLevel: 15 })
-    expect(CLASSES.seniorGeomancer.strategies).toContainEqual({ strategyId: 'daechiryo', learnLevel: 15 })
+    expect(CLASSES.seniorGeomancer.strategies).toContainEqual({ strategyId: 'guwondae', learnLevel: 15 })
     expect(CLASSES.strategist.strategies.some((s) => s.strategyId === 'hwaryong')).toBe(false)
-    expect(CLASSES.geomancer.strategies.some((s) => s.strategyId === 'daechiryo')).toBe(false)
+    expect(CLASSES.geomancer.strategies.some((s) => s.strategyId === 'guwondae')).toBe(false)
+  })
+
+  it('1차 책략도 원작 코드에 맞다 — 소보급 ルＡ / 연병·둔병·고양 ルＢ / 풍진 ルＣ', () => {
+    expect(STRATEGIES.sobogeup).toMatchObject({
+      mpCost: 6,
+      range: 4,
+      area: 'single',
+      heal: { base: 40, mindDiv: 10 },
+    })
+    for (const id of ['yeonbyeong', 'dunbyeong', 'goyang']) {
+      expect(STRATEGIES[id], id).toMatchObject({ mpCost: 6, range: 4, area: 'cross' })
+    }
+    expect(STRATEGIES.dunbyeong.capHitRate).toBe(90)
+    expect(STRATEGIES.goyang.capHitRate).toBe(100)
+    // 바람 계열만 ㅁ자(3×3)
+    expect(STRATEGIES.pungjin).toMatchObject({
+      element: 'wind',
+      mpCost: 12,
+      range: 4,
+      area: 'square',
+      power: 40,
+      capHitRate: 100,
+      targets: 'enemy',
+    })
+    // 이미 원작과 일치했던 항목 — 회귀 방지
+    expect(STRATEGIES.choyeol).toMatchObject({ mpCost: 6, range: 4, area: 'single', power: 70, capHitRate: 100 })
+    expect(STRATEGIES.eophwa).toMatchObject({ mpCost: 10, range: 3, area: 'single', power: 90, capHitRate: 90 })
+    expect(STRATEGIES.hwajin).toMatchObject({ mpCost: 12, range: 4, area: 'cross', power: 50, capHitRate: 90 })
+    expect(STRATEGIES.seonpung).toMatchObject({ mpCost: 6, range: 4, area: 'single', power: 50, capHitRate: 100 })
   })
 
   it('승급한 모사는 Lv15부터 실제로 화룡을 쓸 수 있다', () => {

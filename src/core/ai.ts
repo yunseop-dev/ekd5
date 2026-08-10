@@ -23,6 +23,7 @@ import {
   hitRate,
   physicalDamage,
   strategyDamage,
+  strategyHealAmount,
   strategyHitRate,
 } from './formulas'
 import { manhattan, strategyAreaCells } from './movement'
@@ -193,8 +194,10 @@ function scoreSupportStrategy(
     if (strategy.kind === 'heal') {
       // 중심 대상의 손실이 미미하면 후보에서 뺀다 (힐 스팸 방지)
       if (ally.maxHp - ally.hp < ally.maxHp * HEAL_MIN_LOSS_RATIO) continue
+      // 회복량은 리듀서와 같은 원작 공식 (base + 시전자 정신력/mindDiv)
+      const amount = strategyHealAmount(strategy.heal!, effectiveStats(unit).mind)
       for (const friend of affected) {
-        value += Math.min(strategy.healAmount!, friend.maxHp - friend.hp) * HEAL_VALUE
+        value += Math.min(amount, friend.maxHp - friend.hp) * HEAL_VALUE
       }
     } else {
       for (const friend of affected) {
