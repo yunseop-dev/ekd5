@@ -231,7 +231,11 @@ function runImmediate(state: BattleState, eventId: string, action: EventAction):
     }
 
     case 'setBehavior': {
-      const targets = state.units.filter((u) => u.hp > 0 && action.officerIds.includes(u.officerId))
+      // officerIds 생략 = 생존 적 전원 (levelUpEnemies와 동일 시맨틱)
+      const ids = action.officerIds
+      const targets = state.units.filter(
+        (u) => u.hp > 0 && (ids ? ids.includes(u.officerId) : u.faction === 'enemy'),
+      )
       if (targets.length === 0) return
       for (const unit of targets) unit.behavior = action.behavior
       log(state, `${targets.map(nameOf).join(', ')} — 움직임이 달라졌다`)

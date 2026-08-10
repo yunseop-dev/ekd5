@@ -64,6 +64,12 @@ export type CampaignNode =
       rewardSeal?: boolean
       /** 이 전투 승리 시 합류하는 장수 id 목록 (applyVictory가 소화) */
       join?: string[]
+      /**
+       * 이 전투 승리 시 로스터에서 빠지는 장수 (v1.2 — 전위의 죽음).
+       * when 'ifDead' = 전장에 사체(hp 0)가 남은 경우만 이탈 (원작: 절영으로 구출하면 생존).
+       * 장착 장비는 창고로 회수한다 [설계값 — 플레이어 자산 보호].
+       */
+      leave?: { officerId: string; when?: 'always' | 'ifDead' }[]
       next: string | null
     }
   | {
@@ -73,6 +79,11 @@ export type CampaignNode =
       scriptId: string
       /** 이 스토리 소화 시 합류하는 장수 id 목록 (completeStory가 소화) */
       join?: string[]
+      /**
+       * 로스터 상태에 따른 대체 스크립트 (v1.2). absentOfficerId가 로스터에 없으면 그 scriptId를 쓴다.
+       * (전위가 완성에서 전사한 뒤의 추모 장면 — 해석은 표시 계층)
+       */
+      variants?: { absentOfficerId: string; scriptId: string }[]
       next: string | null
     }
   // 선택지 노드 — 원작 "사실/가상 게이지"를 움직이며 후속 노드를 가른다 (campaign-ux.md 1부 §5).

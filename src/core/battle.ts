@@ -383,6 +383,10 @@ export function createBattle(
     firedEvents: [],
     pendingEvents: [],
     pendingRewards: [],
+    pendingGold: 0,
+    hazards: [],
+    // 스테이지 정의 비오염 — 픽업으로 배열이 줄어드므로 사본이어야 한다
+    groundItems: (stage.groundItems ?? []).map((g) => ({ pos: { ...g.pos }, itemId: g.itemId })),
   }
 }
 

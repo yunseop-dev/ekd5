@@ -84,6 +84,13 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     cost: { foot: 1, horse: 1, wheel: 1, mage: 1 },
     effect: { foot: 120, horse: 120, wheel: 120, mage: 120 },
   },
+  // 여울/늪 — 원작 확정: 기병 성능 80%. 차량은 진입 불가, 보행·기마는 소비 2 [설계값] (v1.2)
+  ford: {
+    id: 'ford',
+    name: '여울',
+    cost: { foot: 2, horse: 2, wheel: null, mage: 2 },
+    effect: { foot: 100, horse: 80, wheel: 100, mage: 100 },
+  },
   // 닫힌 성문 — 이벤트(setTile)로 'gate'가 되기 전까지 아무도 지나갈 수 없다 (v1.1)
   gateClosed: {
     id: 'gateClosed',

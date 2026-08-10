@@ -24,6 +24,7 @@ export type TerrainId =
   | 'wall' // 성벽 (진입 불가)
   | 'gate' // 성문 (열림 — 통행 가능)
   | 'gateClosed' // 닫힌 성문 (진입 불가) — 이벤트 setTile로 'gate'로 열린다 (v1.1)
+  | 'ford' // 여울/늪 — 기병 성능 80% (원작 확정), 차량 진입 불가 (v1.2)
 
 // 병과별 이동/지형효과 프로필. 조조전: 지형효과는 물리 공방에만 적용(%).
 export type MoveProfileId = 'foot' | 'horse' | 'wheel' | 'mage'
@@ -128,6 +129,12 @@ export interface EquipmentDef {
   isTreasure?: boolean // 보물 — 판매 불가 (원작: 영걸전은 가능, 조조전은 불가)
   /** 무구성장으로 오르는 능력치. undefined = 성장하지 않는 장비(보조구류) */
   growthStat?: 'atk' | 'def' | 'mind'
+  /** 사모 — 명중 시 대상 뒤편(공격자 반대쪽) 1칸의 적도 함께 타격 (원작 확정, v1.2) */
+  pierceBack?: boolean
+  /** 여포궁 등 — 명중 시 상태이상 확정 부여 (원작: 보물은 100% 부여, v1.2) */
+  onHitStatus?: StatusId
+  /** 몰우전 — 근접 병과에 원거리 공격을 부여 (원작 확정. 엔진 반영은 후속) */
+  rangedAttack?: boolean
   description: string
 }
 
@@ -211,6 +218,11 @@ export interface StrategyDef {
   buff?: { stat: BuffStat; amount: number; duration: number } // buff/debuff 전용
   /** status 전용 — 부여하는 상태이상. 지속턴은 없다 (원작: 매턴 운÷2% 자연 해제뿐) */
   inflicts?: StatusId
+  /**
+   * 화계 전용 (v1.2) — 영향 범위의 연소 가능 지형에 불길을 남긴다 (원작: 화공 후 화염 타일 잔존).
+   * 십자 범위 화계(화진·화룡)만 보유 [설계값].
+   */
+  hazard?: { duration: number }
   capHitRate: number // 한계 명중률 % (100/90/80/60/50/33). buff/heal은 100
   targets: 'enemy' | 'ally' | 'self'
 }
@@ -269,6 +281,15 @@ export interface DialogueLine {
   text: string
 }
 
+/** 전장 위험 지대 (v1.2) — 화계가 남긴 불길. 진입·통과 불가이며 매 턴 사그라든다 */
+export type HazardKind = 'fire'
+
+export interface Hazard {
+  pos: Vec2
+  kind: HazardKind
+  remainingTurns: number
+}
+
 export interface MapDef {
   width: number
   height: number
@@ -280,6 +301,16 @@ export type VictoryCondition =
   | { type: 'defeatBoss' } // isBoss 유닛 전부 격파
   | { type: 'reachPoint'; pos: Vec2; unitId?: string } // 지점 도달 (기본: 주인공)
   | { type: 'surviveTurns'; turns: number } // N턴 버티기
+
+/**
+ * 패배 조건 (v1.2) — 주인공(조조) 격파는 전 전투 공통이라 계약 밖 암묵 기본이다.
+ * 원작은 전투마다 "20턴을 넘긴다"(표준)·"헌제의 사망" 같은 조건을 데이터로 갖는다.
+ * unitDies는 **hp 0 사체가 남아 있을 때만** 발동 — removeUnits·duel retreat로 전장을 떠난
+ * 유닛은 발동시키지 않는다 (원작 서주 구원전의 "미축 배신으로 실제로는 지지 않는" 페이크 재현).
+ */
+export type DefeatCondition =
+  | { type: 'turnLimit'; turns: number } // turn > turns 이면 패배
+  | { type: 'unitDies'; officerId: string } // 호위 대상 사망 (헌제 등)
 
 export interface ReinforcementDef {
   trigger:
@@ -336,10 +367,19 @@ export type EventAction =
   // 스크립트 상태이상 부여 — **명중 판정 없이 확정**(원작: 순유안 "적 4부대 혼란", c02 여포 격파 → 관외 부대 혼란).
   // removeUnits처럼 몹 일괄 지정이 정상 용례라 officerId 유일성을 강제하지 않는다.
   | { type: 'inflictStatus'; officerIds: string[]; status: StatusId }
-  | { type: 'setBehavior'; officerIds: string[]; behavior: 'guard' | 'pursue' } // 여포 기동 등
+  // officerIds 생략 = 생존 적 전원 (원작: 퇴각 선택 후 적 전체가 주인공을 추격)
+  | { type: 'setBehavior'; officerIds?: string[]; behavior: 'guard' | 'pursue' }
   | { type: 'setTile'; cells: Vec2[]; terrain: TerrainId } // 성문 개방/폐쇄
   | { type: 'levelUpEnemies'; amount: number; officerIds?: string[] } // 생략 = 생존 적 전원. HP/MP 재계산·완전회복
-  | { type: 'giveItem'; itemId: string; kind: 'equipment' | 'consumable' } // pendingRewards 적재 → 승리 시 회수
+  // 표시형(v1.2) — 「{아이템}을(를) 손에 넣었습니다!」 모달을 띄우고 eventContinue 소비 시 적재된다
+  | { type: 'giveItem'; itemId: string; kind: 'equipment' | 'consumable' }
+  | { type: 'giveGold'; amount: number } // 즉시형 — pendingGold 적재 → 승리 시 합산 (부호 추방 금 3000)
+  // 승리/패배 조건 런타임 교체 (원작: 퇴각 선택 → 승리조건 변경, 원술전 → 12턴 상한)
+  | { type: 'setVictory'; victory: VictoryCondition[] }
+  | { type: 'setDefeat'; defeat: DefeatCondition[] }
+  | { type: 'setHazard'; cells: Vec2[]; kind: HazardKind; duration: number } // 스크립트 발화 (완성 화염 방어진)
+  // 맵 드랍 — pos 또는 officerId 중 정확히 하나 (officerId = 그 장수가 서 있던/쓰러진 자리)
+  | { type: 'dropItem'; itemId: string; pos?: Vec2; officerId?: string }
   | { type: 'giveExp'; target: string; amount: number }
 
 export interface BattleEventDef {
@@ -370,6 +410,13 @@ export interface StageDef {
     itemId: string
     officerId?: string // allySurvived 전용
   }[]
+  /**
+   * 패배 조건 (v1.2). 주인공 격파는 명시하지 않아도 항상 적용된다.
+   * 원작 표준은 `[{ type: 'turnLimit', turns: 20 }]`.
+   */
+  defeat?: DefeatCondition[]
+  /** 맵에 놓인 아이템 (v1.2) — 아군이 그 칸에 서면 회수한다 (원작: 적장이 있던 자리의 보물) */
+  groundItems?: { pos: Vec2; itemId: string }[]
   /** 전투 내 이벤트 (v1.1) — 발동 여부는 BattleState.firedEvents가 든다 */
   events?: BattleEventDef[]
   // ---- 출진 준비 화면 (docs/research/campaign-ux.md 1부 §2) ----
@@ -412,6 +459,16 @@ export interface BattleState {
   pendingEvents: PendingEvent[]
   /** giveItem 적재분 — applyVictory가 캠페인으로 회수 (패배 시 소멸) */
   pendingRewards: { itemId: string; kind: 'equipment' | 'consumable' }[]
+  /** giveGold 적재분 — applyVictory가 보상금에 합산 (v1.2) */
+  pendingGold: number
+  /** 불길 등 전장 위험 지대 (v1.2) */
+  hazards: Hazard[]
+  /** 맵에 남아 있는 아이템 — 스테이지 정의의 전투 로컬 사본 (v1.2) */
+  groundItems: { pos: Vec2; itemId: string }[]
+  /** setVictory로 교체된 승리 조건. 없으면 스테이지 정의를 쓴다 (v1.2) */
+  victoryOverride?: VictoryCondition[]
+  /** setDefeat로 교체된 패배 조건 (v1.2) */
+  defeatOverride?: DefeatCondition[]
 }
 
 // ---------- 액션 ----------

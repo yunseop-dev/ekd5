@@ -18,6 +18,7 @@ export const CHAR_TO_TERRAIN: Record<string, TerrainId> = {
   X: 'wall',
   D: 'gate',
   E: 'gateClosed',
+  S: 'ford',
 }
 
 /** 역맵 — CHAR_TO_TERRAIN에서 파생한다 (직접 손으로 쓰지 않는다: 두 표가 갈라지는 사고 방지) */

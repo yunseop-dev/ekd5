@@ -16,6 +16,7 @@
 
 import type {
   BattleEventDef,
+  DefeatCondition,
   DialogueLine,
   EventAction,
   EventTrigger,
@@ -30,10 +31,16 @@ import type {
   VictoryCondition,
   Weather,
 } from '../../core/types'
+import { CONSUMABLES } from '../consumables'
+import { EQUIPMENT } from '../equipment'
 import { OFFICERS } from '../officers'
 import { STATUSES } from '../statuses'
 import { TERRAIN } from '../terrain'
 import { mapToRows, parseMap } from './parseMap'
+
+/** 장비 또는 도구로 등록된 아이템인가 — 전리품·드랍·맵 아이템 공용 검사 */
+const knownItem = (itemId: string): boolean =>
+  EQUIPMENT[itemId] !== undefined || CONSUMABLES[itemId] !== undefined
 
 const FACTIONS = ['player', 'enemy', 'ally'] as const
 const WEATHERS = ['clear', 'rain'] as const
@@ -291,6 +298,44 @@ export function validateStageVerbose(data: unknown): StageValidation {
     return officerId
   }
 
+  // ---- defeat (v1.2) — 주인공 격파는 엔진 기본이라 명시하지 않는다 ----
+  const defeat = raw.defeat === undefined ? undefined : defeatList(raw.defeat, 'defeat', fail, uniqueRef)
+  if (defeat && victory) {
+    // surviveTurns(N턴 버티면 승리)와 turnLimit(N턴 넘기면 패배)이 함께 있으면 판정이 모호해진다
+    const survive = victory.some((v) => v.type === 'surviveTurns')
+    const limited = defeat.some((d) => d.type === 'turnLimit')
+    if (survive && limited) fail('defeat: victory에 surviveTurns가 있으면 turnLimit을 함께 둘 수 없다')
+  }
+
+  // ---- groundItems (v1.2) — 맵에 놓인 아이템. 아군이 그 칸에 서면 회수한다 ----
+  let groundItems: StageDef['groundItems']
+  if (raw.groundItems !== undefined) {
+    if (!Array.isArray(raw.groundItems)) {
+      fail('groundItems: 배열이어야 한다')
+    } else {
+      const entries: NonNullable<StageDef['groundItems']> = []
+      for (const [i, item] of raw.groundItems.entries()) {
+        const where = `groundItems[${i}]`
+        if (!isObject(item)) {
+          fail(`${where}: 객체여야 한다`)
+          continue
+        }
+        const pos = vec2(item.pos, `${where}.pos`)
+        if (!pos) continue
+        if (!isNonEmptyString(item.itemId)) {
+          fail(`${where}.itemId: 문자열이어야 한다`)
+          continue
+        }
+        if (!knownItem(item.itemId)) {
+          fail(`${where}.itemId: 등록되지 않은 아이템 '${item.itemId}'`)
+          continue
+        }
+        entries.push({ pos, itemId: item.itemId })
+      }
+      if (entries.length === raw.groundItems.length) groundItems = entries
+    }
+  }
+
   // ---- loot ----
   let loot: StageDef['loot']
   if (raw.loot !== undefined) {
@@ -475,8 +520,10 @@ export function validateStageVerbose(data: unknown): StageValidation {
         return ids ? { type: 'inflictStatus', officerIds: ids, status: value.status } : null
       }
       case 'setBehavior': {
-        const ids = officerIdList(value.officerIds, `${where}.officerIds`)
+        // officerIds 생략 = 생존 적 전원 (원작: 퇴각 선택 후 적 전체가 주인공을 추격)
         if (!isBehavior(value.behavior)) return fail(`${where}.behavior: ${BEHAVIORS.join('|')}`)
+        if (value.officerIds === undefined) return { type: 'setBehavior', behavior: value.behavior }
+        const ids = officerIdList(value.officerIds, `${where}.officerIds`)
         return ids ? { type: 'setBehavior', officerIds: ids, behavior: value.behavior } : null
       }
       case 'setTile': {
@@ -494,6 +541,37 @@ export function validateStageVerbose(data: unknown): StageValidation {
         if (!isNonEmptyString(value.itemId)) return fail(`${where}.itemId: 문자열이어야 한다`)
         if (!isItemKind(value.kind)) return fail(`${where}.kind: ${ITEM_KINDS.join('|')}`)
         return { type: 'giveItem', itemId: value.itemId, kind: value.kind }
+      }
+      case 'giveGold': {
+        if (!isInt(value.amount) || value.amount < 1) return fail(`${where}.amount: 1 이상 정수여야 한다`)
+        return { type: 'giveGold', amount: value.amount }
+      }
+      case 'setVictory': {
+        const next = victoryList(value.victory, fail, vec2, `${where}.victory`)
+        return next ? { type: 'setVictory', victory: next } : null
+      }
+      case 'setDefeat': {
+        const next = defeatList(value.defeat, `${where}.defeat`, fail, uniqueRef)
+        return next ? { type: 'setDefeat', defeat: next } : null
+      }
+      case 'setHazard': {
+        const cells = vec2List(value.cells, `${where}.cells`)
+        if (value.kind !== 'fire') return fail(`${where}.kind: 'fire'만 지원한다`)
+        if (!isInt(value.duration) || value.duration < 1) return fail(`${where}.duration: 1 이상 정수여야 한다`)
+        return cells ? { type: 'setHazard', cells, kind: 'fire', duration: value.duration } : null
+      }
+      case 'dropItem': {
+        if (!isNonEmptyString(value.itemId)) return fail(`${where}.itemId: 문자열이어야 한다`)
+        if (!knownItem(value.itemId)) return fail(`${where}.itemId: 등록되지 않은 아이템 '${value.itemId}'`)
+        const hasPos = value.pos !== undefined
+        const hasOfficer = value.officerId !== undefined
+        if (hasPos === hasOfficer) return fail(`${where}: pos 또는 officerId 중 정확히 하나가 필요하다`)
+        if (hasPos) {
+          const pos = vec2(value.pos, `${where}.pos`)
+          return pos ? { type: 'dropItem', itemId: value.itemId, pos } : null
+        }
+        const officerId = officerIdField(value.officerId, `${where}.officerId`)
+        return officerId ? { type: 'dropItem', itemId: value.itemId, officerId } : null
       }
       case 'giveExp': {
         const target = officerIdField(value.target, `${where}.target`)
@@ -581,6 +659,8 @@ export function validateStageVerbose(data: unknown): StageValidation {
     ...(deployMax !== undefined ? { deployMax } : {}),
     ...(forcedOfficers ? { forcedOfficers } : {}),
     ...(bonusExp !== undefined ? { bonusExp } : {}),
+    ...(defeat ? { defeat } : {}),
+    ...(groundItems ? { groundItems } : {}),
     ...(loot ? { loot } : {}),
     ...(events ? { events } : {}),
   }
@@ -642,11 +722,12 @@ function victoryList(
   value: unknown,
   fail: (msg: string) => null,
   vec2: (value: unknown, where: string) => Vec2 | null,
+  label = 'victory',
 ): VictoryCondition[] | null {
-  if (!Array.isArray(value) || value.length === 0) return fail('victory: 최소 1개의 승리조건이 필요하다')
+  if (!Array.isArray(value) || value.length === 0) return fail(`${label}: 최소 1개의 승리조건이 필요하다`)
   const out: VictoryCondition[] = []
   for (const [i, item] of value.entries()) {
-    const where = `victory[${i}]`
+    const where = `${label}[${i}]`
     if (!isObject(item)) {
       fail(`${where}: 객체여야 한다`)
       continue
@@ -678,6 +759,53 @@ function victoryList(
       }
       default:
         fail(`${where}.type: 알 수 없는 승리조건 '${String(item.type)}'`)
+    }
+  }
+  return out.length === value.length ? out : null
+}
+
+/**
+ * 패배 조건 목록 (v1.2). 스테이지 defeat와 setDefeat 액션이 공용한다.
+ * turnLimit은 최대 1개 — 두 개면 어느 쪽이 유효한지 모호하다.
+ */
+function defeatList(
+  value: unknown,
+  label: string,
+  fail: (msg: string) => null,
+  uniqueRef: (value: unknown, where: string) => string | null,
+): DefeatCondition[] | null {
+  if (!Array.isArray(value) || value.length === 0) return fail(`${label}: 최소 1개의 패배조건이 필요하다`)
+  const out: DefeatCondition[] = []
+  let turnLimits = 0
+  for (const [i, item] of value.entries()) {
+    const where = `${label}[${i}]`
+    if (!isObject(item)) {
+      fail(`${where}: 객체여야 한다`)
+      continue
+    }
+    switch (item.type) {
+      case 'turnLimit': {
+        if (!isInt(item.turns) || item.turns < 1) {
+          fail(`${where}.turns: 1 이상 정수여야 한다`)
+          break
+        }
+        turnLimits += 1
+        if (turnLimits > 1) {
+          fail(`${label}: turnLimit은 하나만 둘 수 있다`)
+          break
+        }
+        out.push({ type: 'turnLimit', turns: item.turns })
+        break
+      }
+      case 'unitDies': {
+        // 호위 대상은 유일 유닛이어야 한다 (몹이면 "누가 죽어도 패배"가 되어 모호하다)
+        const officerId = uniqueRef(item.officerId, `${where}.officerId`)
+        if (!officerId) break
+        out.push({ type: 'unitDies', officerId })
+        break
+      }
+      default:
+        fail(`${where}.type: 알 수 없는 패배조건 '${String(item.type)}'`)
     }
   }
   return out.length === value.length ? out : null
@@ -717,7 +845,9 @@ export function stageToJson(stage: StageDef, notes?: string): Record<string, unk
     units: stage.units.map(unitToJson),
     victory: stage.victory,
     ...(stage.bonusExp !== undefined ? { bonusExp: stage.bonusExp } : {}),
+    ...(stage.defeat ? { defeat: stage.defeat } : {}),
     reinforcements: stage.reinforcements.map((r) => ({ trigger: r.trigger, units: r.units.map(unitToJson) })),
+    ...(stage.groundItems ? { groundItems: stage.groundItems } : {}),
     ...(stage.loot ? { loot: stage.loot } : {}),
     ...(stage.events ? { events: stage.events } : {}),
   }

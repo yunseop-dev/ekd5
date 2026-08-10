@@ -76,6 +76,11 @@ const ACTION_LABEL: Record<EventAction['type'], string> = {
   levelUpEnemies: '적 레벨업',
   giveItem: '아이템 지급',
   giveExp: '경험치 지급',
+  giveGold: '군자금 지급',
+  setVictory: '승리 조건 변경',
+  setDefeat: '패배 조건 변경',
+  setHazard: '불길 발생',
+  dropItem: '아이템 드랍',
 }
 
 /** 폼으로 편집 가능한 액션 — 나머지는 JSON 소스 모드로 안내 */
@@ -663,7 +668,7 @@ function ActionFields({
           <Field label="대상 장수 (몹 일괄 지정 가능)">
             <OfficerChecklist
               ids={allIds}
-              selected={action.officerIds}
+              selected={action.officerIds ?? []}
               onChange={(officerIds) => onChange({ ...action, officerIds })}
             />
           </Field>
@@ -685,10 +690,10 @@ function ActionFields({
     case 'setBehavior':
       return (
         <>
-          <Field label="대상 장수">
+          <Field label="대상 장수 (비우면 적군 전체)">
             <OfficerChecklist
               ids={allIds}
-              selected={action.officerIds}
+              selected={action.officerIds ?? []}
               onChange={(officerIds) => onChange({ ...action, officerIds })}
             />
           </Field>
