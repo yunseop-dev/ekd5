@@ -87,6 +87,8 @@
 .fl-counter { color: #ff8a7a; }
 .fl-heal { color: #7ce08a; }
 .fl-miss { color: #b8b8b8; }
+/* 상태이상 부여/해제/행동 불능 — 수치 없는 텍스트 플로터 */
+.fl-status { color: #d79ce6; font-size: 12px; }
 
 @keyframes float-up {
   0% { opacity: 0; translate: 0 6px; }
@@ -210,6 +212,38 @@
 .unit-token .hp-bar > div.low { background: #e6b23c; }
 .unit-token .hp-bar > div.critical { background: #e0492f; }
 
+/* 상태이상 배지 — 토큰 우측에 세로로 쌓는다 (44px 타일 안에 최대 3개) */
+.unit-token.afflicted { outline: 1px dashed rgba(215, 156, 230, 0.9); outline-offset: 1px; }
+.unit-token .status-badges {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.unit-token .status-badge {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
+}
+.unit-token .status-badge.sb-poison { background: #7b3fa8; }
+.unit-token .status-badge.sb-confusion { background: #c9a22a; }
+.unit-token .status-badge.sb-immobile { background: #7a5230; }
+.unit-token .status-badge.sb-seal { background: #2f6bb0; }
+.unit-token .status-badge.sb-charm { background: #b8437f; }
+
 /* ---------- 사이드 패널 ---------- */
 
 .side-panel {
@@ -237,6 +271,18 @@
   grid-template-columns: repeat(2, 1fr);
   gap: 2px 10px;
 }
+
+/* 상태이상 줄 (정보 패널) */
+.status-line {
+  margin-top: 4px;
+  color: #bfb39c;
+}
+.status-line .status-name { font-weight: 700; cursor: help; }
+.status-line .s-poison { color: #c48ae6; }
+.status-line .s-confusion { color: #e6cf5a; }
+.status-line .s-immobile { color: #c69a68; }
+.status-line .s-seal { color: #6ab0f3; }
+.status-line .s-charm { color: #f08ab8; }
 
 .forecast-row {
   display: flex;
@@ -408,6 +454,10 @@
 .battle-log .log-reinforcement { color: #e08ae0; }
 .battle-log .log-item { color: #9ce08a; }
 .battle-log .log-promote { color: #ffd76a; font-weight: 700; }
+.battle-log .log-status { color: #d79ce6; }
+.battle-log .log-poison { color: #b07ae0; }
+.battle-log .log-statusCured { color: #8ad9c0; }
+.battle-log .log-statusHold { color: #e6cf5a; }
 
 /* 결과 오버레이 */
 .result-overlay {

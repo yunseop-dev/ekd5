@@ -2,6 +2,7 @@ import { classOf, effectiveStats, moveOf, officerOf, terrainEffectOf } from '../
 import type { BattleState, EquipInstance, EquipSlot, EquipmentDef, UnitState } from '../core/types'
 import { EQUIP_EXP_PER_LEVEL, EQUIP_MAX_LEVEL_NORMAL, EQUIP_MAX_LEVEL_TREASURE } from '../core/types'
 import { EQUIPMENT } from '../data/equipment'
+import { STATUSES, statusName } from '../data/statuses'
 import { TERRAIN } from '../data/terrain'
 
 const SLOTS: EquipSlot[] = ['weapon', 'armor', 'accessory']
@@ -73,6 +74,23 @@ export function UnitInfoPanel({ state, unit }: { state: BattleState; unit: UnitS
             ))
           : '없음'}
       </div>
+      {/* 상태이상 — 없으면 줄 자체를 내지 않는다 (평시 패널을 조용하게 유지) */}
+      {unit.statuses.length > 0 && (
+        <div className="status-line">
+          상태:{' '}
+          {unit.statuses.map((s, i) => (
+            <span key={`${s.id}-${i}`}>
+              {i > 0 && ' · '}
+              <span
+                className={`status-name s-${s.id}`}
+                title={STATUSES[s.id]?.desc ?? statusName(s.id)}
+              >
+                {statusName(s.id)}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

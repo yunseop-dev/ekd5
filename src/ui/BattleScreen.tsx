@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { runAiPhase, stepAiUnit } from '../core/ai'
 import {
   applyAction,
+  canAct,
+  canCast,
+  canMove,
   classOf,
   isHostile,
   knownStrategies,
@@ -27,6 +30,7 @@ import type {
   ConsumableDef,
   ConsumableStack,
   Faction,
+  LogEvent,
   StageDef,
   StrategyDef,
   UnitClassDef,
@@ -36,6 +40,7 @@ import type {
 import { CLASSES } from '../data/classes'
 import { CONSUMABLES } from '../data/consumables'
 import { OFFICERS } from '../data/officers'
+import { STATUSES } from '../data/statuses'
 import { STRATEGIES } from '../data/strategies'
 import { TERRAIN } from '../data/terrain'
 import { Banner, type BannerProps } from './Banner'
@@ -81,7 +86,7 @@ export interface Floater {
   x: number
   y: number
   text: string
-  kind: 'damage' | 'crit' | 'counter' | 'heal' | 'miss'
+  kind: 'damage' | 'crit' | 'counter' | 'heal' | 'miss' | 'status'
   delay: number // 초 단위 stagger
 }
 
@@ -101,7 +106,19 @@ interface BannerSpec {
   direction: 'left' | 'right'
 }
 
-const FLOATER_TEXT: Record<string, (n: number) => { text: string; kind: Floater['kind'] }> = {
+/**
+ * 로그 문장에서 상태이상 이름을 뽑는다 — 상태 로그 계약({targetId})은 상태 id를 따로 싣지 않으므로
+ * 라벨 단일 출처(STATUSES)로 역매칭한다. 못 찾으면 일반 문구로 폴백한다.
+ */
+function statusNameInMessage(message: string): string | null {
+  for (const def of Object.values(STATUSES)) if (message.includes(def.name)) return def.name
+  return null
+}
+
+const FLOATER_TEXT: Record<
+  string,
+  (n: number, e: LogEvent) => { text: string; kind: Floater['kind'] }
+> = {
   hit: (n) => ({ text: `${n}`, kind: 'damage' }),
   crit: (n) => ({ text: `회심! ${n}`, kind: 'crit' }),
   counterHit: (n) => ({ text: `반격! ${n}`, kind: 'counter' }),
@@ -111,7 +128,18 @@ const FLOATER_TEXT: Record<string, (n: number) => { text: string; kind: Floater[
   // 도구 사용(회복류) — 책략 회복과 같은 표기를 쓴다. 승급(인수)은 amount가 없어 플로터가 뜨지 않는다.
   item: (n) => ({ text: `+${n}`, kind: 'heal' }),
   miss: () => ({ text: 'MISS', kind: 'miss' }),
+  // 상태이상 — 독 데미지만 수치(음수)가 있고, 나머지는 텍스트 플로터다.
+  poison: (n) => ({ text: `${n}`, kind: 'damage' }),
+  status: (_n, e) => ({ text: `${statusNameInMessage(e.message) ?? '상태이상'}!`, kind: 'status' }),
+  statusCured: (_n, e) => ({
+    text: `${statusNameInMessage(e.message) ?? '상태이상'} 해제`,
+    kind: 'status',
+  }),
+  statusHold: () => ({ text: '행동 불능', kind: 'status' }),
 }
+
+/** amount 없이도 플로터를 띄우는 로그 타입 (상태 부여/해제/스킵은 수치가 없다) */
+const AMOUNTLESS_FLOATERS = new Set(['status', 'statusCured', 'statusHold'])
 
 // ---------- 승급(인수) 변화 요약 — v0.8 캠프 UI에서 전투로 이식 ----------
 
@@ -349,7 +377,8 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
 
     const created: Floater[] = []
     for (const e of events) {
-      if (!e.targetId || e.amount === undefined) continue
+      if (!e.targetId) continue
+      if (e.amount === undefined && !AMOUNTLESS_FLOATERS.has(e.type)) continue
       const target = state.units.find((u) => u.id === e.targetId)
       const mk = FLOATER_TEXT[e.type]
       if (!target || !mk) continue
@@ -358,7 +387,7 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
         x: target.pos.x,
         y: target.pos.y,
         delay: created.length * 0.25,
-        ...mk(e.amount),
+        ...mk(e.amount ?? 0, e),
       })
     }
     if (created.length === 0) return
@@ -492,7 +521,10 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
 
   function selectUnit(unit: UnitState) {
     setInspectId(null) // 아군을 조작하기 시작하면 들여다보기는 끝난다
-    setSel({ unitId: unit.id, mode: unit.moved ? 'menu' : 'move', undo: state })
+    // 부동(immobile)은 이동 범위가 없다 — 이동 모드를 건너뛰고 바로 행동 메뉴로 간다.
+    // (혼란은 코어가 acted를 선세팅하므로 애초에 선택되지 않는다)
+    const skipMove = unit.moved || !canMove(unit)
+    setSel({ unitId: unit.id, mode: skipMove ? 'menu' : 'move', undo: state })
   }
 
   function cancelSelection() {
@@ -569,6 +601,11 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
       case 'menu':
         // 이동 취소: 이동 전 상태로 복원하고 이동 모드 유지
         setState(sel.undo)
+        // 부동(immobile)은 되돌릴 이동 단계가 없다 — 선택 자체를 해제한다
+        if (selectedUnit && !canMove(selectedUnit)) {
+          setSel(null)
+          return
+        }
         setSel({ unitId: sel.unitId, mode: 'move', undo: sel.undo })
         return
       case 'move':
@@ -682,11 +719,24 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
   const strategies = selectedUnit ? knownStrategies(selectedUnit) : []
   const strategyBlockReason = (s: StrategyDef): string | null => {
     if (!selectedUnit) return '선택된 부대가 없다'
+    // 혼란 먼저 — canCast는 혼란·금책 둘 다 막으므로 사유가 뒤섞이지 않게 순서를 고정한다
+    if (!canAct(selectedUnit)) return '혼란 — 스스로 행동할 수 없다'
+    if (!canCast(selectedUnit)) return '금책 — 책략이 봉인됐다'
     if (s.element === 'fire' && state.weather === 'rain') return '우천 — 화계는 쓸 수 없다'
     if (selectedUnit.mp < s.mpCost) return `MP 부족 (${selectedUnit.mp}/${s.mpCost})`
     return null
   }
   const allStrategiesBlocked = strategies.length > 0 && strategies.every((s) => strategyBlockReason(s) !== null)
+  /** 책략 버튼 툴팁 — 상태이상으로 전부 막힌 경우엔 그 사유를 그대로 보여준다 */
+  const strategyMenuBlockReason: string | null = !selectedUnit
+    ? null
+    : !canAct(selectedUnit)
+      ? '혼란 — 스스로 행동할 수 없다'
+      : !canCast(selectedUnit)
+        ? '금책 — 책략이 봉인됐다'
+        : allStrategiesBlocked
+          ? '쓸 수 있는 책략이 없다'
+          : null
 
   /** 전투 로컬 도구 스톡 (수량 0·미등록 id 제외) */
   const itemStock = useMemo(
@@ -805,7 +855,7 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
               {strategies.length > 0 && (
                 <button
                   disabled={allStrategiesBlocked}
-                  title={allStrategiesBlocked ? '쓸 수 있는 책략이 없다' : undefined}
+                  title={strategyMenuBlockReason ?? undefined}
                   onClick={() => setSel({ ...sel, mode: 'strategyMenu' })}
                 >
                   책략

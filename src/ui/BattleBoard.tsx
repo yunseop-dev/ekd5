@@ -1,6 +1,7 @@
 import { classOf, unitAt } from '../core/battle'
 import { keyOf } from '../core/movement'
-import type { BattleState, UnitState, Vec2 } from '../core/types'
+import type { BattleState, StatusId, UnitState, Vec2 } from '../core/types'
+import { STATUSES } from '../data/statuses'
 import { TERRAIN } from '../data/terrain'
 import type { Floater } from './BattleScreen'
 
@@ -21,6 +22,18 @@ const CLASS_ICON: Record<string, string> = {
   counselor: '策',
   seniorGeomancer: '風',
 }
+
+/** 상태이상 1글자 배지 — 44px 타일에 얹히므로 한 글자로 고정한다 (라벨 원문은 STATUSES) */
+const STATUS_BADGE: Record<StatusId, string> = {
+  poison: '毒',
+  confusion: '乱',
+  immobile: '縛',
+  seal: '封',
+  charm: '魅',
+}
+
+/** 배지 표시 상한 — 넘치면 잘라서 토큰이 뭉개지지 않게 한다 */
+const MAX_BADGES = 3
 
 interface Props {
   state: BattleState
@@ -54,12 +67,26 @@ function UnitToken({ unit, active }: { unit: UnitState; active: boolean }) {
     unit.isLeader ? 'leader' : '',
     unit.isBoss ? 'boss' : '',
     active ? 'ai-active' : '',
+    unit.statuses.length > 0 ? 'afflicted' : '',
   ]
     .filter(Boolean)
     .join(' ')
   return (
     <div className={classes}>
       {CLASS_ICON[unit.classId] ?? '?'}
+      {unit.statuses.length > 0 && (
+        <div className="status-badges">
+          {unit.statuses.slice(0, MAX_BADGES).map((s, i) => (
+            <span
+              key={`${s.id}-${i}`}
+              className={`status-badge sb-${s.id}`}
+              title={STATUSES[s.id] ? `${STATUSES[s.id].name} — ${STATUSES[s.id].desc}` : s.id}
+            >
+              {STATUS_BADGE[s.id] ?? '?'}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="hp-bar">
         <div className={hpClass} style={{ width: `${ratio * 100}%` }} />
       </div>

@@ -44,6 +44,7 @@ import { CONSUMABLES, shopConsumables } from '../data/consumables'
 import { EQUIPMENT } from '../data/equipment'
 import { FRUITS } from '../data/fruits'
 import { OFFICERS } from '../data/officers'
+import { statusName } from '../data/statuses'
 import { CLASS_ICON } from './BattleBoard'
 // .panel-box/.stat-grid(battle.css), .roster-row/.dim/.title-btn(campaign.css) 재사용
 import './battle.css'
@@ -372,14 +373,6 @@ function ownedConsumables(campaign: CampaignState): Array<{ def: ConsumableDef; 
     .map((s) => ({ def: CONSUMABLES[s.itemId], count: s.count }))
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  poison: '독',
-  seal: '금책',
-  confusion: '혼란',
-  immobile: '부동',
-  charm: '매혹',
-}
-
 /** "HP +50" / "MP +30" / "독 치료" / "상위 병과로 승급" */
 function consumableEffectText(def: ConsumableDef): string {
   switch (def.effect.kind) {
@@ -390,7 +383,7 @@ function consumableEffectText(def: ConsumableDef): string {
     case 'cureStatus':
       return def.effect.statuses === 'all'
         ? '모든 상태이상 치료'
-        : `${def.effect.statuses.map((s) => STATUS_LABEL[s] ?? s).join('·')} 치료`
+        : `${def.effect.statuses.map((s) => statusName(s)).join('·')} 치료`
     case 'promotion':
       return '상위 병과로 승급 + HP/MP 완전회복'
   }
