@@ -48,7 +48,8 @@ export const STAGE_11: StageDef = {
     { officerId: 'xunyu', faction: 'player', pos: { x: 7, y: 9 } },
     { officerId: 'xuChu', faction: 'player', pos: { x: 4, y: 8 } },
     // 보스 — 여포. 성문이 열리는 순간 직접 나온다 (2부 최종 보스)
-    { officerId: 'lüBu', faction: 'enemy', pos: { x: 7, y: 1 }, level: 20, isBoss: true, behavior: 'pursue' },
+    // 최종 보스 — 성문 밖으로 나오면 스스로 포위당해 싱거워진다. 원작 하비처럼 농성한다
+    { officerId: 'lüBu', faction: 'enemy', pos: { x: 7, y: 1 }, level: 20, isBoss: true, behavior: 'guard' },
     // 진궁 — 성채 위에서 책략만 던진다 (매턴 회복 + 화룡)
     { officerId: 'chenGong', faction: 'enemy', pos: { x: 3, y: 1 }, level: 19, behavior: 'guard' },
     // 고순 — 반대쪽 성채. 성문 안쪽을 막는 마지막 벽
