@@ -285,6 +285,29 @@ export function joinOfficers(campaign: CampaignState, officerIds: string[]): Cam
 }
 
 /**
+ * 장수 이탈 (원본 불변, 멱등) — 로스터에서 제거한다. 없는/미등록 id는 조용히 건너뛴다.
+ * **장착 장비는 창고(inventory)로 회수한다** [설계값 — 플레이어가 투자한 무구성장을 잃지 않게].
+ * 노드의 leave 필드를 applyVictory가 이 함수로 소화한다 (v1.2 — 전위의 죽음).
+ */
+export function leaveOfficers(campaign: CampaignState, officerIds: string[]): CampaignState {
+  const leaving = campaign.roster.filter((r) => officerIds.includes(r.officerId))
+  if (leaving.length === 0) return campaign
+  const salvaged = leaving.flatMap((r) =>
+    Object.values(r.equipment)
+      .filter((i): i is EquipInstance => i !== undefined)
+      .map((i) => ({ ...i })),
+  )
+  return {
+    ...campaign,
+    roster: campaign.roster.filter((r) => !officerIds.includes(r.officerId)).map(cloneEntry),
+    clearedStages: [...campaign.clearedStages],
+    inventory: [...cloneInventory(campaign.inventory), ...salvaged],
+    fruits: [...campaign.fruits],
+    consumables: campaign.consumables.map((s) => ({ ...s })),
+  }
+}
+
+/**
  * 노드가 속한 부(장) — 상태 필드 없이 노드 그래프 위치에서 파생한다.
  * 2부 첫 노드(s20) 이전이면 1부. s20이 아직 없으면(1부만 존재) 항상 1.
  * 원작: 인수는 2장부터 상점 판매 (items.md §5) — 상점 해금 판정에 쓴다.
@@ -385,10 +408,14 @@ function stageOfBattle(battleState: BattleState): StageDef | undefined {
   return battleState.__stage ?? STAGES.find((s) => s.id === battleState.stageId)
 }
 
-/** 아이템 id가 장비인지 도구인지 — 오타/삭제된 id는 null (조용히 무시된다) */
-type RewardKind = 'equipment' | 'consumable'
+/** 보상 아이템의 적재 경로 — 장비는 창고, 도구는 스톡 */
+export type RewardKind = 'equipment' | 'consumable'
 
-function itemKindOf(itemId: string): RewardKind | null {
+/**
+ * 아이템 id가 장비인지 도구인지 — 오타/삭제된 id는 null (조용히 무시된다).
+ * 전투 쪽 맵 픽업·드랍(battle.ts/events.ts)도 선언 kind보다 이 실제 등록을 신뢰한다.
+ */
+export function itemKindOf(itemId: string): RewardKind | null {
   if (EQUIPMENT[itemId]) return 'equipment'
   if (CONSUMABLES[itemId]) return 'consumable'
   return null
@@ -478,7 +505,8 @@ export function applyVictory(campaign: CampaignState, battleState: BattleState):
       return recovered
     }),
     clearedStages,
-    gold: campaign.gold + (node?.type === 'battle' ? node.rewardGold : 0),
+    // 노드 보상금 + 전투 중 giveGold 적재분 (v1.2 — 부호 추방 금 3000 같은 이벤트 보수)
+    gold: campaign.gold + (node?.type === 'battle' ? node.rewardGold : 0) + battleState.pendingGold,
     inventory: [
       ...cloneInventory(campaign.inventory),
       ...rewards.filter((r) => r.kind === 'equipment').map((r) => toEquipInstance(r.itemId)),
@@ -492,7 +520,21 @@ export function applyVictory(campaign: CampaignState, battleState: BattleState):
 
   // 전투 승리 합류 — 노드의 join을 소화한다 (joinOfficers는 멱등이라 재호출에 안전하다)
   const join = node?.type === 'battle' || node?.type === 'story' ? node.join : undefined
-  return join ? joinOfficers(advanced, join) : advanced
+  const joined = join ? joinOfficers(advanced, join) : advanced
+
+  // 노드 이탈 (v1.2) — 합류 소화 **뒤**에 처리한다.
+  // when 생략 = 'always'. 'ifDead'는 전장에 사체(hp 0)가 남았을 때만 이탈한다
+  // (원작: 절영으로 구출하면 전위가 살아남는다 — 사체가 없으면 로스터에 남는다).
+  const leave = node?.type === 'battle' ? node.leave : undefined
+  if (!leave || leave.length === 0) return joined
+  const leaving = leave
+    .filter(
+      (l) =>
+        (l.when ?? 'always') === 'always' ||
+        battleState.units.some((u) => u.officerId === l.officerId && u.hp <= 0),
+    )
+    .map((l) => l.officerId)
+  return leaving.length > 0 ? leaveOfficers(joined, leaving) : joined
 }
 
 // ---------- 승급 (Lv15 + 인수 — caocao.md §2.1~2.2) ----------

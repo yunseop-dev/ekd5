@@ -14,8 +14,8 @@ import { EQUIPMENT } from '../data/equipment'
 import { OFFICERS } from '../data/officers'
 import { statusName } from '../data/statuses'
 import { TERRAIN } from '../data/terrain'
-import { applyAction } from './battle'
-import { toEquipmentMap } from './campaign'
+import { applyAction, hazardAt, isImpassableTerrain } from './battle'
+import { itemKindOf, toEquipmentMap } from './campaign'
 import { applyExp, maxHp, maxMp } from './formulas'
 import { chebyshev } from './movement'
 import type {
@@ -60,6 +60,17 @@ function subjectParticle(word: string): string {
   return (code - 0xac00) % 28 === 0 ? '가' : '이'
 }
 
+/** 한글 목적격 조사 — 받침 있으면 '을', 없으면 '를' (battle.ts와 같은 규칙) */
+function objectParticle(word: string): string {
+  const code = word.charCodeAt(word.length - 1)
+  if (Number.isNaN(code) || code < 0xac00 || code > 0xd7a3) return '을(를)'
+  return (code - 0xac00) % 28 === 0 ? '를' : '을'
+}
+
+/** 아이템 표시명 — 장비/도구 어느 레지스트리에 있든 이름을 찾는다 (없으면 id) */
+const itemName = (itemId: string): string =>
+  EQUIPMENT[itemId]?.name ?? CONSUMABLES[itemId]?.name ?? itemId
+
 const sameCell = (a: Vec2, b: Vec2): boolean => a.x === b.x && a.y === b.y
 
 const occupied = (state: BattleState, pos: Vec2): boolean =>
@@ -73,9 +84,18 @@ const BUFF_STAT_LABEL: Record<BuffStat, string> = {
   morale: '사기',
 }
 
-/** 표시형 액션 = UI가 재생하고 eventContinue로 소비하는 액션 */
+/**
+ * 표시형 액션 = UI가 재생하고 eventContinue로 소비하는 액션.
+ * v1.2에서 giveItem이 승격됐다 — 「{아이템}을(를) 손에 넣었습니다!」 모달이 원작 연출이라
+ * 큐 헤드로 남겨두고 정지하며, 실제 적재는 battle.ts의 eventContinue가 한다.
+ */
 function isDisplayAction(action: EventAction): boolean {
-  return action.type === 'dialogue' || action.type === 'choice' || action.type === 'duel'
+  return (
+    action.type === 'dialogue' ||
+    action.type === 'choice' ||
+    action.type === 'duel' ||
+    action.type === 'giveItem'
+  )
 }
 
 // ---------- 스폰 (증원/spawnUnits 공용) ----------
@@ -275,11 +295,63 @@ function runImmediate(state: BattleState, eventId: string, action: EventAction):
       return
     }
 
-    case 'giveItem': {
-      // 전투 중 획득은 보류 목록에 쌓고 승리 시 applyVictory가 회수한다 (패배 시 소멸)
-      const name = action.kind === 'equipment' ? EQUIPMENT[action.itemId]?.name : CONSUMABLES[action.itemId]?.name
-      state.pendingRewards.push({ itemId: action.itemId, kind: action.kind })
-      log(state, `${name ?? action.itemId}을(를) 손에 넣었다!`)
+    // ---------- v1.2 ----------
+
+    case 'setVictory': {
+      // 스테이지 정의(모듈 상수)를 건드리지 않도록 항상 딥클론해서 얹는다
+      state.victoryOverride = structuredClone(action.victory)
+      log(state, '승리 조건이 변경되었다!')
+      return
+    }
+
+    case 'setDefeat': {
+      state.defeatOverride = structuredClone(action.defeat)
+      log(state, '패배 조건이 변경되었다!')
+      return
+    }
+
+    case 'setHazard': {
+      // 스크립트 발화 — 화계와 달리 연소 지형을 가리지 않는다(완성된 화염 방어진 연출).
+      // 다만 아무도 못 들어가는 지형(강·성벽·닫힌 성문)과 맵 밖은 개별로 건너뛴다.
+      const { width, height } = state.map
+      let lit = 0
+      for (const cell of action.cells) {
+        if (cell.x < 0 || cell.y < 0 || cell.x >= width || cell.y >= height) continue
+        if (isImpassableTerrain(state.map.tiles[cell.y][cell.x])) continue
+        const existing = hazardAt(state, cell)
+        if (existing) existing.remainingTurns = Math.max(existing.remainingTurns, action.duration)
+        else state.hazards.push({ pos: { ...cell }, kind: action.kind, remainingTurns: action.duration })
+        lit += 1
+      }
+      if (lit > 0) log(state, `불길이 치솟았다 — ${lit}칸`)
+      return
+    }
+
+    case 'dropItem': {
+      const kind = itemKindOf(action.itemId)
+      if (!kind) return // 미등록 id는 조용히 무시 (기존 보상 경로 관례)
+      // officerId는 **사체(hp 0)도 포함**해서 찾는다 — 격파 유닛은 배열에 남으므로 쓰러진 자리가 나온다
+      const pos = action.pos ?? state.units.find((u) => u.officerId === action.officerId)?.pos
+      if (!pos) return
+      const { width, height } = state.map
+      if (pos.x < 0 || pos.y < 0 || pos.x >= width || pos.y >= height) return
+      const name = itemName(action.itemId)
+      // 그 칸에 생존 아군이 서 있으면 픽업 판정을 기다리지 않고 즉시 손에 들어온다
+      const standing = state.units.find((u) => u.hp > 0 && u.faction === 'player' && sameCell(u.pos, pos))
+      if (standing) {
+        state.pendingRewards.push({ itemId: action.itemId, kind })
+        log(state, `${name}${objectParticle(name)} 손에 넣었다!`)
+      } else {
+        state.groundItems.push({ pos: { ...pos }, itemId: action.itemId })
+        log(state, `${name}${subjectParticle(name)} 땅에 떨어졌다`)
+      }
+      return
+    }
+
+    case 'giveGold': {
+      // 즉시형 — 승리 시 applyVictory가 보상금에 합산한다 (패배 시 소멸)
+      state.pendingGold += action.amount
+      log(state, `군자금 ${action.amount}을 얻었다!`)
       return
     }
 
@@ -303,10 +375,12 @@ function runImmediate(state: BattleState, eventId: string, action: EventAction):
       return
     }
 
-    // 표시형은 executeQueue가 걸러낸다 (도달 불가) — 방어적으로 무시
+    // 표시형은 executeQueue가 걸러낸다 (도달 불가) — 방어적으로 무시.
+    // giveItem은 v1.2에서 표시형으로 승격됐고 적재는 battle.ts의 eventContinue가 한다.
     case 'dialogue':
     case 'choice':
     case 'duel':
+    case 'giveItem':
       return
   }
 }

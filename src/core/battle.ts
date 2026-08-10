@@ -9,7 +9,14 @@ import { STATUSES, statusName } from '../data/statuses'
 import { STRATEGIES } from '../data/strategies'
 import { TERRAIN } from '../data/terrain'
 import type { RosterEntry } from './campaign'
-import { canPromoteUnit, classIdOf, consumableCount, removeConsumable, toEquipmentMap } from './campaign'
+import {
+  canPromoteUnit,
+  classIdOf,
+  consumableCount,
+  itemKindOf,
+  removeConsumable,
+  toEquipmentMap,
+} from './campaign'
 import type { OccurredEvent } from './events'
 import { executeQueue, livingByOfficer, runEvents, spawnStageUnit } from './events'
 import type { CombatStats } from './formulas'
@@ -36,10 +43,12 @@ import type {
   BattleAction,
   BattleState,
   ConsumableStack,
+  DefeatCondition,
   EquipInstance,
   EquipmentDef,
   EquipSlot,
   EventAction,
+  Hazard,
   OfficerDef,
   OfficerStats,
   StageDef,
@@ -47,9 +56,11 @@ import type {
   StatusEffect,
   StatusId,
   StrategyDef,
+  TerrainId,
   UnitClassDef,
   UnitState,
   Vec2,
+  VictoryCondition,
 } from './types'
 import {
   CRIT_MULTIPLIER,
@@ -217,6 +228,24 @@ export function terrainEffectOf(state: BattleState, unit: UnitState): number {
   return TERRAIN[tile].effect[classOf(unit).moveProfile]
 }
 
+// ---------- 전장 위험 지대 (v1.2) ----------
+
+/** 그 칸의 위험 지대(불길). 없으면 undefined — UI 오버레이·AI·이동 판정 공용 */
+export function hazardAt(state: BattleState, pos: Vec2): Hazard | undefined {
+  return state.hazards.find((h) => h.pos.x === pos.x && h.pos.y === pos.y)
+}
+
+/** 아무 병과도 들어갈 수 없는 지형 (강·성벽·닫힌 성문) — 불도 붙지 않는다 */
+export function isImpassableTerrain(id: TerrainId): boolean {
+  return Object.values(TERRAIN[id].cost).every((c) => c === null)
+}
+
+/**
+ * 연소 가능 지형 — 화계가 불길을 남길 수 있는 칸 [설계값].
+ * 강·성벽은 애초에 못 들어가고, 산지·황무지·여울·성내·성채는 타지 않는다.
+ */
+export const BURNABLE_TERRAIN: TerrainId[] = ['plain', 'grass', 'forest', 'village', 'bridge']
+
 /** 현재 레벨에서 사용 가능한 책략 목록 */
 export function knownStrategies(unit: UnitState): StrategyDef[] {
   return classOf(unit)
@@ -233,6 +262,9 @@ export function moveContextFor(state: BattleState, unit: UnitState): MoveContext
     width: state.map.width,
     height: state.map.height,
     costAt: (pos) => {
+      // 불길은 진입도 통과도 불가 — 지형 조회보다 먼저 걸러서 적로(flatCost)보다 우선한다 (v1.2).
+      // 시작 칸은 movementRange가 costAt에 묻지 않으므로, 불타는 칸에 갇힌 유닛도 탈출할 수 있다.
+      if (hazardAt(state, pos)) return null
       const cost = TERRAIN[state.map.tiles[pos.y][pos.x]].cost[profile]
       return flatCost && cost !== null ? 1 : cost
     },
@@ -430,6 +462,13 @@ function subjectParticle(word: string): string {
   return (code - 0xac00) % 28 === 0 ? '가' : '이'
 }
 
+/** 한글 목적격 조사 — 받침 있으면 '을', 없으면 '를' (로그 문장용) */
+function objectParticle(word: string): string {
+  const code = word.charCodeAt(word.length - 1)
+  if (Number.isNaN(code) || code < 0xac00 || code > 0xd7a3) return '을(를)'
+  return (code - 0xac00) % 28 === 0 ? '를' : '을'
+}
+
 /** 한글 방향 조사 — 받침 없거나 ㄹ이면 '로', 그 외 '으로' (로그 문장용) */
 function directionParticle(word: string): string {
   const code = word.charCodeAt(word.length - 1)
@@ -465,6 +504,60 @@ function growEquipment(state: BattleState, unit: UnitState, slot: EquipSlot, amo
   if (instance.level >= max) instance.exp = 0 // 만렙 도달 시 경험치 고정 (applyExp와 같은 처리)
 }
 
+// ---------- 위험 지대 / 맵 아이템 (v1.2) ----------
+
+/**
+ * 화계 발화 — 영향 범위 중 **연소 가능 지형**이고 맵 안인 칸에 불길을 남긴다.
+ * 명중 여부와 무관하게 시전이 성립하면 붙는다(원작: 화공 후 화염 타일 잔존).
+ * 이미 타고 있는 칸은 남은 턴을 늘리기만 한다(짧은 불이 긴 불을 덮어쓰지 않는다).
+ */
+function igniteHazards(state: BattleState, cells: Vec2[], duration: number): void {
+  const { width, height } = state.map
+  let ignited = 0
+  for (const cell of cells) {
+    if (cell.x < 0 || cell.y < 0 || cell.x >= width || cell.y >= height) continue
+    if (!BURNABLE_TERRAIN.includes(state.map.tiles[cell.y][cell.x])) continue
+    const existing = hazardAt(state, cell)
+    if (existing) existing.remainingTurns = Math.max(existing.remainingTurns, duration)
+    else state.hazards.push({ pos: { ...cell }, kind: 'fire', remainingTurns: duration })
+    ignited += 1
+  }
+  if (ignited > 0) log(state, 'hazard', `불길이 번졌다 — ${ignited}칸`)
+}
+
+/** 불길 감쇠 — 턴이 증가할 때 1턴씩 사그라들고, 다 타면 사라진다 */
+function decayHazards(state: BattleState): void {
+  if (state.hazards.length === 0) return
+  for (const h of state.hazards) h.remainingTurns -= 1
+  const before = state.hazards.length
+  state.hazards = state.hazards.filter((h) => h.remainingTurns > 0)
+  if (state.hazards.length < before) log(state, 'hazard', '불길이 사그라들었다')
+}
+
+/**
+ * 아이템 1점을 보상 목록에 적재 + 로그 (맵 픽업·이벤트 드랍 공용).
+ * 미등록 id는 조용히 무시한다 (기존 보상 경로 관례).
+ */
+export function grantItem(state: BattleState, itemId: string): void {
+  const kind = itemKindOf(itemId)
+  if (!kind) return
+  const name = (kind === 'equipment' ? EQUIPMENT[itemId].name : CONSUMABLES[itemId].name) ?? itemId
+  state.pendingRewards.push({ itemId, kind })
+  log(state, 'reward', `${name}${objectParticle(name)} 손에 넣었다!`)
+}
+
+/**
+ * 이동을 마친 유닛이 밟은 칸의 맵 아이템을 전부 회수한다 (v1.2).
+ * **아군(player)만** 줍는다 — 적·우군은 밟아도 그대로 남는다 (원작: 보물은 플레이어 것).
+ */
+function pickupGroundItems(state: BattleState, unit: UnitState): void {
+  if (unit.faction !== 'player') return
+  const here = state.groundItems.filter((g) => g.pos.x === unit.pos.x && g.pos.y === unit.pos.y)
+  if (here.length === 0) return
+  state.groundItems = state.groundItems.filter((g) => !here.includes(g))
+  for (const g of here) grantItem(state, g.itemId)
+}
+
 /**
  * 데미지 적용 + 격파 처리. 격파 시 증원을 즉시 트리거하고, 전투 내 이벤트용 사건은
  * occurred에 적재해 공통 후처리(runEvents)에서 일괄 평가한다 (v1.1 — 액션 도중 이벤트가 끼어들지 않게).
@@ -483,25 +576,20 @@ function dealDamage(
   }
 }
 
-/** 한 번의 타격 해소 (명중 → 회심 → 데미지). 명중 여부 반환. damageScale: 반격 시 0.8 */
-function resolveStrike(
+/**
+ * 명중 확정 후의 데미지 해소 (회심 → 랜덤 가산 → 데미지 → 격파 → 경험치 → 무구성장).
+ * 본타·반격·관통타(사모)가 같은 계산을 쓴다 — pierce는 로그 종류만 다르다 (v1.2).
+ */
+function applyHitDamage(
   state: BattleState,
   attacker: UnitState,
   defender: UnitState,
   occurred: OccurredEvent[],
-  damageScale = 1,
-): boolean {
+  damageScale: number,
+  pierce: boolean,
+): void {
   const aStats = effectiveStats(attacker)
   const dStats = effectiveStats(defender)
-
-  const hitRoll = roll(state.rngState, hitRateAgainst(aStats.agi, defender, dStats.agi))
-  state.rngState = hitRoll.nextState
-  if (!hitRoll.value) {
-    log(state, 'miss', `${nameOf(attacker)}의 공격이 빗나갔다!`, { targetId: defender.id, amount: 0 })
-    // 미스: 무기는 소량 획득, 회피한 쪽 방어구는 0 (원작 확정 — equipment.md 증보)
-    growEquipment(state, attacker, 'weapon', EQUIP_EXP_WEAPON_MISS)
-    return false
-  }
 
   const critRoll = roll(state.rngState, critRate(aStats.morale, dStats.morale))
   state.rngState = critRoll.nextState
@@ -524,13 +612,22 @@ function resolveStrike(
   })
 
   const isCounter = damageScale !== 1
-  const eventType = isCounter ? (critRoll.value ? 'counterCrit' : 'counterHit') : critRoll.value ? 'crit' : 'hit'
-  log(
-    state,
-    eventType,
-    `${nameOf(attacker)} → ${nameOf(defender)}: ${dmg} 데미지${critRoll.value ? ' (회심의 일격!)' : ''}`,
-    { targetId: defender.id, amount: -dmg },
-  )
+  const eventType = pierce
+    ? critRoll.value
+      ? 'pierceCrit'
+      : 'pierce'
+    : isCounter
+      ? critRoll.value
+        ? 'counterCrit'
+        : 'counterHit'
+      : critRoll.value
+        ? 'crit'
+        : 'hit'
+  const suffix = pierce ? ' (관통!)' : critRoll.value ? ' (회심의 일격!)' : ''
+  log(state, eventType, `${nameOf(attacker)} → ${nameOf(defender)}: ${dmg} 데미지${suffix}`, {
+    targetId: defender.id,
+    amount: -dmg,
+  })
   dealDamage(state, defender, dmg, occurred)
   grantExp(state, attacker, defender.level, defender.hp === 0)
   // 무구성장은 데미지 확정 후 — 이번 타격의 데미지는 성장 전 보정치로 계산된다.
@@ -547,10 +644,77 @@ function resolveStrike(
     'armor',
     attacker.level >= defender.level ? EQUIP_EXP_ARMOR_HIT.higher : EQUIP_EXP_ARMOR_HIT.lower,
   )
+}
+
+/** 한 번의 타격 해소 (명중 → 회심 → 데미지 → 장비 특수효과). 명중 여부 반환. damageScale: 반격 시 0.8 */
+function resolveStrike(
+  state: BattleState,
+  attacker: UnitState,
+  defender: UnitState,
+  occurred: OccurredEvent[],
+  damageScale = 1,
+): boolean {
+  const aStats = effectiveStats(attacker)
+  const dStats = effectiveStats(defender)
+
+  const hitRoll = roll(state.rngState, hitRateAgainst(aStats.agi, defender, dStats.agi))
+  state.rngState = hitRoll.nextState
+  if (!hitRoll.value) {
+    log(state, 'miss', `${nameOf(attacker)}의 공격이 빗나갔다!`, { targetId: defender.id, amount: 0 })
+    // 미스: 무기는 소량 획득, 회피한 쪽 방어구는 0 (원작 확정 — equipment.md 증보)
+    growEquipment(state, attacker, 'weapon', EQUIP_EXP_WEAPON_MISS)
+    return false
+  }
+
+  applyHitDamage(state, attacker, defender, occurred, damageScale, false)
+
+  // ---- 장비 특수효과 (v1.2) — 반격 시에도 그 타격의 공격자(=방어자) 장비 기준으로 적용된다 ----
+  const gear = equippedItems(attacker)
+
+  // 여포궁류 — 명중 시 상태이상 확정 부여 (원작: 보물은 100%). 이미 보유·격파된 대상은 no-op
+  const onHitStatus = gear.find((item) => item.onHitStatus)?.onHitStatus
+  if (onHitStatus && defender.hp > 0 && !hasStatus(defender, onHitStatus)) {
+    defender.statuses.push({ id: onHitStatus })
+    const name = nameOf(defender)
+    log(state, 'status', `${name}${subjectParticle(name)} ${statusName(onHitStatus)}에 빠졌다!`, {
+      targetId: defender.id,
+    })
+  }
+
+  // 사모 — 공격자→대상 방향 연장선의 다음 칸에 있는 적도 함께 관통한다.
+  // 반격·2회 공격은 발생하지 않고(관통타는 자기 자신을 다시 관통시키지도 않는다) 경험치는 정상 부여된다.
+  // 대각 사거리(궁병류 몰우전 조합)에서는 부호 정규화한 방향을 쓴다.
+  if (gear.some((item) => item.pierceBack)) {
+    const behind: Vec2 = {
+      x: defender.pos.x + Math.sign(defender.pos.x - attacker.pos.x),
+      y: defender.pos.y + Math.sign(defender.pos.y - attacker.pos.y),
+    }
+    const extra = unitAt(state, behind)
+    if (extra && extra.id !== attacker.id && isHostile(attacker, extra)) {
+      applyHitDamage(state, attacker, extra, occurred, damageScale, true)
+    }
+  }
+
   return true
 }
 
 // ---------- 승패 판정 ----------
+
+/**
+ * 지금 유효한 승리 조건 — setVictory 오버라이드가 있으면 그것, 없으면 스테이지 정의 (v1.2).
+ * UI(정보 패널)가 이 함수로 조건 문구를 만든다 — 시그니처 고정.
+ */
+export function effectiveVictory(state: BattleState, stage: StageDef): VictoryCondition[] {
+  return state.victoryOverride ?? stage.victory
+}
+
+/**
+ * 지금 유효한 패배 조건 — setDefeat 오버라이드 우선, 없으면 스테이지 정의 (없으면 빈 목록).
+ * 주인공 격파는 데이터에 없어도 항상 적용되므로 여기에 포함되지 않는다 — 시그니처 고정.
+ */
+export function effectiveDefeat(state: BattleState, stage: StageDef): DefeatCondition[] {
+  return state.defeatOverride ?? stage.defeat ?? []
+}
 
 function checkVictory(state: BattleState, stage: StageDef): void {
   if (state.result !== 'ongoing') return
@@ -563,7 +727,30 @@ function checkVictory(state: BattleState, stage: StageDef): void {
     return
   }
 
-  const met = stage.victory.map((cond) => {
+  // 데이터화된 패배 조건 (v1.2) — 주인공 격파 다음, 승리 평가보다 먼저 본다.
+  // turnLimit은 endPhase의 턴 증가 직후 이 함수가 불리므로 자연히 "N+1턴 시작 시 패배"가 된다.
+  for (const cond of effectiveDefeat(state, stage)) {
+    if (cond.type === 'turnLimit') {
+      if (state.turn > cond.turns) {
+        state.result = 'defeat'
+        log(state, 'defeat', `${cond.turns}턴을 넘겼다 — 패배...`)
+        return
+      }
+      continue
+    }
+    // unitDies는 **사체(hp 0)가 전장에 남아 있을 때만** 발동한다.
+    // removeUnits·일기토 퇴각으로 배열에서 빠진 유닛은 발동시키지 않는다
+    // (원작 서주 구원전 "미축 배신으로 실제로는 지지 않는" 페이크 재현).
+    const corpse = state.units.find((u) => u.officerId === cond.officerId && u.hp <= 0)
+    if (corpse) {
+      state.result = 'defeat'
+      const name = nameOf(corpse)
+      log(state, 'defeat', `${name}${subjectParticle(name)} 쓰러졌다 — 패배...`)
+      return
+    }
+  }
+
+  const met = effectiveVictory(state, stage).map((cond) => {
     switch (cond.type) {
       case 'annihilation':
         return livingUnits(state, 'enemy').length === 0
@@ -704,6 +891,8 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
       if (!cell || !cell.canStop) return prev
       unit.pos = { ...action.to }
       unit.moved = true
+      // 도착 칸의 맵 아이템 회수 (v1.2) — 아군만
+      pickupGroundItems(state, unit)
       break
     }
 
@@ -890,6 +1079,9 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
         }
       }
 
+      // 화계 잔불 (v1.2) — 명중 여부와 무관하게 시전이 성립하면 영향 범위가 타오른다
+      if (strategy.hazard) igniteHazards(state, targetCells, strategy.hazard.duration)
+
       caster.acted = true
       caster.moved = true
       break
@@ -994,6 +1186,7 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
         // 적 페이즈 종료 → 턴 증가, 아군 페이즈
         state.turn += 1
         state.phase = 'player'
+        decayHazards(state) // 불길은 턴 단위로 사그라든다 (v1.2)
         triggerReinforcements(state, { type: 'turnStart', turn: state.turn })
         occurred.push({ type: 'turnStart', turn: state.turn })
       }
@@ -1096,6 +1289,16 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
           resolveDuel(state, head, occurred)
           pending.queue.shift()
           break
+
+        // 표시형 승격 (v1.2) — UI가 「손에 넣었습니다!」 모달을 띄우고 이 소비로 실제 적재된다.
+        // 전투 중 획득은 보류 목록에 쌓이고 승리 시 applyVictory가 회수한다 (패배 시 소멸).
+        case 'giveItem': {
+          const name = head.kind === 'equipment' ? EQUIPMENT[head.itemId]?.name : CONSUMABLES[head.itemId]?.name
+          state.pendingRewards.push({ itemId: head.itemId, kind: head.kind })
+          log(state, 'event', `${name ?? head.itemId}을(를) 손에 넣었다!`)
+          pending.queue.shift()
+          break
+        }
 
         default:
           return prev // 즉시형이 헤드에 남아 있으면 안 된다 (방어)

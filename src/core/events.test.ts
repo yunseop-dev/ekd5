@@ -630,8 +630,9 @@ describe('즉시형 액션 — levelUpEnemies', () => {
   })
 })
 
-describe('즉시형 액션 — giveItem / giveExp', () => {
-  it('giveItem은 pendingRewards에 쌓인다 (장비/도구 각각)', () => {
+describe('표시형 액션 — giveItem / 즉시형 giveExp', () => {
+  // v1.2에서 giveItem은 표시형으로 승격됐다 — 큐 헤드에서 멈추고 eventContinue가 적재한다
+  it('giveItem은 eventContinue 소비 시 pendingRewards에 쌓인다 (장비/도구 각각)', () => {
     const state = mkBattle({
       events: [
         ev('i1', { type: 'battleStart' }, [
@@ -640,10 +641,16 @@ describe('즉시형 액션 — giveItem / giveExp', () => {
         ]),
       ],
     })
-    expect(state.pendingRewards).toEqual([
+    // 표시형이므로 아직 적재되지 않고 큐 헤드로 남아 있다 (UI가 모달을 띄우는 계약)
+    expect(state.pendingRewards).toEqual([])
+    expect(state.pendingEvents[0].queue[0].type).toBe('giveItem')
+
+    const done = autoResolveEvents(state)
+    expect(done.pendingRewards).toEqual([
       { itemId: 'leatherShield', kind: 'equipment' },
       { itemId: 'hoebokSsal', kind: 'consumable' },
     ])
+    expect(done.pendingEvents).toEqual([])
   })
 
   it('giveExp는 아군에게 경험치를 주고 레벨업 시 최대치를 재계산한다', () => {
@@ -684,9 +691,14 @@ describe('executeQueue — 즉시형/표시형 혼합', () => {
     expect(state.pendingRewards).toEqual([]) // 대사 뒤 액션은 아직 실행되지 않았다
     expect(state.pendingEvents[0].queue).toHaveLength(2)
 
+    // 대사를 소비하면 다음 헤드(giveItem — v1.2 표시형)에서 다시 멈춘다
     const next = applyAction(state, { type: 'eventContinue' })
-    expect(next.pendingRewards).toHaveLength(1)
-    expect(next.pendingEvents).toEqual([]) // 큐 소진 → 대기 목록에서 빠진다
+    expect(next.pendingRewards).toEqual([])
+    expect(next.pendingEvents[0].queue[0].type).toBe('giveItem')
+
+    const done = applyAction(next, { type: 'eventContinue' })
+    expect(done.pendingRewards).toHaveLength(1)
+    expect(done.pendingEvents).toEqual([]) // 큐 소진 → 대기 목록에서 빠진다
   })
 
   it('대사 여러 줄(연속 dialogue)은 eventContinue마다 하나씩 소비된다', () => {
@@ -754,7 +766,10 @@ describe('eventContinue — choice', () => {
     const state = startBattle(choiceStage(), 1)
     const next = applyAction(state, { type: 'eventContinue', choice: 1 })
     expect(unit(next, 'yellowInfantry').level).toBe(9)
-    expect(next.pendingRewards).toEqual([{ itemId: 'leatherShield', kind: 'equipment' }])
+    // 분기 안의 giveItem은 표시형(v1.2)이라 한 번 더 소비해야 적재된다
+    expect(next.pendingEvents[0].queue[0].type).toBe('giveItem')
+    const done = applyAction(next, { type: 'eventContinue' })
+    expect(done.pendingRewards).toEqual([{ itemId: 'leatherShield', kind: 'equipment' }])
   })
 
   it('분기 안의 표시형에서 다시 멈추고, 이어지는 즉시형은 그 뒤에 실행된다', () => {
@@ -1110,7 +1125,8 @@ describe('캠페인 — pendingRewards 회수', () => {
 
   it('장비는 소지품, 도구는 스톡으로 회수된다', () => {
     const campaign = completeStory(newCampaign())
-    const state = startBattle(rewardStage(), 1, campaign.roster)
+    // giveItem은 표시형(v1.2) — 모달 소비까지 진행해야 적재된다
+    const state = autoResolveEvents(startBattle(rewardStage(), 1, campaign.roster))
     expect(state.pendingRewards).toHaveLength(2)
     const next = applyVictory(campaign, state)
     expect(next.inventory.filter((i) => i.itemId === 'leatherShield')).toHaveLength(1)
@@ -1133,12 +1149,13 @@ describe('캠페인 — pendingRewards 회수', () => {
       units: ADJACENT_PAIR,
       events: [ev('reward', { type: 'battleStart' }, [{ type: 'giveItem', itemId: 'leatherShield', kind: 'equipment' }])],
     })
-    const state = startBattle(stage, 1, campaign.roster)
+    const state = autoResolveEvents(startBattle(stage, 1, campaign.roster))
     expect(state.pendingRewards).toHaveLength(1)
     const lost = forceKill(toEnemyPhase(state), 'yellowInfantry', 'caocao')
     expect(lost.result).toBe('defeat')
     // 캠페인 회수 경로는 applyVictory뿐 — 패배 상태에서는 호출되지 않으므로 보상은 소멸한다
     expect(campaign.inventory.some((i) => i.itemId === 'leatherShield')).toBe(false)
-    expect(startBattle(stage, 1, campaign.roster).pendingRewards).toHaveLength(1) // 재도전은 처음부터
+    // 재도전은 처음부터 (모달 소비 전이므로 pendingRewards는 비어 있고 큐에 남아 있다)
+    expect(autoResolveEvents(startBattle(stage, 1, campaign.roster)).pendingRewards).toHaveLength(1)
   })
 })
