@@ -12,25 +12,53 @@ import {
   unitAt,
 } from '../core/battle'
 import type { RosterEntry } from '../core/campaign'
-import { growthSummary } from '../core/campaign'
-import { attackableCells, attackRangeUnion, keyOf, manhattan } from '../core/movement'
-import type { BattleState, ConsumableStack, Faction, StageDef, UnitState, Vec2 } from '../core/types'
+import { PROMOTION_LEVEL, canPromoteUnit, consumableCount, growthSummary } from '../core/campaign'
+import { maxHp, maxMp } from '../core/formulas'
+import { attackableCells, attackRangeUnion, keyOf, manhattan, strategyAreaCells } from '../core/movement'
+import type {
+  BattleState,
+  ConsumableDef,
+  ConsumableStack,
+  Faction,
+  StageDef,
+  StrategyDef,
+  UnitClassDef,
+  UnitState,
+  Vec2,
+} from '../core/types'
+import { CLASSES } from '../data/classes'
+import { CONSUMABLES } from '../data/consumables'
 import { OFFICERS } from '../data/officers'
+import { STRATEGIES } from '../data/strategies'
 import { TERRAIN } from '../data/terrain'
 import { Banner, type BannerProps } from './Banner'
-import { BattleBoard } from './BattleBoard'
+import { BattleBoard, CLASS_ICON } from './BattleBoard'
 import { BattleLog } from './BattleLog'
 import { ForecastPanel } from './ForecastPanel'
 import { TerrainInfoPanel } from './TerrainInfoPanel'
 import { UnitInfoPanel } from './UnitInfoPanel'
 import './battle.css'
 
-type SelMode = 'move' | 'menu' | 'attackTarget' | 'strategyTarget'
+/**
+ * 행동 메뉴 2단 구조 (원작 조조전):
+ *   move → menu → (attackTarget | strategyMenu → strategyTarget | itemMenu → itemTarget)
+ * 우클릭은 항상 한 단계만 뒤로 간다.
+ */
+type SelMode =
+  | 'move'
+  | 'menu'
+  | 'strategyMenu'
+  | 'itemMenu'
+  | 'attackTarget'
+  | 'strategyTarget'
+  | 'itemTarget'
 
 interface Selection {
   unitId: string
   mode: SelMode
   strategyId?: string
+  /** 도구 대상 지정 중인 소모품 id */
+  itemId?: string
   undo: BattleState // 취소 시 복원 지점 (이동 전 상태)
 }
 
@@ -66,7 +94,105 @@ const FLOATER_TEXT: Record<string, (n: number) => { text: string; kind: Floater[
   counterCrit: (n) => ({ text: `반격 회심! ${n}`, kind: 'crit' }),
   strategy: (n) => ({ text: `${n}`, kind: 'damage' }),
   heal: (n) => ({ text: `+${n}`, kind: 'heal' }),
+  // 도구 사용(회복류) — 책략 회복과 같은 표기를 쓴다. 승급(인수)은 amount가 없어 플로터가 뜨지 않는다.
+  item: (n) => ({ text: `+${n}`, kind: 'heal' }),
   miss: () => ({ text: 'MISS', kind: 'miss' }),
+}
+
+// ---------- 승급(인수) 변화 요약 — v0.8 캠프 UI에서 전투로 이식 ----------
+
+/** 2차 병과는 CLASS_ICON(1차 6종)에 없다 — 같은 계열(category) 아이콘으로 폴백 */
+const CATEGORY_ICON: Record<string, string> = {
+  lord: '主',
+  cavalry: '騎',
+  infantry: '步',
+  archer: '弓',
+  strategist: '策',
+  support: '風',
+}
+const classIcon = (cls: UnitClassDef): string =>
+  CLASS_ICON[cls.id] ?? CATEGORY_ICON[cls.category] ?? '?'
+
+/** "중기병으로" / "군사로" — 받침(ㄹ 제외) 여부로 조사를 고른다 */
+function euroRo(word: string): string {
+  const code = word.charCodeAt(word.length - 1) - 0xac00
+  const jong = code >= 0 && code <= 11171 ? code % 28 : 0
+  return `${word}${jong === 0 || jong === 8 ? '로' : '으로'}`
+}
+
+const GROWTH_KEYS = ['atk', 'def', 'mind', 'agi', 'morale'] as const
+const GROWTH_LABEL: Record<(typeof GROWTH_KEYS)[number], string> = {
+  atk: '공격',
+  def: '방어',
+  mind: '정신',
+  agi: '순발',
+  morale: '사기',
+}
+const GRADE_RANK: Record<string, number> = { C: 0, B: 1, A: 2, S: 3 }
+
+const rangeText = (cls: UnitClassDef): string =>
+  cls.minRange === cls.maxRange ? `${cls.minRange}` : `${cls.minRange}~${cls.maxRange}`
+
+interface PromotionChange {
+  text: string
+  /** true=상승, false=하락, null=중립(신규 책략 등) */
+  up: boolean | null
+}
+
+/** 현재 병과 → 상위 병과 변화 요약. 값은 전부 CLASSES 비교로 뽑는다(하드코딩 금지) */
+function promotionChanges(from: UnitClassDef, to: UnitClassDef, level: number): PromotionChange[] {
+  const out: PromotionChange[] = []
+  const num = (label: string, a: number, b: number) => {
+    if (a !== b) out.push({ text: `${label} ${a} → ${b}`, up: b > a })
+  }
+  num('HP 최대치', maxHp(from, level), maxHp(to, level))
+  num('MP 최대치', maxMp(from, level), maxMp(to, level))
+  num('이동', from.move, to.move)
+  if (rangeText(from) !== rangeText(to)) {
+    out.push({ text: `사거리 ${rangeText(from)} → ${rangeText(to)}`, up: to.maxRange > from.maxRange })
+  }
+  for (const k of GROWTH_KEYS) {
+    const a = from.growth[k]
+    const b = to.growth[k]
+    if (a !== b) {
+      out.push({
+        text: `${GROWTH_LABEL[k]} 성장 ${a} → ${b}`,
+        up: (GRADE_RANK[b] ?? 0) > (GRADE_RANK[a] ?? 0),
+      })
+    }
+  }
+  const learned = to.strategies.filter((s) => !from.strategies.some((f) => f.strategyId === s.strategyId))
+  for (const s of learned) {
+    const name = STRATEGIES[s.strategyId]?.name ?? s.strategyId
+    out.push({
+      text: `신규 책략 ${name} (Lv${s.learnLevel}${s.learnLevel <= level ? ' — 즉시 습득' : ''})`,
+      up: null,
+    })
+  }
+  return out
+}
+
+interface PromotionInfo {
+  from: UnitClassDef
+  target: UnitClassDef | null
+  ok: boolean
+  /** 불가 사유 — 버튼 툴팁 */
+  reason: string | null
+  changes: PromotionChange[]
+}
+
+/** 전투 유닛의 승급 가능 여부 + 변화 요약. 가능 판정은 코어(canPromoteUnit) 단일 출처 */
+function promotionInfoOf(unit: UnitState): PromotionInfo {
+  const from = classOf(unit)
+  const target = from.promotesTo ? (CLASSES[from.promotesTo] ?? null) : null
+  const ok = canPromoteUnit(unit)
+  let reason: string | null = null
+  if (!ok) {
+    if (!target) reason = '최종 병과 — 더 오를 곳이 없다'
+    else if (unit.level < PROMOTION_LEVEL) reason = `Lv${PROMOTION_LEVEL} 필요 (현재 Lv${unit.level})`
+    else reason = '지금은 승급할 수 없다'
+  }
+  return { from, target, ok, reason, changes: target ? promotionChanges(from, target, unit.level) : [] }
 }
 
 interface Props {
@@ -87,6 +213,10 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
   const [hover, setHover] = useState<Vec2 | null>(null)
   const [speed, setSpeed] = useState<PlaySpeed>(1)
   const [confirmEnd, setConfirmEnd] = useState(false)
+  /** 인수 승급 확인 오버레이 (도구 메뉴에서 인수 선택 시) */
+  const [promoteItemId, setPromoteItemId] = useState<string | null>(null)
+  /** 이동/위협 범위를 들여다보는 유닛 — 선택(sel)과 독립. 적·우군·행동 완료 아군에 쓴다 */
+  const [inspectId, setInspectId] = useState<string | null>(null)
   const [aiActiveId, setAiActiveId] = useState<string | null>(null)
   const [floaters, setFloaters] = useState<Floater[]>([])
   const [banner, setBanner] = useState<BannerSpec | null>(null)
@@ -98,6 +228,7 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
   const selectedUnit = sel ? state.units.find((u) => u.id === sel.unitId) : undefined
   const hoverUnit = hover ? unitAt(state, hover) : undefined
   const aiActiveUnit = aiActiveId ? state.units.find((u) => u.id === aiActiveId) : undefined
+  const inspectUnit = inspectId ? state.units.find((u) => u.id === inspectId) : undefined
 
   // ---------- 페이즈 전환 / 승패 배너 ----------
 
@@ -115,6 +246,9 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
     })
   }, [state.phase, state.turn, state.result, speed])
 
+  // 페이즈가 바뀌면 들여다보기는 해제한다 (지난 페이즈의 사거리는 정보가 아니라 노이즈다)
+  useEffect(() => setInspectId(null), [state.phase, state.turn])
+
   useEffect(() => {
     if (state.result === 'ongoing') return
     if (speed === 0) {
@@ -127,6 +261,16 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
         : { text: '패배...', color: 'enemy', direction: 'right' },
     )
   }, [state.result, speed])
+
+  // 승급 확인 오버레이 — Escape 로 닫기
+  useEffect(() => {
+    if (!promoteItemId) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPromoteItemId(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [promoteItemId])
 
   function handleBannerDone() {
     setBanner(null)
@@ -228,37 +372,85 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
     return set
   }, [sel?.mode, selectedUnit, moveRange, moveCells, state])
 
+  /** 책략/도구 대상 지정 사거리 (보라 오버레이) — 도구는 range>0 인 것만 대상 지정이 필요하다 */
   const strategyCells = useMemo(() => {
     const set = new Set<string>()
-    if (sel?.mode === 'strategyTarget' && selectedUnit && sel.strategyId) {
-      const strategy = knownStrategies(selectedUnit).find((s) => s.id === sel.strategyId)
-      if (strategy) {
-        for (let y = 0; y < state.map.height; y++) {
-          for (let x = 0; x < state.map.width; x++) {
-            if (manhattan(selectedUnit.pos, { x, y }) <= strategy.range) set.add(keyOf({ x, y }))
-          }
-        }
+    if (!selectedUnit) return set
+    let range: number | null = null
+    if (sel?.mode === 'strategyTarget' && sel.strategyId) {
+      range = knownStrategies(selectedUnit).find((s) => s.id === sel.strategyId)?.range ?? null
+    } else if (sel?.mode === 'itemTarget' && sel.itemId) {
+      range = CONSUMABLES[sel.itemId]?.range ?? null
+    }
+    if (range === null) return set
+    for (let y = 0; y < state.map.height; y++) {
+      for (let x = 0; x < state.map.width; x++) {
+        if (manhattan(selectedUnit.pos, { x, y }) <= range) set.add(keyOf({ x, y }))
       }
     }
     return set
   }, [sel, selectedUnit, state])
+
+  /** 책략 착탄 범위 프리뷰 — 커서가 사거리 안에 있을 때만, 맵 경계로 클립해서 보여준다 */
+  const aoeCells = useMemo(() => {
+    const set = new Set<string>()
+    if (sel?.mode !== 'strategyTarget' || !selectedUnit || !sel.strategyId || !hover) return set
+    if (!strategyCells.has(keyOf(hover))) return set
+    const strategy = knownStrategies(selectedUnit).find((s) => s.id === sel.strategyId)
+    if (!strategy) return set
+    for (const p of strategyAreaCells(strategy.area, hover)) {
+      if (p.x < 0 || p.y < 0 || p.x >= state.map.width || p.y >= state.map.height) continue
+      set.add(keyOf(p))
+    }
+    return set
+  }, [sel, selectedUnit, hover, strategyCells, state.map.width, state.map.height])
+
+  /** 들여다보는 유닛의 이동 가능 칸 (자기 위치 포함) */
+  const inspectMoveCells = useMemo(() => {
+    const set = new Set<string>()
+    if (!inspectUnit) return set
+    for (const cell of movementRangeOf(state, inspectUnit).values()) {
+      if (cell.canStop) set.add(keyOf(cell.pos))
+    }
+    set.add(keyOf(inspectUnit.pos))
+    return set
+  }, [state, inspectUnit])
+
+  /** 이동 후 공격이 닿는 칸 — 이동 칸은 빼서 "어디까지 맞을 수 있는가"만 남긴다 */
+  const inspectThreatCells = useMemo(() => {
+    const set = new Set<string>()
+    if (!inspectUnit) return set
+    const cls = classOf(inspectUnit)
+    const union = attackRangeUnion(
+      movementRangeOf(state, inspectUnit),
+      cls.minRange,
+      cls.maxRange,
+      state.map.width,
+      state.map.height,
+    )
+    for (const k of union) if (!inspectMoveCells.has(k)) set.add(k)
+    return set
+  }, [state, inspectUnit, inspectMoveCells])
 
   // ---------- 조작 ----------
 
   const isPlayerTurn = state.phase === 'player' && state.result === 'ongoing'
 
   function selectUnit(unit: UnitState) {
+    setInspectId(null) // 아군을 조작하기 시작하면 들여다보기는 끝난다
     setSel({ unitId: unit.id, mode: unit.moved ? 'menu' : 'move', undo: state })
   }
 
   function cancelSelection() {
     if (sel) setState(sel.undo)
     setSel(null)
+    setPromoteItemId(null)
   }
 
   function finishAction(next: BattleState) {
     setState(next)
     setSel(null)
+    setPromoteItemId(null)
     // 원작(GBA 영걸전) 동작: 전원 행동 완료 시 턴 종료 확인창 자동 표시
     if (
       next.result === 'ongoing' &&
@@ -273,21 +465,60 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
     setConfirmEnd(false)
     if (!isPlayerTurn) return
     setSel(null)
+    setInspectId(null)
     // 페이즈만 넘기면 AI 재생 useEffect가 이어받는다
     setState(applyAction(state, { type: 'endPhase' }))
+  }
+
+  /** 도구 사용 — range 0 은 자기 위치를 대상으로 즉시, range>0 은 대상 지정 모드로 */
+  function useItemAt(itemId: string, target: Vec2) {
+    if (!selectedUnit) return
+    const next = applyAction(state, { type: 'useItem', unitId: selectedUnit.id, itemId, target })
+    if (next === state) return // 무효 액션 — 리듀서가 원본을 그대로 돌려준다
+    finishAction(next)
+  }
+
+  /** 도구 메뉴에서 항목 선택 */
+  function chooseItem(def: ConsumableDef) {
+    if (!sel || !selectedUnit) return
+    if (def.effect.kind === 'promotion') {
+      setPromoteItemId(def.id) // 승급은 되돌릴 수 없다 — 확인 오버레이를 거친다
+      return
+    }
+    if (def.range > 0) {
+      setSel({ ...sel, mode: 'itemTarget', itemId: def.id })
+      return
+    }
+    useItemAt(def.id, selectedUnit.pos)
   }
 
   /** 우클릭 = 원작 취소 버튼: 단계별 뒤로가기, 선택 없음 상태에서는 턴 종료 확인 */
   function handleRightClick() {
     if (!isPlayerTurn) return
+    if (promoteItemId) {
+      setPromoteItemId(null)
+      return
+    }
     if (!sel) {
+      // 들여다보기가 켜져 있으면 먼저 그것을 끈다
+      if (inspectId) {
+        setInspectId(null)
+        return
+      }
       setConfirmEnd(true)
       return
     }
     switch (sel.mode) {
-      case 'attackTarget':
+      case 'itemTarget':
+        setSel({ ...sel, mode: 'itemMenu', itemId: undefined })
+        return
       case 'strategyTarget':
-        setSel({ ...sel, mode: 'menu', strategyId: undefined })
+        setSel({ ...sel, mode: 'strategyMenu', strategyId: undefined })
+        return
+      case 'strategyMenu':
+      case 'itemMenu':
+      case 'attackTarget':
+        setSel({ ...sel, mode: 'menu', strategyId: undefined, itemId: undefined })
         return
       case 'menu':
         // 이동 취소: 이동 전 상태로 복원하고 이동 모드 유지
@@ -305,7 +536,12 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
     const clicked = unitAt(state, pos)
 
     if (!sel) {
-      if (clicked && clicked.faction === 'player' && !clicked.acted) selectUnit(clicked)
+      if (clicked && clicked.faction === 'player' && !clicked.acted) {
+        selectUnit(clicked)
+        return
+      }
+      // 적/우군/행동 완료 아군 — 이동·위협 범위 들여다보기 토글
+      setInspectId((prev) => (clicked && prev !== clicked.id ? clicked.id : null))
       return
     }
 
@@ -337,6 +573,8 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
         return
       }
       case 'menu':
+      case 'strategyMenu':
+      case 'itemMenu':
         return // 메뉴 버튼으로만 진행
       case 'attackTarget': {
         if (clicked && isHostile(unit, clicked) && attackCells.has(keyOf(pos))) {
@@ -360,7 +598,15 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
             return
           }
         }
-        setSel({ ...sel, mode: 'menu' })
+        setSel({ ...sel, mode: 'strategyMenu', strategyId: undefined })
+        return
+      }
+      case 'itemTarget': {
+        if (sel.itemId && strategyCells.has(keyOf(pos))) {
+          useItemAt(sel.itemId, pos)
+          return
+        }
+        setSel({ ...sel, mode: 'itemMenu', itemId: undefined })
         return
       }
     }
@@ -386,6 +632,36 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
     sel?.mode === 'attackTarget' && selectedUnit && hoverUnit && isHostile(selectedUnit, hoverUnit)
       ? hoverUnit
       : undefined
+
+  /** 선택 유닛이 쓸 수 있는 책략 목록 + 개별 사용 가능 판정 */
+  const strategies = selectedUnit ? knownStrategies(selectedUnit) : []
+  const strategyBlockReason = (s: StrategyDef): string | null => {
+    if (!selectedUnit) return '선택된 부대가 없다'
+    if (s.element === 'fire' && state.weather === 'rain') return '우천 — 화계는 쓸 수 없다'
+    if (selectedUnit.mp < s.mpCost) return `MP 부족 (${selectedUnit.mp}/${s.mpCost})`
+    return null
+  }
+  const allStrategiesBlocked = strategies.length > 0 && strategies.every((s) => strategyBlockReason(s) !== null)
+
+  /** 전투 로컬 도구 스톡 (수량 0·미등록 id 제외) */
+  const itemStock = useMemo(
+    () =>
+      state.consumables
+        .filter((s) => s.count > 0 && CONSUMABLES[s.itemId])
+        .map((s) => ({ def: CONSUMABLES[s.itemId], count: s.count })),
+    [state.consumables],
+  )
+  const itemTotal = itemStock.reduce((n, s) => n + s.count, 0)
+
+  const promo = selectedUnit ? promotionInfoOf(selectedUnit) : null
+  const promoteDef = promoteItemId ? CONSUMABLES[promoteItemId] : undefined
+
+  /** 도구 1개의 사용 가능 여부 + 사유 (인수는 승급 조건, 회복류는 항상 가능) */
+  const itemBlockReason = (def: ConsumableDef): string | null => {
+    if (!selectedUnit) return '선택된 부대가 없다'
+    if (def.effect.kind === 'promotion') return promo?.ok ? null : (promo?.reason ?? '승급할 수 없다')
+    return null
+  }
 
   return (
     <div className="battle-screen">
@@ -413,6 +689,10 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
         moveCells={moveCells}
         attackCells={attackCells}
         strategyCells={strategyCells}
+        aoeCells={aoeCells}
+        inspectMoveCells={inspectMoveCells}
+        inspectThreatCells={inspectThreatCells}
+        inspectUnitId={inspectId}
         selectedUnitId={sel?.unitId ?? null}
         activeUnitId={aiActiveId}
         floaters={floaters}
@@ -422,6 +702,7 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
       />
 
       <aside className="side-panel">
+        {/* ① 행동 메뉴 (1단) */}
         {sel?.mode === 'menu' && selectedUnit && (
           <div className="panel-box">
             <h3>{officerOf(selectedUnit).name}의 행동</h3>
@@ -432,19 +713,16 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
               >
                 공격
               </button>
-              {knownStrategies(selectedUnit).map((s) => {
-                const blocked =
-                  selectedUnit.mp < s.mpCost || (s.element === 'fire' && state.weather === 'rain')
-                return (
-                  <button
-                    key={s.id}
-                    disabled={blocked}
-                    onClick={() => setSel({ ...sel, mode: 'strategyTarget', strategyId: s.id })}
-                  >
-                    책략: {s.name} (MP {s.mpCost})
-                  </button>
-                )
-              })}
+              {strategies.length > 0 && (
+                <button
+                  disabled={allStrategiesBlocked}
+                  title={allStrategiesBlocked ? '쓸 수 있는 책략이 없다' : undefined}
+                  onClick={() => setSel({ ...sel, mode: 'strategyMenu' })}
+                >
+                  책략
+                </button>
+              )}
+              {itemTotal > 0 && <button onClick={() => setSel({ ...sel, mode: 'itemMenu' })}>도구</button>}
               <button
                 onClick={() => {
                   const next = applyAction(state, { type: 'wait', unitId: selectedUnit.id })
@@ -458,18 +736,130 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
           </div>
         )}
 
+        {/* ② 책략 목록 (2단) */}
+        {sel?.mode === 'strategyMenu' && selectedUnit && (
+          <div className="panel-box">
+            <h3>{officerOf(selectedUnit).name}의 책략</h3>
+            <div className="action-menu">
+              {strategies.map((s) => {
+                const blocked = strategyBlockReason(s)
+                return (
+                  <button
+                    key={s.id}
+                    disabled={blocked !== null}
+                    title={blocked ?? `사거리 ${s.range} · ${s.area === 'single' ? '단일' : s.area === 'cross' ? '십자 5칸' : '3×3'}`}
+                    onClick={() => setSel({ ...sel, mode: 'strategyTarget', strategyId: s.id })}
+                  >
+                    {s.name} <span className="menu-cost">MP {s.mpCost}</span>
+                  </button>
+                )
+              })}
+              {strategies.length === 0 && <p className="dim">쓸 수 있는 책략이 없다.</p>}
+              <button
+                className="menu-back"
+                onClick={() => setSel({ ...sel, mode: 'menu', strategyId: undefined })}
+              >
+                뒤로
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ③ 도구 목록 (2단) */}
+        {sel?.mode === 'itemMenu' && selectedUnit && (
+          <div className="panel-box">
+            <h3>{officerOf(selectedUnit).name}의 도구</h3>
+            <div className="action-menu">
+              {itemStock.map(({ def, count }) => {
+                const blocked = itemBlockReason(def)
+                return (
+                  <button
+                    key={def.id}
+                    disabled={blocked !== null}
+                    title={blocked ? `${def.desc}\n${blocked}` : def.desc}
+                    onClick={() => chooseItem(def)}
+                  >
+                    {def.name} <span className="menu-count">×{count}</span>
+                  </button>
+                )
+              })}
+              {itemStock.length === 0 && <p className="dim">가진 도구가 없다.</p>}
+              <button
+                className="menu-back"
+                onClick={() => setSel({ ...sel, mode: 'menu', itemId: undefined })}
+              >
+                뒤로
+              </button>
+            </div>
+          </div>
+        )}
+
         {forecastTarget && selectedUnit && (
           <ForecastPanel state={state} attacker={selectedUnit} defender={forecastTarget} />
         )}
 
-        {(hoverUnit ?? selectedUnit ?? aiActiveUnit) && (
-          <UnitInfoPanel state={state} unit={(hoverUnit ?? selectedUnit ?? aiActiveUnit)!} />
+        {(hoverUnit ?? selectedUnit ?? inspectUnit ?? aiActiveUnit) && (
+          <UnitInfoPanel state={state} unit={(hoverUnit ?? selectedUnit ?? inspectUnit ?? aiActiveUnit)!} />
         )}
 
         {hover && <TerrainInfoPanel terrain={TERRAIN[state.map.tiles[hover.y][hover.x]]} />}
 
         <BattleLog log={state.log} />
       </aside>
+
+      {/* 인수 승급 확인 — 되돌릴 수 없는 조작이라 확인 후 확정 */}
+      {promoteItemId && promoteDef && selectedUnit && promo?.ok && promo.target && (
+        <div
+          className="result-overlay"
+          onClick={() => setPromoteItemId(null)}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            setPromoteItemId(null)
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="승급 확인"
+        >
+          <div className="result-box promote-box" onClick={(e) => e.stopPropagation()}>
+            <h2>승급</h2>
+            <div className="promote-line">
+              <span className="promote-officer">{officerOf(selectedUnit).name}</span>
+              <span className="promote-from">
+                <em className="promote-icon">{classIcon(promo.from)}</em>
+                {promo.from.name}
+              </span>
+              <span className="promote-arrow">→</span>
+              <span className="promote-to">
+                <em className="promote-icon">{classIcon(promo.target)}</em>
+                {promo.target.name}
+              </span>
+            </div>
+            <ul className="promote-changes">
+              {promo.changes.map((c) => (
+                <li key={c.text} className={c.up === null ? 'flat' : c.up ? 'up' : 'down'}>
+                  {c.text}
+                </li>
+              ))}
+              {promo.changes.length === 0 && <li className="flat">수치 변화 없음</li>}
+              <li className="flat">사용하면 HP/MP가 모두 회복된다</li>
+            </ul>
+            <p className="promote-cost">
+              {promoteDef.name} 1 소모 (보유 {consumableCount(state.consumables, promoteDef.id)} →{' '}
+              {consumableCount(state.consumables, promoteDef.id) - 1})
+            </p>
+            <div className="promote-actions">
+              <button
+                className="promote-confirm"
+                onClick={() => useItemAt(promoteDef.id, selectedUnit.pos)}
+                autoFocus
+              >
+                {euroRo(promo.target.name)} 승급한다
+              </button>
+              <button onClick={() => setPromoteItemId(null)}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmEnd && isPlayerTurn && (
         <div className="result-overlay" onContextMenu={(e) => { e.preventDefault(); setConfirmEnd(false) }}>

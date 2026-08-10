@@ -137,6 +137,33 @@
 .tile .overlay.strategy { background: rgba(180, 80, 220, 0.45); }
 .tile .overlay.cursor { outline: 2px solid #fff; outline-offset: -2px; }
 
+/* 책략 착탄 범위 — 사거리 보라(.strategy) 위에 얹히는 자홍 강조 + 가벼운 펄스 */
+.tile .overlay.aoe {
+  background: rgba(255, 60, 170, 0.5);
+  outline: 1px solid rgba(255, 200, 235, 0.9);
+  outline-offset: -1px;
+  z-index: 2;
+  animation: aoe-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes aoe-pulse {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+
+/* 적 이동범위 들여다보기 — 아군 파랑(.move)/공격 빨강(.attack)과 다른 주황·연빨강 계열 */
+.tile .overlay.inspect-move { background: rgba(240, 150, 40, 0.42); }
+.tile .overlay.inspect-threat { background: rgba(225, 80, 60, 0.2); }
+.tile .overlay.inspect-mark {
+  outline: 2px dashed #ffb04c;
+  outline-offset: -2px;
+  z-index: 4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile .overlay.aoe { animation: none; }
+}
+
 /* 유닛 토큰 */
 .unit-token {
   position: absolute;
@@ -259,6 +286,98 @@
 .action-menu button:hover:not(:disabled) { background: #55482f; }
 .action-menu button:disabled { opacity: 0.4; cursor: default; }
 
+/* 2단 메뉴(책략/도구) — 비용·수량은 오른쪽에 흐리게, "뒤로"는 한 단 낮춘 톤 */
+.action-menu .menu-cost,
+.action-menu .menu-count {
+  float: right;
+  color: #bfb39c;
+  font-size: 12px;
+}
+.action-menu .menu-back {
+  background: #2b251b;
+  color: #bfb39c;
+}
+.action-menu .menu-back:hover:not(:disabled) { background: #3d3527; }
+.action-menu .dim { margin: 2px 0; color: #857a66; font-size: 12px; }
+
+/* ---------- 인수 승급 확인 오버레이 (v0.9: 캠프 → 전투 이식) ---------- */
+/* .result-overlay/.result-box 위에 얹힌다 */
+
+.promote-box {
+  min-width: 340px;
+  max-width: 460px;
+}
+
+.promote-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 15px;
+}
+.promote-officer { font-weight: 700; color: #e8dcc8; }
+.promote-from { color: #bfb39c; }
+.promote-to { color: #ffd76a; font-weight: 700; }
+.promote-arrow { color: #d8b96a; }
+
+.promote-icon {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  margin-right: 4px;
+  border-radius: 50%;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  color: #fff;
+  background: #2d5da8;
+  border: 2px solid #9cc2ff;
+  vertical-align: middle;
+}
+.promote-to .promote-icon { background: #8a6a1e; border-color: #ffd76a; }
+
+.promote-changes {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  list-style: none;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.7;
+  background: #1f1a13;
+  border: 1px solid #3a3226;
+  border-radius: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.promote-changes li.up { color: #7ce08a; }
+.promote-changes li.down { color: #ff9a7a; }
+.promote-changes li.flat { color: #bfb39c; }
+
+.promote-cost {
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: #d8b96a;
+}
+
+.promote-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* 승급 확정 — 금색 강조 (캠프 승급 버튼에서 옮겨온 톤) */
+.result-overlay .promote-confirm {
+  background: #8a6a1e;
+  border: 1px solid #ffd76a;
+  font-weight: 700;
+  color: #fff5d8;
+}
+.result-overlay .promote-confirm:hover { background: #a37f24; }
+
 /* 로그 */
 .battle-log {
   max-height: 180px;
@@ -274,6 +393,8 @@
 .battle-log .log-levelUp { color: #7ce08a; }
 .battle-log .log-victory { color: #ffd76a; font-weight: 700; }
 .battle-log .log-reinforcement { color: #e08ae0; }
+.battle-log .log-item { color: #9ce08a; }
+.battle-log .log-promote { color: #ffd76a; font-weight: 700; }
 
 /* 결과 오버레이 */
 .result-overlay {

@@ -27,6 +27,14 @@ interface Props {
   moveCells: Set<string>
   attackCells: Set<string>
   strategyCells: Set<string>
+  /** 책략 착탄 범위 프리뷰 (커서 기준) — 사거리(strategyCells)보다 위에 강조해서 얹는다 */
+  aoeCells?: Set<string>
+  /** 들여다보기: 적/우군의 이동 가능 칸 (주황) */
+  inspectMoveCells?: Set<string>
+  /** 들여다보기: 이동 후 공격이 닿는 칸 (연빨강) */
+  inspectThreatCells?: Set<string>
+  /** 들여다보는 유닛 — 타일에 점선 표시 */
+  inspectUnitId?: string | null
   selectedUnitId: string | null
   /** AI 페이즈에서 현재 행동 중인 유닛 (하이라이트) */
   activeUnitId: string | null
@@ -64,6 +72,10 @@ export function BattleBoard({
   moveCells,
   attackCells,
   strategyCells,
+  aoeCells,
+  inspectMoveCells,
+  inspectThreatCells,
+  inspectUnitId,
   selectedUnitId,
   activeUnitId,
   floaters,
@@ -83,6 +95,7 @@ export function BattleBoard({
             const terrain = TERRAIN[tiles[y][x]]
             const unit = unitAt(state, pos)
             const isSelected = unit && unit.id === selectedUnitId
+            const isInspected = unit && unit.id === inspectUnitId
             return (
               <div
                 key={key}
@@ -99,8 +112,12 @@ export function BattleBoard({
                 {moveCells.has(key) && <div className="overlay move" />}
                 {attackCells.has(key) && <div className="overlay attack" />}
                 {strategyCells.has(key) && <div className="overlay strategy" />}
+                {aoeCells?.has(key) && <div className="overlay aoe" />}
+                {inspectThreatCells?.has(key) && <div className="overlay inspect-threat" />}
+                {inspectMoveCells?.has(key) && <div className="overlay inspect-move" />}
                 {unit && <UnitToken unit={unit} active={unit.id === activeUnitId} />}
                 {isSelected && <div className="overlay cursor" />}
+                {isInspected && <div className="overlay inspect-mark" />}
               </div>
             )
           }),

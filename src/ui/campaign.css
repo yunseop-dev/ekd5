@@ -129,7 +129,8 @@
 
 .gold-display { color: #d8b96a; font-weight: 700; font-size: 14px; }
 
-/* ---------- v0.8 승급 (인수 / 2차 병과) ---------- */
+/* ---------- 인수 / 2차 병과 표시 ---------- */
+/* v0.9: 승급 조작은 전투 도구 메뉴로 이관 — 버튼/확인 오버레이 css는 battle.css 로 옮겼다 */
 
 /* 인수 보유량 — 0이면 조용히, 1개 이상이면 금색으로 "쓸 수 있다"를 알린다 */
 .seal-display {
@@ -146,130 +147,17 @@
 /* 2차 병과 이름 — 로스터/출진 목록에서 한눈에 구분 */
 .roster-class.promoted { color: #ffd76a; font-weight: 700; }
 
-/* 상세 패널의 승급 버튼 */
-.promote-btn {
-  display: block;
-  width: 100%;
-  margin-top: 12px;
-  padding: 8px 10px;
-  background: #262119;
-  border: 1px solid #4a4132;
-  border-radius: 8px;
-  color: #857a66;
-  text-align: left;
-  cursor: not-allowed;
-  font: inherit;
-}
-
-.promote-btn-label {
-  display: block;
-  font-size: 14px;
-  font-weight: 700;
-}
-.promote-btn-sub {
-  display: block;
-  margin-top: 2px;
+/* 승급 안내 — 조작 자체는 전투 도구 메뉴에 있다 */
+.promote-hint {
+  margin: 12px 0 0;
+  padding: 7px 10px;
   font-size: 11px;
-  line-height: 1.4;
-  opacity: 0.85;
-}
-
-/* 승급 가능 — 금색 강조 + 은은한 pulse */
-.promote-btn.ready {
-  background: linear-gradient(180deg, #3d3116, #2a2313);
-  border-color: #d8b96a;
-  color: #ffd76a;
-  cursor: pointer;
-  animation: promote-pulse 2.4s ease-in-out infinite;
-}
-.promote-btn.ready:hover {
-  background: linear-gradient(180deg, #4c3d18, #352c16);
-  border-color: #ffd76a;
-}
-
-@keyframes promote-pulse {
-  0%, 100% { box-shadow: 0 0 0 rgba(255, 215, 106, 0); }
-  50% { box-shadow: 0 0 10px rgba(255, 215, 106, 0.32); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .promote-btn.ready { animation: none; }
-}
-
-/* 승급 확인 오버레이 — .result-overlay/.result-box(battle.css) 위에 얹는다 */
-.promote-box {
-  min-width: 340px;
-  max-width: 460px;
-}
-
-.promote-line {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-  font-size: 15px;
-}
-.promote-officer { font-weight: 700; color: #e8dcc8; }
-.promote-from { color: #bfb39c; }
-.promote-to { color: #ffd76a; font-weight: 700; }
-.promote-arrow { color: #d8b96a; }
-
-.promote-icon {
-  display: inline-block;
-  width: 22px;
-  height: 22px;
-  margin-right: 4px;
-  border-radius: 50%;
-  font-style: normal;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 20px;
-  text-align: center;
-  color: #fff;
-  background: #2d5da8;
-  border: 2px solid #9cc2ff;
-  vertical-align: middle;
-}
-.promote-to .promote-icon { background: #8a6a1e; border-color: #ffd76a; }
-
-.promote-changes {
-  margin: 0 0 12px;
-  padding: 10px 12px;
-  list-style: none;
-  text-align: left;
-  font-size: 13px;
-  line-height: 1.7;
+  line-height: 1.5;
+  color: #b0a48c;
   background: #1f1a13;
-  border: 1px solid #3a3226;
+  border: 1px dashed #4a4132;
   border-radius: 6px;
-  max-height: 240px;
-  overflow-y: auto;
 }
-.promote-changes li.up { color: #7ce08a; }
-.promote-changes li.down { color: #ff9a7a; }
-.promote-changes li.flat { color: #bfb39c; }
-
-.promote-cost {
-  margin: 0 0 16px;
-  font-size: 12px;
-  color: #d8b96a;
-}
-
-.promote-actions {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-}
-
-.result-overlay .promote-confirm {
-  background: #8a6a1e;
-  border: 1px solid #ffd76a;
-  font-weight: 700;
-  color: #fff5d8;
-}
-.result-overlay .promote-confirm:hover { background: #a37f24; }
 
 /* ---------- 사실-가상 게이지 (합 100 고정, 임계 85/15 → 열세측 노랑) ---------- */
 

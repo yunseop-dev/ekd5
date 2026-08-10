@@ -11,10 +11,13 @@ import { equipInstanceBonus } from '../core/battle'
 import type { CampaignState, RosterEntry } from '../core/campaign'
 import {
   avgRosterLevel,
+  buyConsumable,
   buyItem,
   canEquip,
   classIdOf,
+  consumableCount,
   equipItem,
+  sellConsumable,
   sellItem,
   shopTierFor,
   unequipItem,
@@ -28,8 +31,16 @@ import {
   EQUIP_MAX_LEVEL_TREASURE,
   EXP_PER_LEVEL,
 } from '../core/types'
-import type { EquipInstance, EquipSlot, EquipmentDef, OfficerStats, UnitClassDef } from '../core/types'
+import type {
+  ConsumableDef,
+  EquipInstance,
+  EquipSlot,
+  EquipmentDef,
+  OfficerStats,
+  UnitClassDef,
+} from '../core/types'
 import { CLASSES } from '../data/classes'
+import { CONSUMABLES } from '../data/consumables'
 import { EQUIPMENT } from '../data/equipment'
 import { FRUITS } from '../data/fruits'
 import { OFFICERS } from '../data/officers'
@@ -352,6 +363,34 @@ function sellPreview(
   }
 }
 
+// ---------- 도구(소모품) ----------
+
+/** 상점 진열 대상 = 가격이 있는 도구. 비매품(인수)은 전투 보상으로만 들어온다 */
+function shopConsumables(): ConsumableDef[] {
+  return Object.values(CONSUMABLES)
+    .filter((c) => c.price !== null)
+    .sort((a, b) => (a.price ?? 0) - (b.price ?? 0) || a.name.localeCompare(b.name, 'ko'))
+}
+
+/** 보유 중인 도구 (비매품 포함) — 창고 읽기 전용 표시용 */
+function ownedConsumables(campaign: CampaignState): Array<{ def: ConsumableDef; count: number }> {
+  return campaign.consumables
+    .filter((s) => s.count > 0 && CONSUMABLES[s.itemId])
+    .map((s) => ({ def: CONSUMABLES[s.itemId], count: s.count }))
+}
+
+/** "HP +50" / "MP +30" / "상위 병과로 승급" */
+function consumableEffectText(def: ConsumableDef): string {
+  switch (def.effect.kind) {
+    case 'heal':
+      return `HP +${def.effect.amount}`
+    case 'mpRestore':
+      return `MP +${def.effect.amount}`
+    case 'promotion':
+      return '상위 병과로 승급 + HP/MP 완전회복'
+  }
+}
+
 // ---------- 창고·장비 탭 ----------
 
 interface TabProps {
@@ -576,6 +615,20 @@ function StorageTab({ campaign, onChange }: TabProps) {
             })}
           </div>
         )}
+
+        {/* 도구는 창고에서 손대지 않는다 — 매매는 상점 도구 탭, 사용은 전투 중 도구 메뉴 */}
+        <h4>도구</h4>
+        {ownedConsumables(campaign).length === 0 ? (
+          <p className="dim">가진 도구가 없다. 상점 도구 탭에서 구할 수 있다.</p>
+        ) : (
+          <div className="fac-consum-list">
+            {ownedConsumables(campaign).map(({ def, count }) => (
+              <span key={def.id} className="fac-consum-chip" title={`${def.desc}\n전투 중 도구 메뉴에서 사용한다`}>
+                {def.name} <strong>×{count}</strong>
+              </span>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   )
@@ -591,7 +644,11 @@ function tierRequirement(tier: number): number | null {
   return null
 }
 
+/** 상점 진열 카테고리 — 장비(무구성장 대상)와 도구(전투 소모품)는 성격이 달라 나눠 진열한다 */
+type ShopCat = 'equip' | 'item'
+
 function ShopTab({ campaign, onChange }: TabProps) {
+  const [cat, setCat] = useState<ShopCat>('equip')
   const avg = avgRosterLevel(campaign)
   const unlockedTier = shopTierFor(avg)
   const avgText = Number.isInteger(avg) ? `${avg}` : avg.toFixed(1)
@@ -613,6 +670,7 @@ function ShopTab({ campaign, onChange }: TabProps) {
   }, [])
 
   const sellable = useMemo(() => inventoryRows(campaign), [campaign])
+  const items = useMemo(() => shopConsumables(), [])
 
   const doBuy = (itemId: string) => {
     const next = buyItem(campaign, itemId)
@@ -622,17 +680,95 @@ function ShopTab({ campaign, onChange }: TabProps) {
     const next = sellItem(campaign, index)
     if (next !== campaign) onChange(next)
   }
+  const doBuyItem = (itemId: string) => {
+    const next = buyConsumable(campaign, itemId)
+    if (next !== campaign) onChange(next)
+  }
+  const doSellItem = (itemId: string) => {
+    const next = sellConsumable(campaign, itemId)
+    if (next !== campaign) onChange(next)
+  }
 
   return (
     <div className="fac-shop">
       <div className="fac-shop-head panel-box">
         <span className="fac-gold-big">금전 {campaign.gold.toLocaleString('ko-KR')}</span>
-        <span className="fac-tier-note">
-          평균 Lv {avgText} — {unlockedTier}단계 상점
-        </span>
+        <div className="fac-cats">
+          <button className={`fac-cat${cat === 'equip' ? ' active' : ''}`} onClick={() => setCat('equip')}>
+            장비
+          </button>
+          <button className={`fac-cat${cat === 'item' ? ' active' : ''}`} onClick={() => setCat('item')}>
+            도구
+          </button>
+        </div>
+        {cat === 'equip' ? (
+          <span className="fac-tier-note">
+            평균 Lv {avgText} — {unlockedTier}단계 상점
+          </span>
+        ) : (
+          <span className="fac-tier-note">도구는 전투 중 도구 메뉴에서 쓴다</span>
+        )}
         {campaign.fruits.length > 0 && <span className="fac-tier-note">열매 {campaign.fruits.length}개 보유</span>}
       </div>
 
+      {cat === 'item' ? (
+        <div className="fac-shop-body single">
+          <section className="panel-box fac-col">
+            <h3>도구 조달</h3>
+            {items.length === 0 && <p className="dim">판매 중인 도구가 없다.</p>}
+            {items.map((def) => {
+              const price = def.price ?? 0
+              const poor = campaign.gold < price
+              const owned = consumableCount(campaign.consumables ?? [], def.id)
+              const refund = Math.trunc(price / 2)
+              return (
+                <div key={def.id} className="fac-shop-row" title={def.desc}>
+                  <span className="fac-item-name">{def.name}</span>
+                  <span className="fac-item-slot">보유 {owned}</span>
+                  <span className="fac-item-effect">
+                    {consumableEffectText(def)}
+                    <span className="fac-classes"> · {def.desc}</span>
+                  </span>
+                  <span className={`fac-price${poor ? ' poor' : ''}`}>{price.toLocaleString('ko-KR')}</span>
+                  <span className="fac-consum-actions">
+                    <button
+                      className="fac-buy-btn"
+                      onClick={() => doBuyItem(def.id)}
+                      disabled={poor}
+                      title={poor ? '금전 부족' : `${price.toLocaleString('ko-KR')} 금전으로 1개 구매`}
+                    >
+                      구매
+                    </button>
+                    <button
+                      className="fac-sell-btn"
+                      onClick={() => doSellItem(def.id)}
+                      disabled={owned <= 0}
+                      title={owned <= 0 ? '보유하고 있지 않다' : `반값 ${refund.toLocaleString('ko-KR')} 금전`}
+                    >
+                      판매 (반값 {refund.toLocaleString('ko-KR')})
+                    </button>
+                  </span>
+                </div>
+              )
+            })}
+
+            {/* 비매품(인수 등)도 보유 현황은 보여준다 — 어디서 얻는지 헷갈리지 않게 */}
+            <h4>보유 도구</h4>
+            {ownedConsumables(campaign).length === 0 ? (
+              <p className="dim">가진 도구가 없다.</p>
+            ) : (
+              <div className="fac-consum-list">
+                {ownedConsumables(campaign).map(({ def, count }) => (
+                  <span key={def.id} className="fac-consum-chip" title={def.desc}>
+                    {def.name} <strong>×{count}</strong>
+                    {def.price === null && <em className="fac-consum-nosale">비매품</em>}
+                  </span>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      ) : (
       <div className="fac-shop-body">
         <section className="panel-box fac-col">
           <h3>물자 조달</h3>
@@ -719,6 +855,7 @@ function ShopTab({ campaign, onChange }: TabProps) {
           )}
         </section>
       </div>
+      )}
     </div>
   )
 }

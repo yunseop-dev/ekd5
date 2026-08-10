@@ -442,3 +442,70 @@
   font-size: 12px;
   color: #857a66;
 }
+
+/* ---------- v0.9 도구(소모품) ---------- */
+
+/* 상점 카테고리 토글 (장비 / 도구) — 탭보다 한 단 작은 톤 */
+.fac-cats {
+  display: flex;
+  gap: 4px;
+}
+
+.fac-cat {
+  padding: 4px 14px;
+  font-size: 12px;
+  background: #1f1a13;
+  color: #bfb39c;
+  border: 1px solid #4a4132;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.fac-cat:hover { border-color: #d8b96a; }
+.fac-cat.active {
+  background: #3d3527;
+  color: #e8dcc8;
+  border-color: #d8b96a;
+  font-weight: 700;
+}
+
+/* 도구 진열은 우측 판매 칼럼이 필요 없다 — 한 칼럼으로 넓게 */
+.fac-shop-body.single { grid-template-columns: 1fr; }
+
+/* 구매/판매 버튼 한 쌍 */
+.fac-consum-actions {
+  display: flex;
+  gap: 4px;
+  white-space: nowrap;
+}
+.fac-consum-actions .fac-sell-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.fac-consum-actions .fac-sell-btn:disabled:hover {
+  background: #3d3527;
+  border-color: #6a5c40;
+}
+
+/* 보유 도구 현황 (읽기 전용) */
+.fac-consum-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fac-consum-chip {
+  padding: 3px 9px;
+  font-size: 12px;
+  color: #bfb39c;
+  background: #1f1a13;
+  border: 1px solid #4a4132;
+  border-radius: 12px;
+}
+.fac-consum-chip strong { color: #e8dcc8; }
+
+.fac-consum-nosale {
+  margin-left: 5px;
+  font-style: normal;
+  font-size: 10px;
+  color: #857a66;
+}
