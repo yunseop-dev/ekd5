@@ -365,7 +365,8 @@ export function createBattle(
 
   return {
     stageId: stage.id,
-    map: stage.map,
+    // 딥클론 — setTile 이벤트(성문 개방)가 스테이지 정의(모듈 상수)를 오염시키지 않게 한다 (v1.1)
+    map: structuredClone(stage.map),
     units,
     turn: 1,
     phase: 'player',
@@ -376,6 +377,9 @@ export function createBattle(
     spawnedReinforcements: [],
     // 캠페인 스톡의 전투 로컬 사본 — 자유 전투처럼 스톡이 없으면 빈 목록 (도구 메뉴 숨김)
     consumables: consumables?.map((s) => ({ ...s })) ?? [],
+    firedEvents: [],
+    pendingEvents: [],
+    pendingRewards: [],
   }
 }
 

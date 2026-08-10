@@ -84,4 +84,11 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     cost: { foot: 1, horse: 1, wheel: 1, mage: 1 },
     effect: { foot: 120, horse: 120, wheel: 120, mage: 120 },
   },
+  // 닫힌 성문 — 이벤트(setTile)로 'gate'가 되기 전까지 아무도 지나갈 수 없다 (v1.1)
+  gateClosed: {
+    id: 'gateClosed',
+    name: '성문(닫힘)',
+    cost: { foot: null, horse: null, wheel: null, mage: null },
+    effect: { foot: 100, horse: 100, wheel: 100, mage: 100 },
+  },
 }

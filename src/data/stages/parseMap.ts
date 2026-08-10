@@ -15,6 +15,7 @@ const CHAR_TO_TERRAIN: Record<string, TerrainId> = {
   C: 'castle',
   X: 'wall',
   D: 'gate',
+  E: 'gateClosed',
 }
 
 export function parseMap(rows: string[]): MapDef {

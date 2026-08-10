@@ -22,7 +22,8 @@ export type TerrainId =
   | 'village' // 마을 (매턴 회복)
   | 'castle' // 성내
   | 'wall' // 성벽 (진입 불가)
-  | 'gate' // 성문
+  | 'gate' // 성문 (열림 — 통행 가능)
+  | 'gateClosed' // 닫힌 성문 (진입 불가) — 이벤트 setTile로 'gate'로 열린다 (v1.1)
 
 // 병과별 이동/지형효과 프로필. 조조전: 지형효과는 물리 공방에만 적용(%).
 export type MoveProfileId = 'foot' | 'horse' | 'wheel' | 'mage'
@@ -299,6 +300,57 @@ export interface StageUnitDef {
   behavior?: 'guard' | 'pursue'
 }
 
+// ---------- 전투 내 이벤트 (v1.1) ----------
+// 원작 조조전의 전투 연출을 데이터로 표현한다: 전투 전 전략 선택(청주 3책), 전투 중 대사,
+// 인접 시 일기토/설전(전투별 고정 쌍 — 랜덤 아님), 지점 도달 이벤트(성문 개방·여포 기동),
+// 대화 후 버프, 우군 생존 보상. 근거: campaign-ux.md §63, caocao.md §8, statuses.md §4.
+//
+// 유닛 참조는 전부 officerId — 제약: 이벤트가 참조하는 officerId는 스테이지 안에서 유일해야
+// 한다 (westInfantry 같은 몹 재사용 금지 — validateStage가 잡는다).
+
+export type EventTrigger =
+  | { type: 'battleStart' }
+  | { type: 'turnStart'; turn: number } // 턴 증가 직후 (아군 페이즈 시작)
+  | { type: 'unitDefeated'; officerId: string }
+  | { type: 'unitsMeet'; a: string; b: string } // 체비쇼프 거리 1 (인접 8방) — 일기토/설전/조우
+  | { type: 'reachArea'; area: Vec2[]; faction: Faction; count?: number } // 지정 칸 위 생존 유닛 ≥ count(기본 1)
+
+export type EventAction =
+  | { type: 'dialogue'; lines: DialogueLine[] }
+  | {
+      type: 'choice'
+      prompt: string
+      speaker: string | null
+      options: { text: string; actions: EventAction[] }[] // 중첩 choice 금지 (validateStage)
+    }
+  | {
+      type: 'duel' // 일기토/설전 — 결과는 데이터 고정 (원작: 랜덤 아님). 승자가 아군이면 일반 격파 경험치
+      a: string
+      b: string
+      lines: DialogueLine[]
+      outcome: { winner: 'a' | 'b'; loserFate: 'die' | 'retreat' } | { draw: true }
+    }
+  | { type: 'buff'; target: string | 'playerAll'; stat: BuffStat; amount: number; duration: number }
+  | { type: 'spawnUnits'; units: StageUnitDef[] } // 증원과 동일 시맨틱 (자리 막히면 개별 취소)
+  | { type: 'removeUnits'; officerIds: string[] } // 조용한 이탈 — 격파 로그/경험치/승패 트리거 없음
+  | { type: 'setBehavior'; officerIds: string[]; behavior: 'guard' | 'pursue' } // 여포 기동 등
+  | { type: 'setTile'; cells: Vec2[]; terrain: TerrainId } // 성문 개방/폐쇄
+  | { type: 'levelUpEnemies'; amount: number; officerIds?: string[] } // 생략 = 생존 적 전원. HP/MP 재계산·완전회복
+  | { type: 'giveItem'; itemId: string; kind: 'equipment' | 'consumable' } // pendingRewards 적재 → 승리 시 회수
+  | { type: 'giveExp'; target: string; amount: number }
+
+export interface BattleEventDef {
+  id: string // 스테이지 내 유일 — firedEvents 키. 발동은 항상 1회 (v1.1 고정)
+  trigger: EventTrigger
+  actions: EventAction[]
+}
+
+/** 표시 대기 중인 이벤트 — 헤드 액션은 항상 표시형(dialogue/choice/duel), UI가 eventContinue로 소비 */
+export interface PendingEvent {
+  eventId: string
+  queue: EventAction[]
+}
+
 export interface StageDef {
   id: string
   name: string
@@ -310,7 +362,13 @@ export interface StageDef {
   bonusExp?: number // 2차 승리조건 달성 시 생존 전원 보너스 (시리즈 전통 +50)
   // 전리품 — 원작 3분류 중 "특정 적 격파 시"(bossKill)와 "승리 후 지급"(victory)만 구현.
   // 시설 점령 즉시 지급은 v0.5 범위 밖 (docs/research/campaign-ux.md 1부 §3).
-  loot?: { trigger: 'victory' | 'bossKill'; itemId: string }[]
+  loot?: {
+    trigger: 'victory' | 'bossKill' | 'allySurvived' // allySurvived = 지정 우군이 승리 시 생존 (원작 c13 유비 → 인수)
+    itemId: string
+    officerId?: string // allySurvived 전용
+  }[]
+  /** 전투 내 이벤트 (v1.1) — 발동 여부는 BattleState.firedEvents가 든다 */
+  events?: BattleEventDef[]
   // ---- 출진 준비 화면 (docs/research/campaign-ux.md 1부 §2) ----
   // 원작은 스테이지마다 출진 부대수 min~max와 강제출진 슬롯(①조조②하후돈 — 번호=출진 순서)이
   // 데이터로 박혀 있고, "선택 순서 = 맵 배치 위치"라 슬롯 인덱스→좌표 테이블이 하드코딩돼 있다.
@@ -345,6 +403,12 @@ export interface BattleState {
   spawnedReinforcements: number[] // 이미 발동한 증원 인덱스
   /** 도구(소모품) — 캠페인 스톡의 전투 로컬 사본. 리듀서가 차감하고 승리 시 캠페인이 회수한다 */
   consumables: ConsumableStack[]
+  /** 소진된 이벤트 id (이벤트는 전투당 1회) */
+  firedEvents: string[]
+  /** 표시 대기 이벤트 큐 (FIFO) — 비어있지 않으면 eventContinue 외 전 액션 거부 */
+  pendingEvents: PendingEvent[]
+  /** giveItem 적재분 — applyVictory가 캠페인으로 회수 (패배 시 소멸) */
+  pendingRewards: { itemId: string; kind: 'equipment' | 'consumable' }[]
 }
 
 // ---------- 액션 ----------
@@ -356,6 +420,8 @@ export type BattleAction =
   | { type: 'useItem'; unitId: string; itemId: string; target: Vec2 } // range 0 도구는 자기 위치를 넣는다
   | { type: 'wait'; unitId: string }
   | { type: 'endPhase' }
+  // 이벤트 큐 헤드 소비: dialogue = pop / choice = options[choice].actions 앞삽입 / duel = 결과 적용 (v1.1)
+  | { type: 'eventContinue'; choice?: number }
 
 // ---------- 상수 ----------
 
