@@ -82,6 +82,12 @@ r = clamp( α × min(y + β', 100) + β, 30, 100 )
 ## 6. 남은 확인 실패
 혼란 −15 회복 페널티의 원판 여부 / 상태 심볼 스프라이트 형태 (애니 ID 30~33만 확보).
 
+## 출처 정정 (v1.1)
+
+ccz-compat-engine에는 조조전 스크립트(S_*.eex)가 없음이 확인됐다 (김용 모드용 — battle-events.md §0).
+이 문서의 **엔진 규칙 인용(행동효과·비트필드·게이트)은 유효**하나, S_05/S_13/S_14 **대사 인용은 신뢰 불가로
+정정**한다. 대사 기반 서술 중 biglobe/thewiki로 재확인된 것(c05 화친 선택지·c13 인수 조건·c14 설원)만 유지.
+
 ## 출처
 ccz-compat-engine origin/main (第一阶段行动效果规则.cs 519-533 등) / 轩辕春秋 tid=206799·82183·55018·136080 /
 Data.e5·Imsg.e5 (ageback/CCZ) / biglobe c04~c15·t01·t02·stratagem.htm / thewiki·나무위키 책략·병과
