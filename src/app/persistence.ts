@@ -5,13 +5,16 @@
 import { openDB, type IDBPDatabase } from 'idb'
 import type { CampaignState, RosterEntry } from '../core/campaign'
 import { addConsumable, canEquipClass, clampGauge, currentNode, GAUGE_INITIAL, INITIAL_GOLD } from '../core/campaign'
-import type { ConsumableStack, EquipInstance, EquipmentMap, EquipSlot, OfficerStats } from '../core/types'
+import type { ConsumableStack, EquipInstance, EquipmentMap, EquipSlot, OfficerStats, StageDef } from '../core/types'
 import { EQUIP_EXP_PER_LEVEL, EQUIP_MAX_LEVEL_NORMAL, EQUIP_MAX_LEVEL_TREASURE } from '../core/types'
 import { CLASSES } from '../data/classes'
 import { CONSUMABLES } from '../data/consumables'
 import { EQUIPMENT } from '../data/equipment'
 import { OFFICERS } from '../data/officers'
 import { STAGES } from '../data/stages'
+// 커스텀 스테이지 계층 — 에디터 산출물. 직렬화/검증은 데이터 계층(W4)이 단일 출처다.
+import { stageToJson, validateStageVerbose } from '../data/stages/validateStage'
+import { CUSTOM_PREFIX } from '../ui/editor/draft'
 
 export interface SaveMeta {
   nodeId: string
@@ -24,6 +27,10 @@ const DB_VERSION = 1
 const STORE = 'saves'
 const AUTO_SLOT = 'auto'
 const META_KEY = 'ekd5:save:meta'
+// 커스텀 스테이지는 같은 'saves' KV 스토어에 'stage:<id>' 키로 넣는다 (DB_VERSION 1 불변 — 설계 §6.1).
+// 스토어를 새로 만들면 업그레이드 마이그레이션 리스크가 이득보다 크다.
+const STAGE_PREFIX = 'stage:'
+const CUSTOM_STAGES_KEY = 'ekd5:customStages'
 
 let dbPromise: Promise<IDBPDatabase> | null = null
 let persistenceRequested = false
@@ -262,4 +269,81 @@ export async function clearSave(): Promise<void> {
   if (!handle) return
   const instance = await handle
   await instance.delete(STORE, AUTO_SLOT)
+}
+
+// ---------- 커스텀 스테이지 (앱 내 에디터, v1.1) ----------
+
+/** localStorage 미러 — 저장 목록을 await 없이 알아야 하는 화면(타이틀/목록 첫 렌더)용. 본체는 IndexedDB */
+function readCustomStageIds(): string[] {
+  if (typeof localStorage === 'undefined') return []
+  const text = localStorage.getItem(CUSTOM_STAGES_KEY)
+  if (!text) return []
+  try {
+    const list = JSON.parse(text)
+    return Array.isArray(list) ? list.filter((id): id is string => typeof id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function writeCustomStageIds(ids: string[]): void {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(CUSTOM_STAGES_KEY, JSON.stringify(ids))
+  } catch {
+    // 미러는 부가 정보 — 실패해도 본체(IndexedDB)가 단일 출처다
+  }
+}
+
+/** 동기 — 커스텀 스테이지 존재 여부를 첫 렌더에서 판단할 때 (본체 로딩은 loadCustomStages) */
+export function loadCustomStageIds(): string[] {
+  return readCustomStageIds()
+}
+
+/**
+ * 커스텀 스테이지 저장. 저장 형태는 JSON 스키마(맵 = 문자 그리드) — 번들 스테이지 JSON과 동일해서
+ * 내보낸 파일을 src/data/stages/json/에 그대로 넣을 수 있고, 로드 시 validateStage를 그대로 통과한다.
+ * id는 `custom-` 접두 강제 (번들 스테이지 덮어쓰기 방지).
+ */
+export async function saveCustomStage(stage: StageDef): Promise<void> {
+  if (!stage.id.startsWith(CUSTOM_PREFIX)) {
+    throw new Error(`커스텀 스테이지 id는 '${CUSTOM_PREFIX}'로 시작해야 합니다 (현재: '${stage.id}')`)
+  }
+  const handle = db()
+  if (!handle) throw new Error('이 브라우저에서는 저장을 쓸 수 없습니다 (IndexedDB 없음)')
+  const instance = await handle
+  await instance.put(STORE, stageToJson(stage), STAGE_PREFIX + stage.id)
+  const ids = readCustomStageIds()
+  if (!ids.includes(stage.id)) writeCustomStageIds([...ids, stage.id].sort())
+  requestPersistence()
+}
+
+/**
+ * 손상된 항목은 조용히 드롭한다 (설계 §5.3 — 커스텀 스테이지는 번들과 달리 console 경고 없이 제외).
+ * validateStage 대신 validateStageVerbose를 쓰는 이유가 그것 — validateStage는 dev에서 console.error를 낸다.
+ */
+export async function loadCustomStages(): Promise<StageDef[]> {
+  const handle = db()
+  if (!handle) return []
+  const instance = await handle
+  const keys = await instance.getAllKeys(STORE)
+  const fromDb = keys
+    .filter((k): k is string => typeof k === 'string' && k.startsWith(STAGE_PREFIX))
+    .map((k) => k.slice(STAGE_PREFIX.length))
+  const ids = [...new Set([...fromDb, ...readCustomStageIds()])].sort()
+  const stages: StageDef[] = []
+  for (const id of ids) {
+    const { stage } = validateStageVerbose(await instance.get(STORE, STAGE_PREFIX + id))
+    if (stage) stages.push(stage)
+  }
+  writeCustomStageIds(stages.map((s) => s.id)) // 미러 자기 치유 (삭제/손상 반영)
+  return stages
+}
+
+export async function deleteCustomStage(id: string): Promise<void> {
+  writeCustomStageIds(readCustomStageIds().filter((x) => x !== id))
+  const handle = db()
+  if (!handle) return
+  const instance = await handle
+  await instance.delete(STORE, STAGE_PREFIX + id)
 }

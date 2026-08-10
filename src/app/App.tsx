@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CampaignState } from '../core/campaign'
 import {
   applyVictory,
@@ -18,7 +18,8 @@ import '../ui/campaign.css'
 import { ChoiceScreen } from '../ui/ChoiceScreen'
 import { DeployScreen } from '../ui/DeployScreen'
 import { DialogueScreen } from '../ui/DialogueScreen'
-import { loadCampaign, loadSaveMeta, saveCampaign } from './persistence'
+import { EditorScreen } from '../ui/editor/EditorScreen'
+import { loadCampaign, loadCustomStages, loadSaveMeta, saveCampaign } from './persistence'
 
 const newSeed = () => Math.floor(Math.random() * 2 ** 31)
 
@@ -38,6 +39,9 @@ type Screen =
       deployment: string[]
       savedAt: number | null
     }
+  // 앱 내 스테이지 에디터 (개발 모드 전용 진입 — 설계 §6)
+  | { s: 'editor' }
+  | { s: 'editorTest'; stage: StageDef; seed: number }
 
 const STAGE_DESC: Record<string, string> = {
   stage01: '강과 다리 길목을 건너 황건적을 전멸시켜라. (이동/지형/상성/책략 기본기)',
@@ -47,6 +51,21 @@ const STAGE_DESC: Record<string, string> = {
 export function App() {
   const [screen, setScreen] = useState<Screen>({ s: 'title' })
   const [confirmNewGame, setConfirmNewGame] = useState(false)
+  // 에디터 draft는 App이 보관한다 — 플레이테스트로 EditorScreen이 언마운트돼도 편집 내용이 살아야 한다
+  const [editorDraft, setEditorDraft] = useState<StageDef | null>(null)
+  const [customStages, setCustomStages] = useState<StageDef[]>([])
+
+  // 자유 전투 목록 진입 시 커스텀 스테이지를 읽어 병합 (검증 통과분만 — loadCustomStages가 걸러 준다)
+  useEffect(() => {
+    if (screen.s !== 'freeSelect') return
+    let alive = true
+    void loadCustomStages().then((list) => {
+      if (alive) setCustomStages(list)
+    })
+    return () => {
+      alive = false
+    }
+  }, [screen.s])
 
   async function startNewCampaign() {
     setConfirmNewGame(false)
@@ -89,6 +108,9 @@ export function App() {
             처음부터
           </button>
           <button onClick={() => setScreen({ s: 'freeSelect' })}>자유 전투 (테스트)</button>
+          {import.meta.env.DEV && (
+            <button onClick={() => setScreen({ s: 'editor' })}>스테이지 에디터 (개발)</button>
+          )}
         </div>
 
         {confirmNewGame && (
@@ -120,6 +142,13 @@ export function App() {
             <div className="stage-desc">{STAGE_DESC[s.id]}</div>
           </button>
         ))}
+        {customStages.length > 0 && <h2>커스텀 스테이지</h2>}
+        {customStages.map((s) => (
+          <button key={s.id} className="stage-card" onClick={() => setScreen({ s: 'freeBattle', stage: s, seed: newSeed() })}>
+            <strong>{s.name}</strong>
+            <div className="stage-desc">에디터에서 만든 스테이지 ({s.id})</div>
+          </button>
+        ))}
         <button className="stage-card" onClick={() => setScreen({ s: 'title' })}>
           ← 타이틀로
         </button>
@@ -134,6 +163,37 @@ export function App() {
         stage={screen.stage}
         seed={screen.seed}
         onExit={() => setScreen({ s: 'freeSelect' })}
+        onRestart={() => setScreen({ ...screen, seed: newSeed() })}
+      />
+    )
+  }
+
+  // ---------- 스테이지 에디터 (개발 모드) ----------
+
+  if (screen.s === 'editor') {
+    return (
+      <EditorScreen
+        initial={editorDraft ?? undefined}
+        onPlaytest={(stage) => {
+          setEditorDraft(stage)
+          setScreen({ s: 'editorTest', stage, seed: newSeed() })
+        }}
+        onExit={(draft) => {
+          setEditorDraft(draft)
+          setScreen({ s: 'title' })
+        }}
+      />
+    )
+  }
+
+  // 플레이테스트 — 자유 전투와 동일한 Props로 마운트하고, 나가면 draft를 유지한 에디터로 돌아간다
+  if (screen.s === 'editorTest') {
+    return (
+      <BattleScreen
+        key={`${screen.stage.id}-${screen.seed}`}
+        stage={screen.stage}
+        seed={screen.seed}
+        onExit={() => setScreen({ s: 'editor' })}
         onRestart={() => setScreen({ ...screen, seed: newSeed() })}
       />
     )
