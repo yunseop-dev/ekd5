@@ -10,6 +10,7 @@ import { STORY_SCRIPTS } from '../data/story'
 import { livingUnits, startBattle } from './battle'
 import type { CampaignNode, GrowthSnapshot, RosterEntry } from './campaign'
 import {
+  scriptIdFor,
   applyVictory,
   CAMPAIGN_NODES,
   chapterOf,
@@ -776,5 +777,40 @@ describe('validateCampaign', () => {
     expect(validateCampaign({ ...base, gauge: 77.9 })!.gauge).toBe(77)
     expect(validateCampaign({ ...base, gauge: 'high' })!.gauge).toBe(GAUGE_INITIAL)
     expect(validateCampaign({ ...base, gauge: Number.NaN })!.gauge).toBe(GAUGE_INITIAL)
+  })
+})
+
+// ---------- 스토리 variants (v1.2) ----------
+
+describe('scriptIdFor — 로스터 부재에 따른 대체 스크립트', () => {
+  const s32 = CAMPAIGN_NODES.find((n) => n.id === 's32')!
+
+  it('s32는 전위 부재 시 추모 스크립트로 갈린다', () => {
+    const base = newCampaign()
+    // 전위가 로스터에 있으면 기본 스크립트
+    expect(scriptIdFor(s32, base)).toBe('afterWan')
+    // 전위가 이탈했으면 variant
+    const bereaved = { ...base, roster: base.roster.filter((r) => r.officerId !== 'dianwei') }
+    expect(scriptIdFor(s32, bereaved)).toBe('mourningDianwei')
+  })
+
+  it('variants가 없는 story 노드는 항상 자기 scriptId', () => {
+    const s00 = CAMPAIGN_NODES.find((n) => n.id === 's00' && n.type === 'story')!
+    const empty = { ...newCampaign(), roster: [] }
+    expect(scriptIdFor(s00, empty)).toBe('intro')
+  })
+
+  it('story가 아닌 노드는 null', () => {
+    const battle = CAMPAIGN_NODES.find((n) => n.type === 'battle')!
+    expect(scriptIdFor(battle, newCampaign())).toBeNull()
+  })
+
+  it('모든 variant의 scriptId가 STORY_SCRIPTS에 실재한다', () => {
+    for (const node of CAMPAIGN_NODES) {
+      if (node.type !== 'story') continue
+      for (const v of node.variants ?? []) {
+        expect(STORY_SCRIPTS[v.scriptId], `${node.id} → ${v.scriptId}`).toBeDefined()
+      }
+    }
   })
 })

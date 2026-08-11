@@ -404,6 +404,19 @@ export function currentNode(campaign: CampaignState): CampaignNode | null {
   return CAMPAIGN_NODES.find((n) => n.id === campaign.nodeId) ?? null
 }
 
+/**
+ * story 노드가 실제로 재생할 스크립트 id (v1.2).
+ * variants는 "그 장수가 로스터에 없을 때" 대체 스크립트를 쓴다 —
+ * 전위가 완성에서 전사하면 s32가 추모 장면으로 갈린다. 먼저 맞는 variant가 이긴다.
+ */
+export function scriptIdFor(node: CampaignNode, campaign: CampaignState): string | null {
+  if (node.type !== 'story') return null
+  for (const variant of node.variants ?? []) {
+    if (!campaign.roster.some((r) => r.officerId === variant.absentOfficerId)) return variant.scriptId
+  }
+  return node.scriptId
+}
+
 /** battle 노드 전용 — story 노드는 전투가 없으므로 예외 */
 export function stageForNode(node: CampaignNode): StageDef {
   if (node.type !== 'battle') throw new Error(`전투 노드가 아니다: ${node.id}`)

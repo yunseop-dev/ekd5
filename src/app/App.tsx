@@ -7,6 +7,7 @@ import {
   currentNode,
   isCampaignFinished,
   newCampaign,
+  scriptIdFor,
   stageForNode,
 } from '../core/campaign'
 import type { BattleState, StageDef } from '../core/types'
@@ -240,7 +241,7 @@ export function App() {
     return (
       <DialogueScreen
         title={node.title}
-        script={STORY_SCRIPTS[node.scriptId] ?? []}
+        script={STORY_SCRIPTS[scriptIdFor(node, screen.campaign) ?? node.scriptId] ?? []}
         onDone={() => {
           const next = completeStory(screen.campaign)
           void saveCampaign(next).then(() => {
