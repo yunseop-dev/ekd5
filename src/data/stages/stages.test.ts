@@ -851,7 +851,7 @@ describe('스테이지 14 — 원술 정벌전', () => {
     expect(STAGE_14.loot).toEqual([{ trigger: 'bossKill', itemId: 'moYuJian' }])
   })
 
-  it('옵션 0(내탕을 푼다): 조건은 그대로, 보물 2점 + Lv18 로스터로 승리한다', () => {
+  it('옵션 0(유비에게 도움을 청한다): 조건은 그대로, 보물 2점 + Lv18 로스터로 승리한다', () => {
     for (const seed of [42, 7]) {
       const result = simulate(startBattle(STAGE_14, seed, rosterAt(STAGE_14, 18)), 800, undefined, 0)
       expect(result.result, `seed ${seed}`).toBe('victory')
@@ -864,12 +864,17 @@ describe('스테이지 14 — 원술 정벌전', () => {
     }
   })
 
-  it('옵션 1(책임관 처형): 승리 = 보스 단일 / 패배 = 12턴으로 조여지고 인수가 나온다', () => {
+  it('옵션 1(군량총관 처형): 승리 = 보스 단일 / 패배 = 12턴 + 보물 2점에 인수까지 나온다', () => {
     const opened = autoResolveEvents(startBattle(STAGE_14, 42, rosterAt(STAGE_14, 18)), 1)
     expect(opened.firedEvents).toContain('s14-open')
     expect(opened.victoryOverride).toEqual([{ type: 'defeatBoss' }])
     expect(opened.defeatOverride).toEqual([{ type: 'turnLimit', turns: 12 }])
-    expect(opened.pendingRewards).toEqual([{ itemId: 'insu', kind: 'consumable' }])
+    // 원작 확정: 바람바퀴·파초선은 선택과 무관한 공통 보상이고, 인수만 이 갈래 전용이다 (kr-blog §R4)
+    expect(opened.pendingRewards).toEqual([
+      { itemId: 'windWheel', kind: 'equipment' },
+      { itemId: 'bashoFan', kind: 'equipment' },
+      { itemId: 'insu', kind: 'consumable' },
+    ])
     // 12턴 상한은 빡빡하다 — 고위험 갈래라 시드에 따라 승패가 갈린다 (양쪽 허용)
     for (const seed of [42, 7]) {
       const result = simulate(startBattle(STAGE_14, seed, rosterAt(STAGE_14, 18)), 800, undefined, 1)
