@@ -2,7 +2,7 @@
   "id": "stage09",
   "name": "복양 전투",
   "weather": "clear",
-  "notes": "스테이지 9 \"복양 전투\" — 제2부 세 번째 전투 (원작 1장 후반 복양, 난이도 A)\n검증 목표: 성벽(진입 불가) 블록으로 갈린 시가전 — 기병이 달릴 직선이 없다,\n           보스 여포(Lv18 pursue) 조우 + 후방 진궁(참모 = 2차 병과)의 공격·방해 책략,\n           턴 3 좌우 골목 측면 증원. 1차 여포 격파 = 원작 \"여포 퇴각\" 재현\n지형 구성: 남쪽 성밖 개활지(출진) → 성내 격자 시가지 (가로 골목 y=0/3/6/9, 세로 골목 x=0/4·5/10·11/15)\n밸런스: 여포는 방천화극·적토마를 지닌 Lv18이라 정면 1:1은 불가 — 골목에 가두고 다수로 에워싸야 한다.\n        진궁이 화룡(2차 전용)을 쏘므로 뭉쳐 서면 광역으로 녹는다.\n        AI 자동 시뮬 5시드 기준 Lv16 로스터 승률 0% / Lv18 80% — 성장 없이는 넘을 수 없는 벽이다.\n---\nv1.1 이벤트: 개전 진궁 계략 경고 / 조조×여포 인접 시 일기토 — 무승부.\n  원작 확정: 여포 일기토는 전부 △(무승부)이고, 발동은 지정 쌍의 인접 자동 — 확인 프롬프트가 없다.\n  회피는 \"붙이지 않는 플레이\"로만 가능하다 (battle-events.md §2). 무승부라 경험치도 없다.\n---\nv1.2 보강: 성내 북쪽 골목(y=0, x6~9)에 닿으면 부호(富豪)의 처분 선택지가 뜬다.\n  ①용서한다 → 여포궁(성루에 남은 활) / ②성 밖으로 내쫓는다 → 군자금 3000(giveGold).\n  옵션 0이 시뮬 기준선이며 어느 쪽도 전투 조건을 바꾸지 않는다.",
+  "notes": "스테이지 9 \"복양 전투\" — 제2부 세 번째 전투 (원작 1장 후반 복양, 난이도 A)\n검증 목표: 성벽(진입 불가) 블록으로 갈린 시가전 — 기병이 달릴 직선이 없다,\n           보스 여포(Lv18 pursue) 조우 + 후방 진궁(참모 = 2차 병과)의 공격·방해 책략,\n           턴 3 좌우 골목 측면 증원. 1차 여포 격파 = 원작 \"여포 퇴각\" 재현\n지형 구성: 남쪽 성밖 개활지(출진) → 성내 격자 시가지 (가로 골목 y=0/3/6/9, 세로 골목 x=0/4·5/10·11/15)\n밸런스: 여포는 방천화극·적토마를 지닌 Lv18이라 정면 1:1은 불가 — 골목에 가두고 다수로 에워싸야 한다.\n        진궁이 화룡(2차 전용)을 쏘므로 뭉쳐 서면 광역으로 녹는다.\n        AI 자동 시뮬 5시드 기준 Lv16 로스터 승률 0% / Lv18 80% — 성장 없이는 넘을 수 없는 벽이다.\n---\nv1.1 이벤트: 개전 진궁 계략 경고 / 조조×여포 인접 시 일기토 — 무승부.\n  원작 확정: 여포 일기토는 전부 △(무승부)이고, 발동은 지정 쌍의 인접 자동 — 확인 프롬프트가 없다.\n  회피는 \"붙이지 않는 플레이\"로만 가능하다 (battle-events.md §2). 무승부라 경험치도 없다.\n---\nv1.2 보강: 성내 북쪽 골목(y=0, x6~9)에 닿으면 부호(富豪)의 처분 선택지가 뜬다.\n  ①용서한다 → 여포궁(성루에 남은 활) / ②성 밖으로 내쫓는다 → 군자금 3000(giveGold).\n  옵션 0이 시뮬 기준선이며 어느 쪽도 전투 조건을 바꾸지 않는다.\nv1.2: 여포 퇴각 대사는 한국어판 화면 판독 원문(「쿡, 퇴각!」 — kr-blog.md §3).",
   "map": {
     "rows": [
       "CCCCCCCCCCCCCCCC",
@@ -20,13 +20,34 @@
     ]
   },
   "playerSlots": [
-    { "x": 5, "y": 11 },
-    { "x": 4, "y": 11 },
-    { "x": 6, "y": 11 },
-    { "x": 10, "y": 11 },
-    { "x": 11, "y": 11 },
-    { "x": 5, "y": 10 },
-    { "x": 10, "y": 10 }
+    {
+      "x": 5,
+      "y": 11
+    },
+    {
+      "x": 4,
+      "y": 11
+    },
+    {
+      "x": 6,
+      "y": 11
+    },
+    {
+      "x": 10,
+      "y": 11
+    },
+    {
+      "x": 11,
+      "y": 11
+    },
+    {
+      "x": 5,
+      "y": 10
+    },
+    {
+      "x": 10,
+      "y": 10
+    }
   ],
   "deployMin": 5,
   "deployMax": 7,
@@ -37,38 +58,59 @@
     {
       "officerId": "caocao",
       "faction": "player",
-      "pos": { "x": 5, "y": 11 },
+      "pos": {
+        "x": 5,
+        "y": 11
+      },
       "isLeader": true
     },
     {
       "officerId": "xiahoudun",
       "faction": "player",
-      "pos": { "x": 4, "y": 11 }
+      "pos": {
+        "x": 4,
+        "y": 11
+      }
     },
     {
       "officerId": "dianwei",
       "faction": "player",
-      "pos": { "x": 6, "y": 11 }
+      "pos": {
+        "x": 6,
+        "y": 11
+      }
     },
     {
       "officerId": "xiahouyuan",
       "faction": "player",
-      "pos": { "x": 10, "y": 11 }
+      "pos": {
+        "x": 10,
+        "y": 11
+      }
     },
     {
       "officerId": "guojia",
       "faction": "player",
-      "pos": { "x": 11, "y": 11 }
+      "pos": {
+        "x": 11,
+        "y": 11
+      }
     },
     {
       "officerId": "xunyu",
       "faction": "player",
-      "pos": { "x": 5, "y": 10 }
+      "pos": {
+        "x": 5,
+        "y": 10
+      }
     },
     {
       "officerId": "lüBu",
       "faction": "enemy",
-      "pos": { "x": 5, "y": 3 },
+      "pos": {
+        "x": 5,
+        "y": 3
+      },
       "level": 18,
       "isBoss": true,
       "behavior": "pursue"
@@ -76,66 +118,97 @@
     {
       "officerId": "westCavalry",
       "faction": "enemy",
-      "pos": { "x": 4, "y": 3 },
+      "pos": {
+        "x": 4,
+        "y": 3
+      },
       "level": 16,
       "behavior": "pursue"
     },
     {
       "officerId": "westCavalry",
       "faction": "enemy",
-      "pos": { "x": 10, "y": 3 },
+      "pos": {
+        "x": 10,
+        "y": 3
+      },
       "level": 15,
       "behavior": "guard"
     },
     {
       "officerId": "westInfantry",
       "faction": "enemy",
-      "pos": { "x": 5, "y": 6 },
+      "pos": {
+        "x": 5,
+        "y": 6
+      },
       "level": 14,
       "behavior": "guard"
     },
     {
       "officerId": "westInfantry",
       "faction": "enemy",
-      "pos": { "x": 10, "y": 6 },
+      "pos": {
+        "x": 10,
+        "y": 6
+      },
       "level": 14,
       "behavior": "guard"
     },
     {
       "officerId": "westInfantry",
       "faction": "enemy",
-      "pos": { "x": 0, "y": 6 },
+      "pos": {
+        "x": 0,
+        "y": 6
+      },
       "level": 14,
       "behavior": "guard"
     },
     {
       "officerId": "westArcher",
       "faction": "enemy",
-      "pos": { "x": 4, "y": 0 },
+      "pos": {
+        "x": 4,
+        "y": 0
+      },
       "level": 14,
       "behavior": "guard"
     },
     {
       "officerId": "westArcher",
       "faction": "enemy",
-      "pos": { "x": 11, "y": 0 },
+      "pos": {
+        "x": 11,
+        "y": 0
+      },
       "level": 14,
       "behavior": "guard"
     },
     {
       "officerId": "chenGong",
       "faction": "enemy",
-      "pos": { "x": 10, "y": 0 },
+      "pos": {
+        "x": 10,
+        "y": 0
+      },
       "behavior": "guard"
     }
   ],
   "victory": [
-    { "type": "defeatBoss" },
-    { "type": "annihilation" }
+    {
+      "type": "defeatBoss"
+    },
+    {
+      "type": "annihilation"
+    }
   ],
   "bonusExp": 150,
   "defeat": [
-    { "type": "turnLimit", "turns": 20 }
+    {
+      "type": "turnLimit",
+      "turns": 20
+    }
   ],
   "reinforcements": [
     {
@@ -147,21 +220,30 @@
         {
           "officerId": "westCavalry",
           "faction": "enemy",
-          "pos": { "x": 0, "y": 9 },
+          "pos": {
+            "x": 0,
+            "y": 9
+          },
           "level": 15,
           "behavior": "pursue"
         },
         {
           "officerId": "westCavalry",
           "faction": "enemy",
-          "pos": { "x": 15, "y": 9 },
+          "pos": {
+            "x": 15,
+            "y": 9
+          },
           "level": 15,
           "behavior": "pursue"
         },
         {
           "officerId": "westInfantry",
           "faction": "enemy",
-          "pos": { "x": 15, "y": 6 },
+          "pos": {
+            "x": 15,
+            "y": 6
+          },
           "level": 14,
           "behavior": "pursue"
         }
@@ -171,7 +253,9 @@
   "events": [
     {
       "id": "s09-open",
-      "trigger": { "type": "battleStart" },
+      "trigger": {
+        "type": "battleStart"
+      },
       "actions": [
         {
           "type": "dialogue",
@@ -233,10 +317,22 @@
       "trigger": {
         "type": "reachArea",
         "area": [
-          { "x": 6, "y": 0 },
-          { "x": 7, "y": 0 },
-          { "x": 8, "y": 0 },
-          { "x": 9, "y": 0 }
+          {
+            "x": 6,
+            "y": 0
+          },
+          {
+            "x": 7,
+            "y": 0
+          },
+          {
+            "x": 8,
+            "y": 0
+          },
+          {
+            "x": 9,
+            "y": 0
+          }
         ],
         "faction": "player",
         "count": 1
@@ -308,6 +404,32 @@
                   "amount": 3000
                 }
               ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s09-lubu-retreat",
+      "trigger": {
+        "type": "unitDefeated",
+        "officerId": "lüBu"
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "lüBu",
+              "text": "쿡, 퇴각!"
+            },
+            {
+              "speaker": null,
+              "text": "여포는 웃으면서 말머리를 돌렸다. 골목의 서량병이 그 뒤를 따라 물러났다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "…….쫓지 마시오. 저 웃음은 다음에 갚겠소."
             }
           ]
         }

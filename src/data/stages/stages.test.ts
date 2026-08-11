@@ -975,15 +975,15 @@ function advanceToTurn(state: BattleState, turn: number, pick = 0): BattleState 
   return current
 }
 
-describe('이벤트 데이터 — v1.2 전량 54건', () => {
+describe('이벤트 데이터 — v1.2 전량 58건', () => {
   it('15스테이지 전부 이벤트를 갖고 id는 스테이지 안에서 유일하다', () => {
     const counts = STAGES.map((s) => [s.id, (s.events ?? []).length] as const)
     expect(counts).toEqual([
       ['stage01', 2], ['stage02', 2], ['stage03', 2], ['stage04', 2], ['stage05', 2], ['stage06', 4],
-      ['stage07', 1], ['stage08', 3], ['stage09', 3], ['stage10', 2], ['stage11', 9],
-      ['stage12', 3], ['stage13', 10], ['stage14', 3], ['stage15', 6],
+      ['stage07', 1], ['stage08', 3], ['stage09', 4], ['stage10', 2], ['stage11', 9],
+      ['stage12', 3], ['stage13', 12], ['stage14', 4], ['stage15', 6],
     ])
-    expect(counts.reduce((n, [, c]) => n + c, 0)).toBe(54)
+    expect(counts.reduce((n, [, c]) => n + c, 0)).toBe(58)
     for (const stage of STAGES) {
       const ids = (stage.events ?? []).map((e) => e.id)
       expect(new Set(ids).size, stage.id).toBe(ids.length)

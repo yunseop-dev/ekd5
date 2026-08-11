@@ -2,7 +2,7 @@
   "id": "stage13",
   "name": "장수 토벌전",
   "weather": "clear",
-  "notes": "스테이지 13 \"장수 토벌전\" — 제3부 두 번째 전투 (원작 완성(宛城) 야습, 난이도 A)\n검증 목표: **화염 방어진(setHazard)으로 아군 진영을 두 동으로 가르는 첫 스테이지** +\n           전위의 최후 연출(unitDefeated → 3단 dialogue + 보물).\n           소수전(deployMin 5 / Max 6)이고 강제출진이 조조①·전위②라 배치가 서사를 만든다.\n지형 구성: 완 야영지 — 목책(wall X)이 x=4·x=11 두 줄과 y=2·y=9 두 줄로 진영을 둘러싸고,\n           (4,3) 진문(gate D)과 (5,9) 남서 트임이 유일한 통로다. 천막은 마을(V) 3칸.\n           서쪽 끝 (1,10) = 퇴각 승리 지점.\n배치 의도: 슬롯 ①조조 (8,6) 진영 안쪽 / ②전위 (5,3) 진문 바로 안쪽 — 전위는 처음부터 홀로 문을 막는다.\n           적 9기는 남·서에서 기습 배치(장수 남서·가후 최후열·호거아 진문 밖).\n밸런스: 아군 예상 Lv16~17. 장수 Lv18(보스) / 호거아 Lv18 / 가후 Lv17 / 서량병 Lv15.\n        [밸런스 조정] 초안은 서량병 Lv16 11기였으나 5시드 중 2승뿐이라 9기 Lv15로 낮췄다 —\n        5시드 기준 전위 생존 갈래 4승 / 전위 전사 갈래 4승 (양쪽 승리 가능).\n        턴 2·3의 setHazard가 전위의 유일한 후퇴로((5,4)·(6,4)·(6,3) → +(7,3)·(6,5)·(5,5))를 태워 막는다.\n        불길은 진입·통과만 막고 데미지는 없다(v1.2 계약) — 즉 전위는 \"포위 + 배후 차단\" 상태가 되고\n        방치하면 격파된다. **전위 생사 양쪽 모두 승리 가능**해야 정상이다(stages.test에서 두 경우 확인).\n        절영(jueYing, stage06 이유 격파 보상)을 전위에게 채우면 이동력이 붙어 구출이 쉬워진다.\n---\nv1.2 이벤트 10건\n  ① 개전 기습 대사 (전위가 홀로 진문으로)\n  ② 턴 2 가후의 허보 + 전위의 응수\n  ③ 턴 2 화염 3칸 (전위·조조 사이 통로) / ④ 턴 3 화염 +3칸\n  ⑤ 전위×호거아 인접 → 일기토 무승부 (원작의 무기 도난은 대사로만 표현 — duel outcome은 draw)\n  ⑥ 호거아 격파 → 비룡도복\n  ⑦ 전위 격파 → 3단 연출(전위의 마지막 말 → 내레이션 → 조조의 격정) + 봉황깃옷\n  ⑧ 조조가 진문 밖으로 → 조안민 대사 / ⑨ 서쪽 끝 도달 → 원군 호출 대사\n  ⑩ 턴 4 구원대(조조군 보병·기병) **ally 진영** 등장 — player 스폰은 출진 계약을 깨므로 금지\n[의도적 이탈] reachArea는 진영(faction) 단위 판정이라 \"조조가\" 도달했는지는 데이터로 못 쓴다.\n  ⑧⑨는 아군 1부대 도달로 근사했다.",
+  "notes": "스테이지 13 \"장수 토벌전\" — 제3부 두 번째 전투 (원작 완성(宛城) 야습, 난이도 A)\n검증 목표: **화염 방어진(setHazard)으로 아군 진영을 두 동으로 가르는 첫 스테이지** +\n           전위의 최후 연출(unitDefeated → 3단 dialogue + 보물).\n           소수전(deployMin 5 / Max 6)이고 강제출진이 조조①·전위②라 배치가 서사를 만든다.\n지형 구성: 완 야영지 — 목책(wall X)이 x=4·x=11 두 줄과 y=2·y=9 두 줄로 진영을 둘러싸고,\n           (4,3) 진문(gate D)과 (5,9) 남서 트임이 유일한 통로다. 천막은 마을(V) 3칸.\n           서쪽 끝 (1,10) = 퇴각 승리 지점.\n배치 의도: 슬롯 ①조조 (8,6) 진영 안쪽 / ②전위 (5,3) 진문 바로 안쪽 — 전위는 처음부터 홀로 문을 막는다.\n           적 9기는 남·서에서 기습 배치(장수 남서·가후 최후열·호거아 진문 밖).\n밸런스: 아군 예상 Lv16~17. 장수 Lv18(보스) / 호거아 Lv18 / 가후 Lv17 / 서량병 Lv15.\n        [밸런스 조정] 초안은 서량병 Lv16 11기였으나 5시드 중 2승뿐이라 9기 Lv15로 낮췄다 —\n        5시드 기준 전위 생존 갈래 4승 / 전위 전사 갈래 4승 (양쪽 승리 가능).\n        턴 2·3의 setHazard가 전위의 유일한 후퇴로((5,4)·(6,4)·(6,3) → +(7,3)·(6,5)·(5,5))를 태워 막는다.\n        불길은 진입·통과만 막고 데미지는 없다(v1.2 계약) — 즉 전위는 \"포위 + 배후 차단\" 상태가 되고\n        방치하면 격파된다. **전위 생사 양쪽 모두 승리 가능**해야 정상이다(stages.test에서 두 경우 확인).\n        절영(jueYing, stage06 이유 격파 보상)을 전위에게 채우면 이동력이 붙어 구출이 쉬워진다.\n---\nv1.2 이벤트 10건\n  ① 개전 기습 대사 (전위가 홀로 진문으로)\n  ② 턴 2 가후의 허보 + 전위의 응수\n  ③ 턴 2 화염 3칸 (전위·조조 사이 통로) / ④ 턴 3 화염 +3칸\n  ⑤ 전위×호거아 인접 → 일기토 무승부 (원작의 무기 도난은 대사로만 표현 — duel outcome은 draw)\n  ⑥ 호거아 격파 → 비룡도복\n  ⑦ 전위 격파 → 3단 연출(전위의 마지막 말 → 내레이션 → 조조의 격정) + 봉황깃옷\n  ⑧ 조조가 진문 밖으로 → 조안민 대사 / ⑨ 서쪽 끝 도달 → 원군 호출 대사\n  ⑩ 턴 4 구원대(조조군 보병·기병) **ally 진영** 등장 — player 스폰은 출진 계약을 깨므로 금지\n[의도적 이탈] reachArea는 진영(faction) 단위 판정이라 \"조조가\" 도달했는지는 데이터로 못 쓴다.\n  ⑧⑨는 아군 1부대 도달로 근사했다.\nv1.2: 가후 후퇴 3줄·전멸 후 조조 3줄은 한국어판 화면 판독 원문(kr-blog.md §3). 사모는 장수 격파 전리품.",
   "map": {
     "rows": [
       "GGPPPPPPPPPPGG",
@@ -20,12 +20,30 @@
     ]
   },
   "playerSlots": [
-    { "x": 8, "y": 6 },
-    { "x": 5, "y": 3 },
-    { "x": 9, "y": 5 },
-    { "x": 7, "y": 5 },
-    { "x": 9, "y": 7 },
-    { "x": 8, "y": 4 }
+    {
+      "x": 8,
+      "y": 6
+    },
+    {
+      "x": 5,
+      "y": 3
+    },
+    {
+      "x": 9,
+      "y": 5
+    },
+    {
+      "x": 7,
+      "y": 5
+    },
+    {
+      "x": 9,
+      "y": 7
+    },
+    {
+      "x": 8,
+      "y": 4
+    }
   ],
   "deployMin": 5,
   "deployMax": 6,
@@ -37,38 +55,59 @@
     {
       "officerId": "caocao",
       "faction": "player",
-      "pos": { "x": 8, "y": 6 },
+      "pos": {
+        "x": 8,
+        "y": 6
+      },
       "isLeader": true
     },
     {
       "officerId": "dianwei",
       "faction": "player",
-      "pos": { "x": 5, "y": 3 }
+      "pos": {
+        "x": 5,
+        "y": 3
+      }
     },
     {
       "officerId": "xiahoudun",
       "faction": "player",
-      "pos": { "x": 9, "y": 5 }
+      "pos": {
+        "x": 9,
+        "y": 5
+      }
     },
     {
       "officerId": "xuChu",
       "faction": "player",
-      "pos": { "x": 7, "y": 5 }
+      "pos": {
+        "x": 7,
+        "y": 5
+      }
     },
     {
       "officerId": "xiahouyuan",
       "faction": "player",
-      "pos": { "x": 9, "y": 7 }
+      "pos": {
+        "x": 9,
+        "y": 7
+      }
     },
     {
       "officerId": "guojia",
       "faction": "player",
-      "pos": { "x": 8, "y": 4 }
+      "pos": {
+        "x": 8,
+        "y": 4
+      }
     },
     {
       "officerId": "zhangXiu",
       "faction": "enemy",
-      "pos": { "x": 2, "y": 9 },
+      "pos": {
+        "x": 2,
+        "y": 9
+      },
       "level": 18,
       "isBoss": true,
       "behavior": "pursue"
@@ -76,73 +115,111 @@
     {
       "officerId": "jiaXu",
       "faction": "enemy",
-      "pos": { "x": 2, "y": 11 },
+      "pos": {
+        "x": 2,
+        "y": 11
+      },
       "level": 17,
       "behavior": "guard"
     },
     {
       "officerId": "huCheEr",
       "faction": "enemy",
-      "pos": { "x": 3, "y": 3 },
+      "pos": {
+        "x": 3,
+        "y": 3
+      },
       "level": 18,
       "behavior": "pursue"
     },
     {
       "officerId": "westCavalry",
       "faction": "enemy",
-      "pos": { "x": 3, "y": 2 },
+      "pos": {
+        "x": 3,
+        "y": 2
+      },
       "level": 15,
       "behavior": "pursue"
     },
     {
       "officerId": "westCavalry",
       "faction": "enemy",
-      "pos": { "x": 2, "y": 4 },
+      "pos": {
+        "x": 2,
+        "y": 4
+      },
       "level": 15,
       "behavior": "pursue"
     },
     {
       "officerId": "westInfantry",
       "faction": "enemy",
-      "pos": { "x": 3, "y": 5 },
+      "pos": {
+        "x": 3,
+        "y": 5
+      },
       "level": 15,
       "behavior": "pursue"
     },
     {
       "officerId": "westInfantry",
       "faction": "enemy",
-      "pos": { "x": 4, "y": 10 },
+      "pos": {
+        "x": 4,
+        "y": 10
+      },
       "level": 15,
       "behavior": "pursue"
     },
     {
       "officerId": "westArcher",
       "faction": "enemy",
-      "pos": { "x": 1, "y": 4 },
+      "pos": {
+        "x": 1,
+        "y": 4
+      },
       "level": 15,
       "behavior": "guard"
     },
     {
       "officerId": "westArcher",
       "faction": "enemy",
-      "pos": { "x": 2, "y": 8 },
+      "pos": {
+        "x": 2,
+        "y": 8
+      },
       "level": 15,
       "behavior": "guard"
     }
   ],
   "victory": [
-    { "type": "annihilation" },
-    { "type": "reachPoint", "pos": { "x": 1, "y": 10 }, "unitId": "caocao" }
+    {
+      "type": "annihilation"
+    },
+    {
+      "type": "reachPoint",
+      "pos": {
+        "x": 1,
+        "y": 10
+      },
+      "unitId": "caocao"
+    }
   ],
   "bonusExp": 200,
   "defeat": [
-    { "type": "turnLimit", "turns": 20 }
+    {
+      "type": "turnLimit",
+      "turns": 20
+    }
   ],
   "reinforcements": [],
   "events": [
     {
       "id": "s13-open",
-      "trigger": { "type": "battleStart" },
+      "trigger": {
+        "type": "battleStart"
+      },
       "actions": [
         {
           "type": "dialogue",
@@ -169,7 +246,10 @@
     },
     {
       "id": "s13-jiaxu-bluff",
-      "trigger": { "type": "turnStart", "turn": 2 },
+      "trigger": {
+        "type": "turnStart",
+        "turn": 2
+      },
       "actions": [
         {
           "type": "dialogue",
@@ -188,7 +268,10 @@
     },
     {
       "id": "s13-fire-1",
-      "trigger": { "type": "turnStart", "turn": 2 },
+      "trigger": {
+        "type": "turnStart",
+        "turn": 2
+      },
       "actions": [
         {
           "type": "dialogue",
@@ -202,9 +285,18 @@
         {
           "type": "setHazard",
           "cells": [
-            { "x": 5, "y": 4 },
-            { "x": 6, "y": 4 },
-            { "x": 6, "y": 3 }
+            {
+              "x": 5,
+              "y": 4
+            },
+            {
+              "x": 6,
+              "y": 4
+            },
+            {
+              "x": 6,
+              "y": 3
+            }
           ],
           "kind": "fire",
           "duration": 3
@@ -213,7 +305,10 @@
     },
     {
       "id": "s13-fire-2",
-      "trigger": { "type": "turnStart", "turn": 3 },
+      "trigger": {
+        "type": "turnStart",
+        "turn": 3
+      },
       "actions": [
         {
           "type": "dialogue",
@@ -227,9 +322,18 @@
         {
           "type": "setHazard",
           "cells": [
-            { "x": 7, "y": 3 },
-            { "x": 6, "y": 5 },
-            { "x": 5, "y": 5 }
+            {
+              "x": 7,
+              "y": 3
+            },
+            {
+              "x": 6,
+              "y": 5
+            },
+            {
+              "x": 5,
+              "y": 5
+            }
           ],
           "kind": "fire",
           "duration": 3
@@ -343,11 +447,26 @@
       "trigger": {
         "type": "reachArea",
         "area": [
-          { "x": 4, "y": 3 },
-          { "x": 3, "y": 2 },
-          { "x": 3, "y": 3 },
-          { "x": 3, "y": 4 },
-          { "x": 2, "y": 3 }
+          {
+            "x": 4,
+            "y": 3
+          },
+          {
+            "x": 3,
+            "y": 2
+          },
+          {
+            "x": 3,
+            "y": 3
+          },
+          {
+            "x": 3,
+            "y": 4
+          },
+          {
+            "x": 2,
+            "y": 3
+          }
         ],
         "faction": "player",
         "count": 1
@@ -373,12 +492,30 @@
       "trigger": {
         "type": "reachArea",
         "area": [
-          { "x": 0, "y": 9 },
-          { "x": 1, "y": 9 },
-          { "x": 0, "y": 10 },
-          { "x": 1, "y": 10 },
-          { "x": 0, "y": 11 },
-          { "x": 1, "y": 11 }
+          {
+            "x": 0,
+            "y": 9
+          },
+          {
+            "x": 1,
+            "y": 9
+          },
+          {
+            "x": 0,
+            "y": 10
+          },
+          {
+            "x": 1,
+            "y": 10
+          },
+          {
+            "x": 0,
+            "y": 11
+          },
+          {
+            "x": 1,
+            "y": 11
+          }
         ],
         "faction": "player",
         "count": 1
@@ -401,7 +538,10 @@
     },
     {
       "id": "s13-rescue",
-      "trigger": { "type": "turnStart", "turn": 4 },
+      "trigger": {
+        "type": "turnStart",
+        "turn": 4
+      },
       "actions": [
         {
           "type": "dialogue",
@@ -422,18 +562,89 @@
             {
               "officerId": "weiInfantry",
               "faction": "ally",
-              "pos": { "x": 0, "y": 6 },
+              "pos": {
+                "x": 0,
+                "y": 6
+              },
               "level": 16,
               "behavior": "pursue"
             },
             {
               "officerId": "weiCavalry",
               "faction": "ally",
-              "pos": { "x": 0, "y": 7 },
+              "pos": {
+                "x": 0,
+                "y": 7
+              },
               "level": 16,
               "behavior": "pursue"
             }
           ]
+        }
+      ]
+    },
+    {
+      "id": "s13-jiaxu-withdraw",
+      "trigger": {
+        "type": "unitsMeet",
+        "a": "caocao",
+        "b": "jiaXu"
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "jiaXu",
+              "text": "안되지, 안돼."
+            },
+            {
+              "speaker": "jiaXu",
+              "text": "군사가 싸움에 끼어 들어서는."
+            },
+            {
+              "speaker": "jiaXu",
+              "text": "안전한 장소로 피하도록 하자."
+            }
+          ]
+        },
+        {
+          "type": "setBehavior",
+          "officerIds": [
+            "jiaXu"
+          ],
+          "behavior": "guard"
+        }
+      ]
+    },
+    {
+      "id": "s13-zhangxiu-fall",
+      "trigger": {
+        "type": "unitDefeated",
+        "officerId": "zhangXiu"
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "caocao",
+              "text": "자, 적을 전멸시켰다!"
+            },
+            {
+              "speaker": "caocao",
+              "text": "하지만 희생도 적지 않다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "일단 퇴각하여 다시 정비하자!"
+            }
+          ]
+        },
+        {
+          "type": "giveItem",
+          "itemId": "serpentSpear",
+          "kind": "equipment"
         }
       ]
     }
