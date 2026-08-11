@@ -8,7 +8,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
   caocao: {
     id: 'caocao',
     name: '조조',
-    stats: { str: 78, ldr: 96, int: 92, agi: 82, luck: 90 },
+    stats: { str: 82, ldr: 98, int: 92, agi: 80, luck: 84 }, // 원작 확정 (kr-blog §R2)
     classId: 'lord',
     initialEquipment: { weapon: 'yitianSword', armor: 'leatherArmor' },
     level: 3,
@@ -16,7 +16,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
   xiahoudun: {
     id: 'xiahoudun',
     name: '하후돈',
-    stats: { str: 90, ldr: 78, int: 60, agi: 78, luck: 70 },
+    stats: { str: 98, ldr: 82, int: 64, agi: 90, luck: 66 }, // 원작 확정 (kr-blog §R2)
     classId: 'lightCavalry',
     initialEquipment: { weapon: 'woodSpear', armor: 'leatherArmor' },
     level: 2,
@@ -24,7 +24,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
   dianwei: {
     id: 'dianwei',
     name: '전위',
-    stats: { str: 94, ldr: 66, int: 32, agi: 70, luck: 82 },
+    stats: { str: 100, ldr: 76, int: 52, agi: 98, luck: 68 }, // 원작 확정 — 무력 100·순발 98 (kr-blog §R2)
     classId: 'heavyInfantry',
     initialEquipment: { weapon: 'woodSword', armor: 'leatherArmor' },
     level: 2,
@@ -32,7 +32,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
   xiahouyuan: {
     id: 'xiahouyuan',
     name: '하후연',
-    stats: { str: 86, ldr: 74, int: 58, agi: 88, luck: 66 },
+    stats: { str: 92, ldr: 80, int: 62, agi: 66, luck: 78 }, // 원작 확정 (kr-blog §R2)
     classId: 'archer',
     initialEquipment: { weapon: 'woodBow', armor: 'leatherArmor' },
     level: 2,
@@ -179,7 +179,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
   huaXiong: {
     id: 'huaXiong',
     name: '화웅',
-    stats: { str: 88, ldr: 74, int: 40, agi: 76, luck: 58 },
+    stats: { str: 90, ldr: 82, int: 38, agi: 56, luck: 54 }, // 원작 확정 (kr-blog §R2)
     classId: 'lightCavalry',
     initialEquipment: { weapon: 'bronzeSpear', armor: 'leatherArmor' },
     level: 7,
@@ -317,8 +317,14 @@ export const OFFICERS: Record<string, OfficerDef> = {
 
   // ==========================================================================
   // v1.2: 1부 서사 인물 확장 — 정의만 하고 배치는 스테이지 쪽(Wave 2) 소유다.
-  // 능력치는 전부 **원작 급 감각에 맞춘 [설계값]**(짝수 관례 유지)이며,
-  // R 조사가 Data.e5 실측을 가져오면 통합 단계에서 교정한다.
+  // 능력치는 **원작 확정값**(biglobe 스탯표 + thewiki, kr-blog.md §R2)으로 교정 완료.
+  // --------------------------------------------------------------------------
+  // [알려진 병과 갭 — v1.3 과제] 원작 아군 13계열 중 우리는 6계열만 구현했다.
+  //   미구현: 궁기병계·포차계·무도가계·적병계·도사계·기마책사계·무희계 + **황제(皇帝)**
+  //   대체 배치: 전위(무도가→heavyInfantry) · 허저(적병→guardInfantry) ·
+  //             하후연/조안민(궁기병→archer/lightCavalry) · 가후(도사→counselor) ·
+  //             헌제(황제→lord — 원작 헌제는 **공격 자체가 불가**한 호송 유닛이다)
+  //   병과가 늘면 능력치는 그대로 두고 classId만 옮기면 된다 (스탯은 장수 귀속).
   // ==========================================================================
 
   // ---- 한 황실 ----
@@ -326,7 +332,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     id: 'xianDi',
     name: '헌제',
     // 비무장 천자 — 초기 장비 없음(원작에서도 싸우는 인물이 아니다). 전 능력 40~50대 [설계값]
-    stats: { str: 40, ldr: 46, int: 50, agi: 44, luck: 42 },
+    stats: { str: 36, ldr: 64, int: 76, agi: 58, luck: 100 }, // 원작 확정 — 운 100(전 장수 최고) (kr-blog §R2)
     classId: 'lord',
     level: 6,
   },
@@ -335,26 +341,26 @@ export const OFFICERS: Record<string, OfficerDef> = {
   liJue: {
     id: 'liJue',
     name: '이각',
-    // 동탁 사후 장안을 장악한 서량 무장. 무력은 화웅급, 지력은 낮다 [설계값]
-    stats: { str: 80, ldr: 70, int: 44, agi: 66, luck: 48 },
-    classId: 'lightCavalry',
-    initialEquipment: { weapon: 'bronzeSpear', armor: 'leatherArmor' },
+    // 동탁 사후 장안을 장악한 서량 무장. 원작 병과는 **보병계** (kr-blog §R2)
+    stats: { str: 76, ldr: 76, int: 60, agi: 62, luck: 52 }, // 원작 확정. 지력은 thewiki 60 채택 (bg 70과 충돌 — kr-blog §R2)
+    classId: 'heavyInfantry',
+    initialEquipment: { weapon: 'bronzeSword', armor: 'leatherArmor' },
     level: 9,
   },
   guoSi: {
     id: 'guoSi',
     name: '곽사',
-    // 이각과 한 쌍. 반 급 아래로 잡았다 [설계값]
-    stats: { str: 76, ldr: 66, int: 42, agi: 64, luck: 46 },
-    classId: 'lightCavalry',
-    initialEquipment: { weapon: 'bronzeSpear', armor: 'leatherArmor' },
+    // 이각과 한 쌍. 원작 병과는 **보병계** — 통솔은 이각보다 위다 (kr-blog §R2)
+    stats: { str: 74, ldr: 78, int: 62, agi: 58, luck: 64 }, // 원작 확정 (kr-blog §R2)
+    classId: 'heavyInfantry',
+    initialEquipment: { weapon: 'bronzeSword', armor: 'leatherArmor' },
     level: 9,
   },
   xuRong: {
     id: 'xuRong',
     name: '서영',
     // 동탁군 부장 — 조조를 한 번 패퇴시킨 실적이 있어 화웅 바로 아래로 잡았다 [설계값]
-    stats: { str: 82, ldr: 76, int: 62, agi: 68, luck: 52 },
+    stats: { str: 84, ldr: 74, int: 50, agi: 52, luck: 56 }, // 원작 확정 (kr-blog §R2)
     classId: 'lightCavalry',
     initialEquipment: { weapon: 'bronzeSpear', armor: 'leatherArmor' },
     level: 8,
@@ -365,7 +371,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     id: 'xuHuang',
     name: '서황',
     // 원작 궁병 에이스 — 무력 90급 [설계값]. 1부에서는 적으로 나오고 뒤에 아군이 된다
-    stats: { str: 90, ldr: 86, int: 72, agi: 70, luck: 78 },
+    stats: { str: 92, ldr: 90, int: 56, agi: 78, luck: 96 }, // 원작 확정 — 운 96 (kr-blog §R2)
     classId: 'archer',
     initialEquipment: { weapon: 'bronzeBow', armor: 'bronzeArmor' },
     level: 12,
@@ -373,10 +379,10 @@ export const OFFICERS: Record<string, OfficerDef> = {
   manChong: {
     id: 'manChong',
     name: '만총',
-    // 조조 막하의 문관. 책사 계열 중견 [설계값]
-    stats: { str: 40, ldr: 62, int: 84, agi: 58, luck: 66 },
-    classId: 'strategist',
-    initialEquipment: { weapon: 'bambooFan', armor: 'clothRobe' },
+    // 원작 병과는 **풍수사계** — 회복·지원형 문관이다 (kr-blog §R2)
+    stats: { str: 54, ldr: 68, int: 90, agi: 78, luck: 84 }, // 원작 확정 (kr-blog §R2)
+    classId: 'geomancer',
+    initialEquipment: { weapon: 'stoneGemSword', armor: 'clothRobe' },
     level: 11,
   },
 
@@ -385,7 +391,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     id: 'zhangXiu',
     name: '장수',
     // 완성의 주인. 보스급 기병 [설계값]
-    stats: { str: 84, ldr: 82, int: 60, agi: 74, luck: 56 },
+    stats: { str: 80, ldr: 76, int: 62, agi: 58, luck: 56 }, // 원작 확정 (kr-blog §R2)
     classId: 'lightCavalry',
     initialEquipment: { weapon: 'bronzeSpear', armor: 'bronzeArmor' },
     level: 12,
@@ -396,7 +402,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     // 지력 96급의 독사 [설계값]. 진궁과 같은 이유로 **참모(2차)** — 방해 책략(허보·봉책)의
     // 적측 실사용을 확보한다 (statuses.md §3 [의도적 이탈]).
     // ※ 독연은 방술사 계열 책략이라 이 병과로는 쓰지 못한다 — 허보·봉책으로 대체된다
-    stats: { str: 44, ldr: 74, int: 96, agi: 64, luck: 80 },
+    stats: { str: 52, ldr: 68, int: 96, agi: 80, luck: 78 }, // 원작 확정 (kr-blog §R2)
     classId: 'counselor',
     initialEquipment: { weapon: 'whiteFeatherFan', armor: 'silkRobe' },
     level: 12,
@@ -405,7 +411,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     id: 'huCheEr',
     name: '호거아',
     // 장수의 호위. 원작에서 전위의 무기를 훔쳐낸 괴력·민첩형 — 전위의 일기토 상대 [설계값]
-    stats: { str: 88, ldr: 66, int: 34, agi: 78, luck: 50 },
+    stats: { str: 82, ldr: 72, int: 26, agi: 92, luck: 58 }, // 원작 확정 — 순발 92·지력 26 (kr-blog §R2)
     classId: 'heavyInfantry',
     initialEquipment: { weapon: 'bronzeSword', armor: 'leatherArmor' },
     level: 11,
@@ -415,10 +421,10 @@ export const OFFICERS: Record<string, OfficerDef> = {
   yuanShu: {
     id: 'yuanShu',
     name: '원술',
-    // 참칭 황제. 무력·통솔이 모두 낮은 "그릇이 안 되는 군주" 보스 [설계값]
-    stats: { str: 60, ldr: 44, int: 66, agi: 50, luck: 40 },
-    classId: 'lord',
-    initialEquipment: { weapon: 'bronzeSword', armor: 'bronzeArmor' },
+    // 참칭 황제. 원작 병과는 **기병계**(군주계 아님) — 통솔이 낮은 "그릇이 안 되는" 보스 (kr-blog §R2)
+    stats: { str: 64, ldr: 58, int: 62, agi: 60, luck: 52 }, // 원작 확정 (kr-blog §R2)
+    classId: 'lightCavalry',
+    initialEquipment: { weapon: 'bronzeSpear', armor: 'bronzeArmor' },
     level: 13,
   },
 
@@ -427,7 +433,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
     id: 'sunJian',
     name: '손견',
     // 사수관에서 함께 싸우는 우군 군주 — 생존 시 보물 보상 분기의 주인공 [설계값]
-    stats: { str: 88, ldr: 82, int: 70, agi: 74, luck: 66 },
+    stats: { str: 92, ldr: 80, int: 72, agi: 76, luck: 84 }, // 원작 확정 (kr-blog §R2)
     classId: 'lord',
     initialEquipment: { weapon: 'bronzeSword', armor: 'leatherArmor' },
     level: 10,
@@ -435,10 +441,10 @@ export const OFFICERS: Record<string, OfficerDef> = {
   sunCe: {
     id: 'sunCe',
     name: '손책',
-    // 소패왕. 아버지보다 무력·순발이 위인 우군 기병 [설계값]
-    stats: { str: 92, ldr: 84, int: 72, agi: 86, luck: 78 },
-    classId: 'lightCavalry',
-    initialEquipment: { weapon: 'bronzeSpear', armor: 'bronzeArmor' },
+    // 소패왕. 원작 병과는 **군주계** — 무력 94는 1부 우군 최고치다 (kr-blog §R2)
+    stats: { str: 94, ldr: 86, int: 54, agi: 78, luck: 52 }, // 원작 확정 (kr-blog §R2)
+    classId: 'lord',
+    initialEquipment: { weapon: 'bronzeSword', armor: 'bronzeArmor' },
     level: 14,
   },
 
@@ -447,7 +453,7 @@ export const OFFICERS: Record<string, OfficerDef> = {
   caoAnMin: {
     id: 'caoAnMin',
     name: '조안민',
-    stats: { str: 40, ldr: 36, int: 40, agi: 38, luck: 30 }, // 대사 전용 — 최소 스탯 [설계값]
+    stats: { str: 76, ldr: 62, int: 64, agi: 54, luck: 84 }, // 원작 확정 — 원작에서는 궁기병 유닛으로 나온다 (kr-blog §R2)
     classId: 'heavyInfantry',
     level: 1,
   },

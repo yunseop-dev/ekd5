@@ -132,8 +132,9 @@ describe('EQUIPMENT — v1.2 신규 20종', () => {
   it('특수 효과 4종 — 사모 관통 / 여포궁 포박 / 절영 이동 / 성자보검 정신 (원작 확정)', () => {
     expect(EQUIPMENT.serpentSpear.pierceBack).toBe(true)
     expect(EQUIPMENT.lüBuBow.onHitStatus).toBe('immobile')
-    expect(EQUIPMENT.jueYing.moveBonus).toBe(2)
-    expect(EQUIPMENT.windWheel.moveBonus).toBe(1)
+    // 원작 확정: 절영 +1 / 바람바퀴 +2 (thewiki·biglobe 독립 2소스 일치 — kr-blog §R5)
+    expect(EQUIPMENT.jueYing.moveBonus).toBe(1)
+    expect(EQUIPMENT.windWheel.moveBonus).toBe(2)
     expect(EQUIPMENT.holySword.bonus.mind).toBe(10)
     // 몰우전은 원작 확정 효과지만 엔진 미반영 — 데이터에만 존재한다
     expect(EQUIPMENT.moYuJian.rangedAttack).toBe(true)
@@ -195,23 +196,29 @@ describe('OFFICERS — v1.2 신규 21명', () => {
     }
   })
 
-  it('헌제는 비무장이고, 대사 전용 3인도 장비를 들지 않는다', () => {
-    for (const id of ['xianDi', 'caoAnMin', 'zouShi', 'fuHao'] as const) {
+  it('헌제는 비무장이고, 대사 전용 2인도 장비를 들지 않는다', () => {
+    for (const id of ['xianDi', 'zouShi', 'fuHao'] as const) {
       expect(OFFICERS[id].initialEquipment, id).toBeUndefined()
     }
-    // 헌제는 전 능력 40~50대 (저능력 천자)
-    for (const value of Object.values(OFFICERS.xianDi.stats)) {
-      expect(value).toBeGreaterThanOrEqual(40)
-      expect(value).toBeLessThanOrEqual(50)
-    }
+    // 원작 확정: 무력 36(전 장수 최하급) · 운 100(전 장수 최고) — 싸우지 않고 살아남는 천자
+    expect(OFFICERS.xianDi.stats).toEqual({ str: 36, ldr: 64, int: 76, agi: 58, luck: 100 })
   })
 
-  it('급 감각 — 서황·손책 무력 90급 / 가후 지력 96 / 호거아 무력 88 / 원술 통솔 최하', () => {
-    expect(OFFICERS.xuHuang.stats.str).toBeGreaterThanOrEqual(90)
+  it('원작 확정 능력치 — 주력 5인 + v1.2 신규 (kr-blog §R2)', () => {
+    expect(OFFICERS.caocao.stats).toEqual({ str: 82, ldr: 98, int: 92, agi: 80, luck: 84 })
+    expect(OFFICERS.dianwei.stats).toEqual({ str: 100, ldr: 76, int: 52, agi: 98, luck: 68 })
+    expect(OFFICERS.xiahoudun.stats).toEqual({ str: 98, ldr: 82, int: 64, agi: 90, luck: 66 })
+    expect(OFFICERS.xiahouyuan.stats).toEqual({ str: 92, ldr: 80, int: 62, agi: 66, luck: 78 })
+    expect(OFFICERS.huaXiong.stats).toEqual({ str: 90, ldr: 82, int: 38, agi: 56, luck: 54 })
+    expect(OFFICERS.xuHuang.stats).toEqual({ str: 92, ldr: 90, int: 56, agi: 78, luck: 96 })
     expect(OFFICERS.jiaXu.stats.int).toBe(96)
-    expect(OFFICERS.jiaXu.classId).toBe('counselor') // 방해 책략(허보·봉책)의 적측 실사용
-    expect(OFFICERS.huCheEr.stats.str).toBe(88)
-    expect(OFFICERS.sunJian.stats.str).toBe(88)
+    expect(OFFICERS.jiaXu.classId).toBe('counselor') // 원작 도사계 미구현 — 방해 책략 실사용을 택했다
+    // 호거아는 무력형이 아니라 **순발 92 · 지력 26**의 극단형이다 (전위의 무기를 훔쳐낸 인물)
+    expect(OFFICERS.huCheEr.stats.agi).toBe(92)
+    expect(OFFICERS.huCheEr.stats.int).toBe(26)
+    expect(OFFICERS.sunJian.stats.str).toBe(92)
+    expect(OFFICERS.sunCe.classId).toBe('lord') // 원작 군주계
+    expect(OFFICERS.yuanShu.classId).toBe('lightCavalry') // 원작 기병계 — 군주계가 아니다
     // 원술은 "그릇이 안 되는 군주" — 로스터 군주들보다 통솔이 낮다
     expect(OFFICERS.yuanShu.stats.ldr).toBeLessThan(OFFICERS.liuBei.stats.ldr)
     expect(OFFICERS.yuanShu.stats.ldr).toBeLessThan(OFFICERS.caocao.stats.ldr)

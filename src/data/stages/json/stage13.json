@@ -139,7 +139,7 @@
         "x": 3,
         "y": 2
       },
-      "level": 15,
+      "level": 14,
       "behavior": "pursue"
     },
     {
@@ -149,7 +149,7 @@
         "x": 2,
         "y": 4
       },
-      "level": 15,
+      "level": 14,
       "behavior": "pursue"
     },
     {
@@ -159,7 +159,7 @@
         "x": 3,
         "y": 5
       },
-      "level": 15,
+      "level": 14,
       "behavior": "pursue"
     },
     {
@@ -169,7 +169,7 @@
         "x": 4,
         "y": 10
       },
-      "level": 15,
+      "level": 14,
       "behavior": "pursue"
     },
     {
@@ -179,7 +179,7 @@
         "x": 1,
         "y": 4
       },
-      "level": 15,
+      "level": 14,
       "behavior": "guard"
     },
     {
@@ -189,7 +189,7 @@
         "x": 2,
         "y": 8
       },
-      "level": 15,
+      "level": 14,
       "behavior": "guard"
     }
   ],

@@ -424,7 +424,9 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     name: '칠흑도복',
     slot: 'armor',
     classes: ['strategist', 'geomancer'],
-    bonus: { def: 28 }, // [설계값]
+    // 원작 방어 12(+9) — 도복 3종 중 최하. 본체 효과는 **MP 최대치 +20**이나 우리 EquipmentDef에
+    // 최대 MP 가산 필드가 없어 미반영이다 [알려진 갭 — kr-blog.md §R5]
+    bonus: { def: 28 },
     price: null,
     tier: 2,
     isTreasure: true,
@@ -436,7 +438,8 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     name: '비룡도복',
     slot: 'armor',
     classes: ['strategist', 'geomancer'],
-    bonus: { def: 32, mind: 8 }, // [설계값]
+    // 원작 방어 14(+9) — 도복 3종 중 최상. 부가 효과는 정신이 아니라 **순발 +10**이다 (원작 확정)
+    bonus: { def: 32, agi: 10 },
     price: null,
     tier: 3,
     isTreasure: true,
@@ -448,7 +451,10 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     name: '봉황깃옷',
     slot: 'armor',
     classes: ['strategist', 'geomancer'],
-    bonus: { def: 36 }, // [설계값]
+    // 원작 방어 12(+9) — 칠흑과 동급이고 비룡보다 낮다. 값이 아니라 **매 턴 최대 HP 20% 회복**이
+    // 이 옷의 본체다(청낭서와 비중첩, 회복 지형과 중첩) — 우리는 hpRegen 필드가 없어 미반영
+    // [알려진 갭 — kr-blog.md §R5]
+    bonus: { def: 28 },
     price: null,
     tier: 3,
     isTreasure: true,
@@ -566,7 +572,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     name: '파초선',
     slot: 'weapon',
     classes: ['geomancer'],
-    // 원작 설명은 "풍계 강화"인데 한국 정발판은 버그로 지계가 강화된다 (caocao.md §5).
+    // 일본판은 풍계 +20%, **한국 정발판은 지계 +20%** — 로컬라이즈 차이로 확정 (kr-blog.md §R5).
     // 우리는 지계 책략이 없어 설명문만 원작을 인용하고 효과는 정신력으로 환산했다 [의도적 단순화]
     bonus: { mind: 45 }, // [설계값]
     price: null,
@@ -605,10 +611,11 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     name: '절영',
     slot: 'accessory',
     bonus: {},
-    // 원작 c03 전멸 클리어 보상이자 c10 전위 구출의 필수템 — 조조의 이동력 확보가 존재 이유다
-    // (battle-events.md §4). ※ equipment.md §2 표는 절영 +1 / 바람바퀴 +2로 적고 있어 상충 —
-    // 여기서는 "전위 구출 핵심"이라는 용도 근거를 채택해 +2로 둔다 (v1.2 결정, R 실측 시 재교정)
-    moveBonus: 2,
+    // 원작 c03 전멸 클리어 보상이자 c10 전위 구출의 필수템 (battle-events.md §4).
+    // **원작 확정 +1** — thewiki 「이동력 보조 +1」 / biglobe 「移動力＋１」 독립 2소스 일치.
+    // v1.2 초안의 +2("전위 구출에 필요")는 반박됨: 절영 +1로도 원작 공략은 2턴에 서쪽 도달한다
+    // (kr-blog.md §R5).
+    moveBonus: 1,
     price: null,
     tier: 2,
     isTreasure: true,
@@ -619,7 +626,9 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     name: '바람바퀴',
     slot: 'accessory',
     bonus: {},
-    moveBonus: 1, // [설계값] — 절영과의 상하 관계는 위 주석 참조
+    // **원작 확정 +2, 단 포차계 전용** (thewiki·biglobe 일치). 포차계가 미구현이라 병과 제약은
+    // 계열 추가 시점까지 보류한다 — 지금 classes를 걸면 착용자가 아무도 없어진다 (kr-blog.md §R5)
+    moveBonus: 2,
     price: null,
     tier: 2,
     isTreasure: true,

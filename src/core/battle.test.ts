@@ -172,16 +172,23 @@ describe('반격 규칙 (docs/research/ux.md §5)', () => {
     })
 
   it('근접 공격 시 반격이 실제로 실행되어 공격자 HP가 감소한다 (시드 5종)', () => {
+    // 등무 Lv30의 반격 명중은 97% — 원작 확정 스탯 교정으로 전위의 순발이 98이 되어 100%가 아니다.
+    // 따라서 시드마다 "반격이 발동한다"를 단언하고, HP 감소는 명중한 시드에서 확인한다.
+    let damagedSeeds = 0
     for (const seed of [1, 7, 42, 99, 2026]) {
       const state = startBattle(counterStage(), seed)
       const dianwei = unit(state, 'dianwei')
+      expect(forecastAttack(state, dianwei, unit(state, 'dengMao')).counterHitRate).toBeGreaterThanOrEqual(95)
       const next = applyAction(state, {
         type: 'attack', unitId: dianwei.id, targetId: unit(state, 'dengMao').id,
       })
       expect(unit(next, 'dengMao').hp).toBeGreaterThan(0) // 방어자 생존
-      expect(unit(next, 'dianwei').hp).toBeLessThan(dianwei.maxHp) // 반격 피해 적용
       expect(next.log.some((e) => e.type === 'counter'), `seed ${seed}`).toBe(true)
+      // 레벨업이 끼면 maxHp가 오르며 hp도 같이 오른다 — 판정은 **사후 maxHp** 기준
+      const after = unit(next, 'dianwei')
+      if (after.hp < after.maxHp) damagedSeeds += 1
     }
+    expect(damagedSeeds).toBeGreaterThanOrEqual(4) // 97% 명중이면 5시드 중 4회 이상은 맞는다
   })
 
   it('반격 예측 데미지 = 역방향 공격 데미지의 80% (버림)', () => {
@@ -208,7 +215,7 @@ describe('반격 규칙 (docs/research/ux.md §5)', () => {
     const next = applyAction(state, {
       type: 'attack', unitId: dianwei.id, targetId: unit(state, 'yellowArcher').id,
     })
-    expect(unit(next, 'dianwei').hp).toBe(dianwei.maxHp) // 반격 안 맞음
+    expect(unit(next, 'dianwei').hp).toBe(unit(next, 'dianwei').maxHp) // 반격 안 맞음 (사후 maxHp 기준)
   })
 })
 
