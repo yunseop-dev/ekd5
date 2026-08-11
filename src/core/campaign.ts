@@ -229,8 +229,74 @@ export const CAMPAIGN_NODES: CampaignNode[] = [
   },
   { id: 'n21', type: 'battle', stageId: 'stage08', rewardGold: 1100, next: 's22' },
   { id: 's22', type: 'story', title: '복양의 배신', scriptId: 'puyangBetrayal', next: 'n22' },
-  { id: 'n22', type: 'battle', stageId: 'stage09', rewardGold: 1300, next: 's23' },
+  { id: 'n22', type: 'battle', stageId: 'stage09', rewardGold: 1300, next: 's30' },
+  // ---- 제3부 「허도 천도」 — 원작 미구현 4전투 (v1.2 W-content) ----
+  // 복양(n22) 직후에 삽입한 구간이다. 원작 시간축상 천자 동천 → 허도 천도 → 완성 → 원술 참칭 →
+  // 완성 재정벌이 하비(n24) 앞에 놓이므로, 기존 s23~n24 구간은 손대지 않고 앞에 끼워 넣었다.
+  // 세이브 v6 유지 — 스키마가 바뀌지 않고 구 세이브의 nodeId는 전부 그대로 존속한다
+  // (구 세이브가 s23에 서 있으면 신규 구간을 건너뛴 채 이어진다).
+  // 허저 합류는 s23 → s30으로 앞당겨졌다. s23의 join은 **삭제하지 않는다** —
+  // joinOfficers가 멱등이므로 구 세이브에 대한 안전망으로 남는다.
+  { id: 's30', type: 'story', title: '천자 동천', scriptId: 'emperorFlight', join: ['xuChu'], next: 'n30' },
+  { id: 'n30', type: 'battle', stageId: 'stage12', rewardGold: 1500, next: 's31' },
+  {
+    id: 's31',
+    type: 'story',
+    title: '허도 천도',
+    scriptId: 'xuduCapital',
+    join: ['xuHuang', 'manChong'],
+    next: 'c30',
+  },
+  {
+    id: 'c30',
+    type: 'choice',
+    title: '완성의 항복',
+    prompt:
+      '장수가 완성에서 항복했다. 성에 든 첫날 밤, 조안민이 은밀히 아뢴다 — 장수의 숙모 추씨가 절색이라는 것이다.',
+    speaker: 'caoAnMin',
+    // 원작 비대칭 증감폭(10/5) 재현 — 자제하는 쪽이 사실(+5), 부르는 쪽이 가상(-10).
+    // 어느 쪽을 골라도 n31(완성 야습)로 들어간다: 원작도 야습 자체는 회피 불가다.
+    options: [
+      { text: '아니, 그럴 필요는 없다.', gaugeDelta: 5, next: 'n31' },
+      { text: '그래, 모시고 와라.', gaugeDelta: -10, next: 'n31' },
+    ],
+  },
+  // 전위의 최후 — 전장에 사체가 남았을 때만(ifDead) 로스터에서 빠진다.
+  // 절영으로 구출하면 살아남고, 그 결과가 s32의 variants로 갈린다.
+  {
+    id: 'n31',
+    type: 'battle',
+    stageId: 'stage13',
+    rewardGold: 1600,
+    leave: [{ officerId: 'dianwei', when: 'ifDead' }],
+    next: 's32',
+  },
+  {
+    id: 's32',
+    type: 'story',
+    title: '완성의 아침',
+    scriptId: 'afterWan',
+    variants: [{ absentOfficerId: 'dianwei', scriptId: 'mourningDianwei' }],
+    next: 's33',
+  },
+  { id: 's33', type: 'story', title: '원술 참칭', scriptId: 'yuanShuEmperor', next: 'n32' },
+  { id: 'n32', type: 'battle', stageId: 'stage14', rewardGold: 1700, next: 'c31' },
+  {
+    id: 'c31',
+    type: 'choice',
+    title: '가후의 서신',
+    prompt:
+      '완성의 가후가 서신을 보내왔다. 장수와 함께 항복할 뜻이 있으나, 완성의 그 밤을 짠 것은 자신이라고 적혀 있다.',
+    speaker: 'caocao',
+    // 증감폭 2 = 원작 4단계(2/5/10/20) 중 최소 — 원작 c04와 같은 급의 소폭 선택지다.
+    options: [
+      { text: '관직을 주고 후대한다.', gaugeDelta: 2, next: 'n33' },
+      { text: '충의를 모르는 놈이다. 벤다!', gaugeDelta: -2, next: 'n33' },
+    ],
+  },
+  { id: 'n33', type: 'battle', stageId: 'stage15', rewardGold: 1750, next: 's23' },
   // 허저 합류 — story 노드의 join을 completeStory가 소화한다
+  // (v1.2에서 실제 합류 시점은 s30으로 앞당겨졌다. 여기 join은 구 세이브 안전망 — joinOfficers는 멱등)
   {
     id: 's23',
     type: 'story',
@@ -239,9 +305,10 @@ export const CAMPAIGN_NODES: CampaignNode[] = [
     join: ['xuChu'],
     next: 'n23',
   },
-  { id: 'n23', type: 'battle', stageId: 'stage10', rewardGold: 1400, next: 's24' },
+  // v1.2: 제3부 4전투(n30~n33)가 앞에 들어와 보상금 곡선이 밀렸다 — 1400→1900 / 1800→2200 상향
+  { id: 'n23', type: 'battle', stageId: 'stage10', rewardGold: 1900, next: 's24' },
   { id: 's24', type: 'story', title: '하비 포위', scriptId: 'xiapiSiege', next: 'n24' },
-  { id: 'n24', type: 'battle', stageId: 'stage11', rewardGold: 1800, rewardSeal: true, next: 's25' },
+  { id: 'n24', type: 'battle', stageId: 'stage11', rewardGold: 2200, rewardSeal: true, next: 's25' },
   // 장료 합류 — 원작 명장면("장료는 죽음을 두려워하지 않는다") 직후 2차 병과 그대로 들어온다
   { id: 's25', type: 'story', title: '2부 종장', scriptId: 'chapter2End', join: ['zhangLiao'], next: 'fin' },
   { id: 'fin', type: 'end', title: '제2부 완' },

@@ -92,6 +92,9 @@
   "victory": [
     { "type": "annihilation" }
   ],
+  "defeat": [
+    { "type": "turnLimit", "turns": 20 }
+  ],
   "reinforcements": [],
   "events": [
     {

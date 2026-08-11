@@ -1,0 +1,317 @@
+{
+  "id": "stage12",
+  "name": "헌제 구출전",
+  "weather": "clear",
+  "notes": "스테이지 12 \"헌제 구출전\" — 제3부 「허도 천도」 첫 전투 (원작 미구현 4전투의 첫째, 난이도 B)\n검증 목표: **호위(escort) 기믹의 첫 사례** — defeat에 unitDies가 들어간 1부 유일 스테이지.\n           헌제(ally·guard·비무장)가 쓰러지면 그 자리에서 패배한다.\n           개전 3줄 → 조조×헌제 조우 시 선택지(호송 / 소탕)로 승리·패배 조건 자체가 갈린다.\n지형 구성: 낙양 서쪽 황토 개활지(wasteland) + 중앙 큰 숲(엄폐 진로) —\n           남쪽 출진 → 서쪽 (2,5) 마을에 피난 중인 헌제 → 북동 (12,1) 동쪽 길(피신 지점)\n           숲은 진입 코스트가 높아 기병 우회로가 되고, 보병은 숲을 타고 서쪽으로 붙는다.\n밸런스: 아군 예상 Lv15~16. 이각 Lv17(보스) / 곽사·서황 Lv16 / 서량병 Lv15.\n        전 적이 북서 진채(y≤2)에서 guard로 버티고, 헌제는 (2,5) 마을(매턴 회복)에 앉아 있다.\n        [의도적 이탈] 원작 이각·곽사는 천자를 추격하는 쪽이지만, 우리 AI는 pursue를 주면\n        최근접 적대 유닛인 헌제에게 일직선으로 붙어 1~2턴에 격파한다(= 회피 불가 패배).\n        그래서 전 적을 guard로 두고 \"서쪽 길을 막고 선 진채\"로 재해석했다.\n        헌제와 궁병 사거리(2)가 겹치지 않도록 적 배치를 y≤2로 못박아 뒀다 — 이 제약을 깨면\n        플레이어가 손쓸 수 없는 패배가 생긴다.\n---\nv1.2 이벤트 3건\n  ① 개전 3줄 (조조 상황 인식 → 이각 도발 → 조조 응답)\n  ② 조조×헌제 인접(unitsMeet) → 대사 + 선택지\n     ・「폐하를 동쪽 길로 모신다」(옵션 0 = 시뮬 기준선)\n       → removeUnits(헌제) + setDefeat(20턴만) + setVictory(조조 (12,1) 도달 / 전멸) + 황금갑옷\n       removeUnits로 전장을 떠난 유닛은 unitDies를 영구히 발동시키지 않는다(types.ts 계약) —\n       호위 조건이 데이터 삭제 없이 안전하게 풀린다.\n     ・「이 자리에서 역적을 소탕한다」 → 성자보검. 헌제가 잔류하므로 호위 패배 조건이 그대로 남는다.\n  ③ 서황 격파 → 퇴각 대사 (s31 허도 천도에서 합류하는 복선)",
+  "map": {
+    "rows": [
+      "WWWWWWWWWWWWWW",
+      "WWWWWWWWWWWWPW",
+      "WWWWWWWWWWWWWW",
+      "WWWWWFFFFWWWWW",
+      "WWWWFFFFFFWWWW",
+      "WWVWFFFFFFFWWW",
+      "WWWWFFFFFFFWWW",
+      "WWWWWFFFFFWWWW",
+      "WWWWWWFFWWWWWW",
+      "WWWWWWWWWWWWWW",
+      "WWWWWWWWWWWWWW",
+      "WWWWWWWWWWWWWW"
+    ]
+  },
+  "playerSlots": [
+    { "x": 6, "y": 10 },
+    { "x": 5, "y": 10 },
+    { "x": 7, "y": 10 },
+    { "x": 4, "y": 11 },
+    { "x": 8, "y": 11 },
+    { "x": 6, "y": 11 },
+    { "x": 9, "y": 10 }
+  ],
+  "deployMin": 5,
+  "deployMax": 7,
+  "forcedOfficers": [
+    "caocao"
+  ],
+  "units": [
+    {
+      "officerId": "caocao",
+      "faction": "player",
+      "pos": { "x": 6, "y": 10 },
+      "isLeader": true
+    },
+    {
+      "officerId": "xiahoudun",
+      "faction": "player",
+      "pos": { "x": 5, "y": 10 }
+    },
+    {
+      "officerId": "dianwei",
+      "faction": "player",
+      "pos": { "x": 7, "y": 10 }
+    },
+    {
+      "officerId": "xiahouyuan",
+      "faction": "player",
+      "pos": { "x": 4, "y": 11 }
+    },
+    {
+      "officerId": "guojia",
+      "faction": "player",
+      "pos": { "x": 8, "y": 11 }
+    },
+    {
+      "officerId": "xunyu",
+      "faction": "player",
+      "pos": { "x": 6, "y": 11 }
+    },
+    {
+      "officerId": "xuChu",
+      "faction": "player",
+      "pos": { "x": 9, "y": 10 }
+    },
+    {
+      "officerId": "xianDi",
+      "faction": "ally",
+      "pos": { "x": 2, "y": 5 },
+      "level": 17,
+      "equipment": {},
+      "behavior": "guard"
+    },
+    {
+      "officerId": "liJue",
+      "faction": "enemy",
+      "pos": { "x": 1, "y": 1 },
+      "level": 17,
+      "isBoss": true,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "guoSi",
+      "faction": "enemy",
+      "pos": { "x": 1, "y": 2 },
+      "level": 16,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "xuHuang",
+      "faction": "enemy",
+      "pos": { "x": 3, "y": 1 },
+      "level": 16,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westCavalry",
+      "faction": "enemy",
+      "pos": { "x": 2, "y": 0 },
+      "level": 15,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westCavalry",
+      "faction": "enemy",
+      "pos": { "x": 4, "y": 2 },
+      "level": 15,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": { "x": 0, "y": 0 },
+      "level": 15,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": { "x": 0, "y": 2 },
+      "level": 15,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": { "x": 3, "y": 0 },
+      "level": 15,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westArcher",
+      "faction": "enemy",
+      "pos": { "x": 2, "y": 2 },
+      "level": 15,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westArcher",
+      "faction": "enemy",
+      "pos": { "x": 4, "y": 1 },
+      "level": 15,
+      "behavior": "guard"
+    }
+  ],
+  "victory": [
+    { "type": "annihilation" },
+    { "type": "defeatBoss" }
+  ],
+  "bonusExp": 200,
+  "defeat": [
+    { "type": "turnLimit", "turns": 20 },
+    { "type": "unitDies", "officerId": "xianDi" }
+  ],
+  "reinforcements": [],
+  "events": [
+    {
+      "id": "s12-open",
+      "trigger": { "type": "battleStart" },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "caocao",
+              "text": "낙양이오. …….성도 궁도 재만 남고, 황토만 남았소."
+            },
+            {
+              "speaker": "liJue",
+              "text": "조조! 천자를 업고 가려고 왔느냐. 이 이각이 먼저 목을 받아 두마!"
+            },
+            {
+              "speaker": "caocao",
+              "text": "…….이각. 그 입으로 천자를 말하지 마시오. 서쪽 길을 여시오!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s12-emperor",
+      "trigger": {
+        "type": "unitsMeet",
+        "a": "caocao",
+        "b": "xianDi"
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "xianDi",
+              "text": "……조공인가. 짐은 이제 어디로 가야 하는가."
+            },
+            {
+              "speaker": "caocao",
+              "text": "…….폐하. 이 들판에 하루도 더 머무르실 수는 없습니다."
+            },
+            {
+              "speaker": "xiahoudun",
+              "text": "맹덕, 동쪽 길은 아직 비어 있소. 지금이면 지날 수 있소."
+            }
+          ]
+        },
+        {
+          "type": "choice",
+          "prompt": "폐하를 어찌 모실 것인가.",
+          "speaker": "caocao",
+          "options": [
+            {
+              "text": "폐하를 동쪽 길로 모신다.",
+              "actions": [
+                {
+                  "type": "dialogue",
+                  "lines": [
+                    {
+                      "speaker": "caocao",
+                      "text": "허저, 폐하를 모시고 동쪽으로 먼저 가시오. 뒤는 내가 막소."
+                    },
+                    {
+                      "speaker": "xianDi",
+                      "text": "…….조공. 짐은 그 말을 잊지 않겠다."
+                    },
+                    {
+                      "speaker": null,
+                      "text": "천자의 수레가 동쪽 길로 빠졌다. 이제 이 들판에 남은 것은 창뿐이다."
+                    }
+                  ]
+                },
+                {
+                  "type": "removeUnits",
+                  "officerIds": ["xianDi"]
+                },
+                {
+                  "type": "setDefeat",
+                  "defeat": [{ "type": "turnLimit", "turns": 20 }]
+                },
+                {
+                  "type": "setVictory",
+                  "victory": [
+                    { "type": "reachPoint", "pos": { "x": 12, "y": 1 }, "unitId": "caocao" },
+                    { "type": "annihilation" }
+                  ]
+                },
+                {
+                  "type": "giveItem",
+                  "itemId": "goldenArmor",
+                  "kind": "equipment"
+                }
+              ]
+            },
+            {
+              "text": "이 자리에서 역적을 소탕한다.",
+              "actions": [
+                {
+                  "type": "dialogue",
+                  "lines": [
+                    {
+                      "speaker": "caocao",
+                      "text": "…….아니오. 등을 보이면 저들이 폐하를 쫓소. 여기서 끊소."
+                    },
+                    {
+                      "speaker": "xianDi",
+                      "text": "짐은 이 마을에 있겠다. 조공, 무리하지 말라."
+                    },
+                    {
+                      "speaker": "xuChu",
+                      "text": "폐하 앞은 이 몸이 막습니다. 한 놈도 마을에 들이지 않습니다."
+                    }
+                  ]
+                },
+                {
+                  "type": "giveItem",
+                  "itemId": "holySword",
+                  "kind": "equipment"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s12-xuhuang",
+      "trigger": {
+        "type": "unitDefeated",
+        "officerId": "xuHuang"
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "xuHuang",
+              "text": "…….이만한 군을 이각 밑에서 본 적이 없다. 내가 섬긴 쪽이 틀렸던가."
+            },
+            {
+              "speaker": "caocao",
+              "text": "서황이오. 그 활은 이각 밑에서 썩힐 것이 아니오 — 살려 보내시오."
+            },
+            {
+              "speaker": "xuHuang",
+              "text": "……조공. 이 이름을 기억해 두시오. 다시 뵙겠소."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

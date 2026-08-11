@@ -54,6 +54,13 @@ function mkStage(over: Partial<StageDef> = {}): StageDef {
 const unit = (state: BattleState, officerId: string): UnitState =>
   state.units.find((u) => u.officerId === officerId)!
 
+/** 전위가 출진한 배치 — n31(완성 야습)의 leave ifDead 검증용 */
+const withDianwei: StageDef['units'] = [
+  { officerId: 'caocao', faction: 'player', pos: { x: 1, y: 1 }, isLeader: true },
+  { officerId: 'dianwei', faction: 'player', pos: { x: 2, y: 1 } },
+  { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 4, y: 1 } },
+]
+
 describe('newCampaign', () => {
   it('아군 6명이 장수 기본 레벨 / 경험치 0으로 편성된다', () => {
     const campaign = newCampaign()
@@ -107,7 +114,10 @@ describe('캠페인 노드', () => {
     expect(walk(0)).toEqual([
       's00', 'n01', 's01', 'n02', 's02', 'n03',
       's10', 'n11', 's11', 'n12', 'c01', 'n13', 's13',
-      's20', 'n20', 's21', 'c02', 'n21', 's22', 'n22', 's23', 'n23', 's24', 'n24', 's25', 'fin',
+      's20', 'n20', 's21', 'c02', 'n21', 's22', 'n22',
+      // 제3부 「허도 천도」 — v1.2에서 n22와 s23 사이에 삽입한 10노드
+      's30', 'n30', 's31', 'c30', 'n31', 's32', 's33', 'n32', 'c31', 'n33',
+      's23', 'n23', 's24', 'n24', 's25', 'fin',
     ])
   })
 
@@ -116,10 +126,61 @@ describe('캠페인 노드', () => {
     expect(visited).toEqual([
       's00', 'n01', 's01', 'n02', 's02', 'n03',
       's10', 'n11', 's11', 'n12', 'c01', 's12', 's13',
-      's20', 'n20', 's21', 'c02', 's22', 'n22', 's23', 'n23', 's24', 'n24', 's25', 'fin',
+      's20', 'n20', 's21', 'c02', 's22', 'n22',
+      // c30·c31은 어느 갈래를 골라도 같은 전투로 합류한다 (원작도 완성 야습은 회피 불가)
+      's30', 'n30', 's31', 'c30', 'n31', 's32', 's33', 'n32', 'c31', 'n33',
+      's23', 'n23', 's24', 'n24', 's25', 'fin',
     ])
     expect(visited).not.toContain('n13')
     expect(visited).not.toContain('n21')
+  })
+
+  it('제3부 삽입 구간: n22 → s30 … n33 → s23으로 이어붙고 보상금 곡선이 단조 증가한다', () => {
+    const node = (id: string) => CAMPAIGN_NODES.find((n) => n.id === id)!
+    const n22 = node('n22')
+    expect(n22.type === 'battle' && n22.next).toBe('s30')
+    const n33 = node('n33')
+    expect(n33.type === 'battle' && n33.next).toBe('s23')
+
+    // c30 = 완성의 항복 (원작 비대칭 증감폭 +5 / -10). 두 갈래 모두 n31로 합류한다
+    const c30 = node('c30')
+    expect(c30.type).toBe('choice')
+    if (c30.type === 'choice') {
+      expect(c30.speaker).toBe('caoAnMin')
+      expect(c30.options.map((o) => o.gaugeDelta)).toEqual([5, -10])
+      expect(c30.options.map((o) => o.next)).toEqual(['n31', 'n31'])
+    }
+    // c31 = 가후의 서신 (최소 증감폭 ±2)
+    const c31 = node('c31')
+    expect(c31.type).toBe('choice')
+    if (c31.type === 'choice') {
+      expect(c31.speaker).toBe('caocao')
+      expect(c31.options.map((o) => o.gaugeDelta)).toEqual([2, -2])
+      expect(c31.options.map((o) => o.next)).toEqual(['n33', 'n33'])
+    }
+
+    // 신규 구간 합류·이탈
+    const s30 = node('s30')
+    expect(s30.type === 'story' && s30.join).toEqual(['xuChu'])
+    const s31 = node('s31')
+    expect(s31.type === 'story' && s31.join).toEqual(['xuHuang', 'manChong'])
+    const n31 = node('n31')
+    expect(n31.type === 'battle' && n31.leave).toEqual([{ officerId: 'dianwei', when: 'ifDead' }])
+    const s32 = node('s32')
+    expect(s32.type === 'story' && s32.variants).toEqual([
+      { absentOfficerId: 'dianwei', scriptId: 'mourningDianwei' },
+    ])
+    // s23의 join은 구 세이브 안전망으로 남는다 (joinOfficers 멱등)
+    const s23 = node('s23')
+    expect(s23.type === 'story' && s23.join).toEqual(['xuChu'])
+
+    // 2부 후반 보상금 상향 (신규 구간과의 곡선 정합)
+    const golds = ['n30', 'n31', 'n32', 'n33', 'n23', 'n24'].map((id) => {
+      const n = node(id)
+      return n.type === 'battle' ? n.rewardGold : 0
+    })
+    expect(golds).toEqual([1500, 1600, 1700, 1750, 1900, 2200])
+    expect([...golds].sort((a, b) => a - b)).toEqual(golds)
   })
 
   it('c02는 원작 c05의 「화친/토벌」 선택지 — 화친을 고르면 서주 전투를 건너뛴다', () => {
@@ -148,18 +209,31 @@ describe('캠페인 노드', () => {
     expect([...all].sort()).toEqual(CAMPAIGN_NODES.map((n) => n.id).sort())
   })
 
-  it('battle 노드는 stage01→11, story 노드는 스크립트를 가리킨다', () => {
+  it('battle 노드는 stage01→15, story 노드는 스크립트를 가리킨다', () => {
     const battles = CAMPAIGN_NODES.filter((n) => n.type === 'battle')
     expect(battles.map((n) => n.stageId)).toEqual([
       'stage01', 'stage02', 'stage03', 'stage04', 'stage05', 'stage06',
-      'stage07', 'stage08', 'stage09', 'stage10', 'stage11',
+      'stage07', 'stage08', 'stage09',
+      // 제3부 4전투는 그래프상 stage09 뒤 · stage10 앞에 놓인다
+      'stage12', 'stage13', 'stage14', 'stage15',
+      'stage10', 'stage11',
     ])
+    expect(new Set(battles.map((n) => n.stageId)).size).toBe(15) // 15전투 전부 1회씩
     const stories = CAMPAIGN_NODES.filter((n) => n.type === 'story')
     expect(stories.map((n) => n.scriptId)).toEqual([
       'intro', 'afterStage01', 'afterStage02', 'coalition', 'toHulao', 'retreat', 'chapterEnd',
-      'chapter2Intro', 'fatherDeath', 'puyangBetrayal', 'xuzhouRescue', 'xiapiSiege', 'chapter2End',
+      'chapter2Intro', 'fatherDeath', 'puyangBetrayal',
+      'emperorFlight', 'xuduCapital', 'afterWan', 'yuanShuEmperor',
+      'xuzhouRescue', 'xiapiSiege', 'chapter2End',
     ])
     for (const node of stories) expect(node.title.length).toBeGreaterThan(0)
+    // variants가 가리키는 대체 스크립트도 실재해야 한다 (노드 scriptId 목록에는 없다)
+    for (const node of stories) {
+      for (const variant of node.variants ?? []) {
+        expect(STORY_SCRIPTS[variant.scriptId], variant.scriptId).toBeDefined()
+        expect(OFFICERS[variant.absentOfficerId], variant.absentOfficerId).toBeDefined()
+      }
+    }
   })
 
   it('모든 next/선택지 목적지가 실제 노드를 가리킨다', () => {
@@ -436,18 +510,26 @@ describe('applyVictory', () => {
     return campaign
   }
 
-  it('첫 갈래를 끝까지 진행하면 11전투를 모두 클리어하고 종막에 닿는다', () => {
+  it('첫 갈래를 끝까지 진행하면 15전투를 모두 클리어하고 종막에 닿는다', () => {
     const campaign = playThrough(0)
     expect(campaign.nodeId).toBe('fin')
     expect(isCampaignFinished(campaign)).toBe(true)
     expect(campaign.clearedStages).toEqual([
       'stage01', 'stage02', 'stage03', 'stage04', 'stage05', 'stage06',
-      'stage07', 'stage08', 'stage09', 'stage10', 'stage11',
+      'stage07', 'stage08', 'stage09',
+      'stage12', 'stage13', 'stage14', 'stage15',
+      'stage10', 'stage11',
     ])
-    // c01 추격 +10, c02 토벌 속행 +5
-    expect(campaign.gauge).toBe(GAUGE_INITIAL + 15)
-    // 2부 합류 2명이 로스터에 얹힌다
-    expect(campaign.roster.map((r) => r.officerId)).toEqual([...PLAYER_OFFICER_IDS, 'xuChu', 'zhangLiao'])
+    // c01 추격 +10, c02 토벌 속행 +5, c30 자제 +5, c31 후대 +2
+    expect(campaign.gauge).toBe(GAUGE_INITIAL + 22)
+    // 2·3부 합류 4명이 로스터에 얹힌다 (전위는 mkStage 시뮬에서 사체가 남지 않아 이탈하지 않는다)
+    expect(campaign.roster.map((r) => r.officerId)).toEqual([
+      ...PLAYER_OFFICER_IDS,
+      'xuChu',
+      'xuHuang',
+      'manChong',
+      'zhangLiao',
+    ])
   })
 
   it('둘째 갈래를 끝까지 진행하면 stage06·stage08을 건너뛴 채 종막에 닿는다', () => {
@@ -456,10 +538,38 @@ describe('applyVictory', () => {
     expect(isCampaignFinished(campaign)).toBe(true)
     expect(campaign.clearedStages).toEqual([
       'stage01', 'stage02', 'stage03', 'stage04', 'stage05',
-      'stage07', 'stage09', 'stage10', 'stage11',
+      'stage07', 'stage09',
+      'stage12', 'stage13', 'stage14', 'stage15',
+      'stage10', 'stage11',
     ])
-    // c01 회군 -10, c02 화친 -5
-    expect(campaign.gauge).toBe(GAUGE_INITIAL - 15)
+    // c01 회군 -10, c02 화친 -5, c30 추씨 -10, c31 처형 -2
+    expect(campaign.gauge).toBe(GAUGE_INITIAL - 27)
+  })
+
+  it('n31에서 전위의 사체가 남으면 로스터에서 이탈하고 장비는 창고로 회수된다 (leave ifDead)', () => {
+    let campaign = { ...newCampaign(), nodeId: 'n31' }
+    const state = startBattle(mkStage({ id: 'stage13', units: withDianwei }), 1, campaign.roster)
+    const dianwei = unit(state, 'dianwei')
+    const weapon = campaign.roster.find((r) => r.officerId === 'dianwei')!.equipment.weapon!
+    dianwei.hp = 0 // 사체가 전장에 남았다
+    campaign = applyVictory(campaign, state)
+    expect(campaign.nodeId).toBe('s32')
+    expect(campaign.roster.some((r) => r.officerId === 'dianwei')).toBe(false)
+    expect(campaign.inventory).toContainEqual(weapon)
+  })
+
+  it('절영 등으로 구출해 사체가 없으면 전위는 로스터에 남는다 + s32는 정상 스크립트를 쓴다', () => {
+    const campaign = { ...newCampaign(), nodeId: 'n31' }
+    const state = startBattle(mkStage({ id: 'stage13', units: withDianwei }), 1, campaign.roster)
+    const after = applyVictory(campaign, state) // 아무도 쓰러지지 않았다
+    expect(after.roster.some((r) => r.officerId === 'dianwei')).toBe(true)
+
+    // s32 variants 해석은 표시 계층 몫이지만, 두 스크립트가 모두 존재해야 성립한다
+    const s32 = CAMPAIGN_NODES.find((n) => n.id === 's32')!
+    expect(s32.type).toBe('story')
+    if (s32.type !== 'story') return
+    expect(STORY_SCRIPTS[s32.scriptId]).toBeDefined()
+    expect(STORY_SCRIPTS[s32.variants![0].scriptId]).toBeDefined()
   })
 
   it('보상금은 노드에 박힌 값의 합이다 (추격 갈래)', () => {

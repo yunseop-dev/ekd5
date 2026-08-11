@@ -584,10 +584,12 @@ function deploymentFor(stageDef: StageDef, roster: RosterEntry[]): string[] | un
   return [...forced, ...rest].slice(0, stageDef.deployMax ?? stageDef.playerSlots.length)
 }
 
-describe('풀 캠페인 레벨 커브 (추격 루트 완주 — 1부 + 2부)', () => {
+describe('풀 캠페인 레벨 커브 (추격 루트 완주 — 1부 + 2부 + 3부 15전)', () => {
   it('전 노드를 AI로 완주하면 로스터가 이월되고 최고 레벨이 보고된다', () => {
     let campaign = newCampaign()
     const results: string[] = []
+    // v1.2 계측 — 완성 야습(n31)에서 전위가 살아남는지, 인수가 어디서 들어오는지
+    let dianweiFellAt: string | null = null
     // v0.9 AI 확장 계측 — 회복/강화 책략을 실제로 쓰는지 (풍수사 순욱은 stage02부터 출진)
     let healCasts = 0
     let buffCasts = 0
@@ -615,20 +617,31 @@ describe('풀 캠페인 레벨 커브 (추격 루트 완주 — 1부 + 2부)', (
         healCasts += state.log.filter((l) => l.type === 'heal').length
         buffCasts += state.log.filter((l) => l.type === 'buff' || l.type === 'debuff').length
         if (node.rewardSeal) sealsFromBattle += 1
+        const corpse = state.units.some((u) => u.officerId === 'dianwei' && u.hp <= 0)
+        if (corpse && dianweiFellAt === null) dianweiFellAt = `${node.id}(${stageDef.id})`
         results.push(`${node.id}(${stageDef.id}): ${state.result}${bonusFired ? '+보너스' : ''}`)
         campaign = applyVictory(campaign, state)
       } else break
     }
 
     expect(currentNode(campaign)?.type).toBe('end')
+    // v1.2: 제3부 4전투(stage12~15)가 stage09 뒤 · stage10 앞에 삽입됐다
     expect(campaign.clearedStages).toEqual([
       'stage01', 'stage02', 'stage03', 'stage04', 'stage05', 'stage06',
-      'stage07', 'stage08', 'stage09', 'stage10', 'stage11',
+      'stage07', 'stage08', 'stage09',
+      'stage12', 'stage13', 'stage14', 'stage15',
+      'stage10', 'stage11',
     ])
-    expect(consumableCount(campaign.consumables, 'insu')).toBe(5) // 전투 보상 4 + 유비 생존(allySurvived — 원작 c13) 1
-    // 2부 합류 2명이 로스터에 얹힌다 (허저 s23 / 장료 s25)
-    expect(campaign.roster.map((r) => r.officerId)).toContain('xuChu')
-    expect(campaign.roster.map((r) => r.officerId)).toContain('zhangLiao')
+    expect(campaign.clearedStages).toHaveLength(15)
+    // 전투 보상 4(n11/n12/n13/n24) + 유비 생존(stage10 allySurvived — 원작 c13) 1 + stage15 보스 전멸 1
+    expect(consumableCount(campaign.consumables, 'insu')).toBeGreaterThanOrEqual(5)
+    // 2·3부 합류가 로스터에 얹힌다 (허저 s30 / 서황·만총 s31 / 장료 s25)
+    for (const id of ['xuChu', 'xuHuang', 'manChong', 'zhangLiao']) {
+      expect(campaign.roster.map((r) => r.officerId), id).toContain(id)
+    }
+    // 전위는 완성 야습(n31)에서만 이탈할 수 있다 — 그 밖의 전투에서 빠지면 leave 배선이 잘못된 것이다
+    const dianweiSurvived = campaign.roster.some((r) => r.officerId === 'dianwei')
+    if (!dianweiSurvived) expect(dianweiFellAt).toMatch(/^n31\(stage13\)$/)
 
     const levels = campaign.roster.map((r) => `${OFFICERS[r.officerId].name} Lv${r.level}`)
     const top = Math.max(...campaign.roster.map((r) => r.level))
@@ -636,11 +649,12 @@ describe('풀 캠페인 레벨 커브 (추격 루트 완주 — 1부 + 2부)', (
     const insuBuyable = Math.floor(campaign.gold / CONSUMABLES.insu.price!)
     console.log(
       [
-        '[v1.0 레벨 커브 시뮬] 추격 루트 완주 (1부 6전투 + 2부 5전투)',
+        '[v1.2 레벨 커브 시뮬] 추격 루트 완주 15전 (1부 6전투 + 3부 4전투 + 2부 5전투)',
         `  전투 결과: ${results.join(' / ')}`,
         `  최종 로스터: ${levels.join(', ')}`,
         `  최고 레벨 ${top} / 승급 기준 Lv${PROMOTION_LEVEL} 도달 ${promotable}명 / 인수 ${consumableCount(campaign.consumables, 'insu')}개`,
         `  인수 수급: 전투 보상 ${sealsFromBattle}개 + 상점 해금 ${shopOpenedAt ?? '없음'}부터 (잔여 군자금 ${campaign.gold} → 추가 구매 가능 ${insuBuyable}개)`,
+        `  전위: ${dianweiSurvived ? '생존 (로스터 유지)' : `완성에서 전사 — ${dianweiFellAt}에서 사체 확인 → leave ifDead 발동`}`,
         `  AI 지원 책략: 회복 ${healCasts}회 / 강화·방해 ${buffCasts}회`,
         top >= PROMOTION_LEVEL
           ? '  → Lv15 도달: 승급이 캠페인 안에서 열린다'

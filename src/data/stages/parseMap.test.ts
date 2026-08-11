@@ -27,8 +27,8 @@ describe('parseMap ↔ mapToRows', () => {
     expect(mapToRows(map)).toEqual(rows)
   })
 
-  it('번들 스테이지 11개 전부: 맵이 문자 그리드로 무손실 왕복한다', () => {
-    expect(STAGES).toHaveLength(11)
+  it('번들 스테이지 15개 전부: 맵이 문자 그리드로 무손실 왕복한다', () => {
+    expect(STAGES).toHaveLength(15)
     for (const stage of STAGES) {
       const rows = mapToRows(stage.map)
       const reparsed = parseMap(rows)

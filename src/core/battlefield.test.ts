@@ -719,7 +719,7 @@ describe('giveItem — 표시형 승격 (UI 모달 계약)', () => {
 
     const next = applyAction(state, { type: 'eventContinue' })
     expect(next.pendingRewards).toEqual([{ itemId: 'leatherShield', kind: 'equipment' }])
-    expect(next.log.some((l) => l.type === 'event' && l.message === '가죽 방패을(를) 손에 넣었다!')).toBe(true)
+    expect(next.log.some((l) => l.type === 'event' && l.message === '가죽 방패를 손에 넣었다!')).toBe(true)
     expect(unit(next, 'caocao').buffs).toHaveLength(1) // 뒤의 즉시형이 이어서 실행된다
     expect(next.pendingEvents).toEqual([])
   })

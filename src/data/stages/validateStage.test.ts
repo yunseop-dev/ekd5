@@ -354,8 +354,8 @@ describe('validateStage — 이벤트 규칙 (v1.1)', () => {
 })
 
 describe('stageToJson — 왕복', () => {
-  it('번들 스테이지 11개가 JSON → StageDef → JSON 왕복에서 변하지 않는다', () => {
-    expect(STAGES).toHaveLength(11)
+  it('번들 스테이지 15개가 JSON → StageDef → JSON 왕복에서 변하지 않는다', () => {
+    expect(STAGES).toHaveLength(15)
     for (const stage of STAGES) {
       const json = stageToJson(stage)
       const reparsed = validateStage(json)

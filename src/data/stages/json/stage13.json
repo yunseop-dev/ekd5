@@ -1,0 +1,441 @@
+{
+  "id": "stage13",
+  "name": "장수 토벌전",
+  "weather": "clear",
+  "notes": "스테이지 13 \"장수 토벌전\" — 제3부 두 번째 전투 (원작 완성(宛城) 야습, 난이도 A)\n검증 목표: **화염 방어진(setHazard)으로 아군 진영을 두 동으로 가르는 첫 스테이지** +\n           전위의 최후 연출(unitDefeated → 3단 dialogue + 보물).\n           소수전(deployMin 5 / Max 6)이고 강제출진이 조조①·전위②라 배치가 서사를 만든다.\n지형 구성: 완 야영지 — 목책(wall X)이 x=4·x=11 두 줄과 y=2·y=9 두 줄로 진영을 둘러싸고,\n           (4,3) 진문(gate D)과 (5,9) 남서 트임이 유일한 통로다. 천막은 마을(V) 3칸.\n           서쪽 끝 (1,10) = 퇴각 승리 지점.\n배치 의도: 슬롯 ①조조 (8,6) 진영 안쪽 / ②전위 (5,3) 진문 바로 안쪽 — 전위는 처음부터 홀로 문을 막는다.\n           적 9기는 남·서에서 기습 배치(장수 남서·가후 최후열·호거아 진문 밖).\n밸런스: 아군 예상 Lv16~17. 장수 Lv18(보스) / 호거아 Lv18 / 가후 Lv17 / 서량병 Lv15.\n        [밸런스 조정] 초안은 서량병 Lv16 11기였으나 5시드 중 2승뿐이라 9기 Lv15로 낮췄다 —\n        5시드 기준 전위 생존 갈래 4승 / 전위 전사 갈래 4승 (양쪽 승리 가능).\n        턴 2·3의 setHazard가 전위의 유일한 후퇴로((5,4)·(6,4)·(6,3) → +(7,3)·(6,5)·(5,5))를 태워 막는다.\n        불길은 진입·통과만 막고 데미지는 없다(v1.2 계약) — 즉 전위는 \"포위 + 배후 차단\" 상태가 되고\n        방치하면 격파된다. **전위 생사 양쪽 모두 승리 가능**해야 정상이다(stages.test에서 두 경우 확인).\n        절영(jueYing, stage06 이유 격파 보상)을 전위에게 채우면 이동력이 붙어 구출이 쉬워진다.\n---\nv1.2 이벤트 10건\n  ① 개전 기습 대사 (전위가 홀로 진문으로)\n  ② 턴 2 가후의 허보 + 전위의 응수\n  ③ 턴 2 화염 3칸 (전위·조조 사이 통로) / ④ 턴 3 화염 +3칸\n  ⑤ 전위×호거아 인접 → 일기토 무승부 (원작의 무기 도난은 대사로만 표현 — duel outcome은 draw)\n  ⑥ 호거아 격파 → 비룡도복\n  ⑦ 전위 격파 → 3단 연출(전위의 마지막 말 → 내레이션 → 조조의 격정) + 봉황깃옷\n  ⑧ 조조가 진문 밖으로 → 조안민 대사 / ⑨ 서쪽 끝 도달 → 원군 호출 대사\n  ⑩ 턴 4 구원대(조조군 보병·기병) **ally 진영** 등장 — player 스폰은 출진 계약을 깨므로 금지\n[의도적 이탈] reachArea는 진영(faction) 단위 판정이라 \"조조가\" 도달했는지는 데이터로 못 쓴다.\n  ⑧⑨는 아군 1부대 도달로 근사했다.",
+  "map": {
+    "rows": [
+      "GGPPPPPPPPPPGG",
+      "GPPPPPPPPPPPPG",
+      "PPPPXXXXXXXPPP",
+      "PPPPDPPPPPPXPP",
+      "PPPPXPPVPPPXPP",
+      "PPPPXPPPPPPXPP",
+      "PPPPXPPPPVPXPP",
+      "PPPPXPPVPPPXPP",
+      "PPPPXPPPPPPXPP",
+      "PPPPPPXXXXXPPP",
+      "GPPPPPPPPPPPPG",
+      "GGPPPPPPPPPPGG"
+    ]
+  },
+  "playerSlots": [
+    { "x": 8, "y": 6 },
+    { "x": 5, "y": 3 },
+    { "x": 9, "y": 5 },
+    { "x": 7, "y": 5 },
+    { "x": 9, "y": 7 },
+    { "x": 8, "y": 4 }
+  ],
+  "deployMin": 5,
+  "deployMax": 6,
+  "forcedOfficers": [
+    "caocao",
+    "dianwei"
+  ],
+  "units": [
+    {
+      "officerId": "caocao",
+      "faction": "player",
+      "pos": { "x": 8, "y": 6 },
+      "isLeader": true
+    },
+    {
+      "officerId": "dianwei",
+      "faction": "player",
+      "pos": { "x": 5, "y": 3 }
+    },
+    {
+      "officerId": "xiahoudun",
+      "faction": "player",
+      "pos": { "x": 9, "y": 5 }
+    },
+    {
+      "officerId": "xuChu",
+      "faction": "player",
+      "pos": { "x": 7, "y": 5 }
+    },
+    {
+      "officerId": "xiahouyuan",
+      "faction": "player",
+      "pos": { "x": 9, "y": 7 }
+    },
+    {
+      "officerId": "guojia",
+      "faction": "player",
+      "pos": { "x": 8, "y": 4 }
+    },
+    {
+      "officerId": "zhangXiu",
+      "faction": "enemy",
+      "pos": { "x": 2, "y": 9 },
+      "level": 18,
+      "isBoss": true,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "jiaXu",
+      "faction": "enemy",
+      "pos": { "x": 2, "y": 11 },
+      "level": 17,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "huCheEr",
+      "faction": "enemy",
+      "pos": { "x": 3, "y": 3 },
+      "level": 18,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "westCavalry",
+      "faction": "enemy",
+      "pos": { "x": 3, "y": 2 },
+      "level": 15,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "westCavalry",
+      "faction": "enemy",
+      "pos": { "x": 2, "y": 4 },
+      "level": 15,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": { "x": 3, "y": 5 },
+      "level": 15,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": { "x": 4, "y": 10 },
+      "level": 15,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "westArcher",
+      "faction": "enemy",
+      "pos": { "x": 1, "y": 4 },
+      "level": 15,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westArcher",
+      "faction": "enemy",
+      "pos": { "x": 2, "y": 8 },
+      "level": 15,
+      "behavior": "guard"
+    }
+  ],
+  "victory": [
+    { "type": "annihilation" },
+    { "type": "reachPoint", "pos": { "x": 1, "y": 10 }, "unitId": "caocao" }
+  ],
+  "bonusExp": 200,
+  "defeat": [
+    { "type": "turnLimit", "turns": 20 }
+  ],
+  "reinforcements": [],
+  "events": [
+    {
+      "id": "s13-open",
+      "trigger": { "type": "battleStart" },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": null,
+              "text": "한밤중이었다. 목책 밖에서 함성이 올라오고, 천막이 차례로 불을 물었다."
+            },
+            {
+              "speaker": "zhangXiu",
+              "text": "조조! 항복한 자의 진영에서 자다니, 잠자리를 잘못 골랐구나!"
+            },
+            {
+              "speaker": "dianwei",
+              "text": "조조님, 갑주는 나중입니다. 진문은 제가 막습니다 — 혼자면 충분합니다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "…….전위. 무리하지 마시오. 내가 곧 그 문으로 가겠소."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s13-jiaxu-bluff",
+      "trigger": { "type": "turnStart", "turn": 2 },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "jiaXu",
+              "text": "조조군은 이미 문을 버리고 달아났다! 진문에 남은 것은 한 사람뿐이다!"
+            },
+            {
+              "speaker": "dianwei",
+              "text": "…….한 사람이면 되오. 들어올 수 있으면 들어와 보시오!"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s13-fire-1",
+      "trigger": { "type": "turnStart", "turn": 2 },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": null,
+              "text": "천막에서 옮겨 붙은 불이 진문 안쪽 통로를 삼켰다. 전위의 등 뒤가 끊겼다."
+            }
+          ]
+        },
+        {
+          "type": "setHazard",
+          "cells": [
+            { "x": 5, "y": 4 },
+            { "x": 6, "y": 4 },
+            { "x": 6, "y": 3 }
+          ],
+          "kind": "fire",
+          "duration": 3
+        }
+      ]
+    },
+    {
+      "id": "s13-fire-2",
+      "trigger": { "type": "turnStart", "turn": 3 },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "caocao",
+              "text": "…….불이 번지오. 전위, 물러서시오! 그 문은 버려도 좋소!"
+            }
+          ]
+        },
+        {
+          "type": "setHazard",
+          "cells": [
+            { "x": 7, "y": 3 },
+            { "x": 6, "y": 5 },
+            { "x": 5, "y": 5 }
+          ],
+          "kind": "fire",
+          "duration": 3
+        }
+      ]
+    },
+    {
+      "id": "s13-duel-hucheer",
+      "trigger": {
+        "type": "unitsMeet",
+        "a": "dianwei",
+        "b": "huCheEr"
+      },
+      "actions": [
+        {
+          "type": "duel",
+          "a": "dianwei",
+          "b": "huCheEr",
+          "lines": [
+            {
+              "speaker": "huCheEr",
+              "text": "네가 전위인가. 그 쌍철극(雙鐵戟), 내가 가져가겠다."
+            },
+            {
+              "speaker": "dianwei",
+              "text": "…….가져가려면 팔부터 가져가시오."
+            },
+            {
+              "speaker": null,
+              "text": "호거아가 몸을 낮춰 파고들었다. 손이 스치고, 극 한 자루가 흙 위로 굴렀다."
+            },
+            {
+              "speaker": "dianwei",
+              "text": "한 자루면 되오. 문은 아직 내 뒤에 있소."
+            }
+          ],
+          "outcome": {
+            "draw": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "s13-hucheer-fall",
+      "trigger": {
+        "type": "unitDefeated",
+        "officerId": "huCheEr"
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "huCheEr",
+              "text": "……극 한 자루로…… 이만한 힘이…… 나오는가……."
+            },
+            {
+              "speaker": "dianwei",
+              "text": "훔친 것은 두고 가시오."
+            }
+          ]
+        },
+        {
+          "type": "giveItem",
+          "itemId": "flyingDragonRobe",
+          "kind": "equipment"
+        }
+      ]
+    },
+    {
+      "id": "s13-dianwei-fall",
+      "trigger": {
+        "type": "unitDefeated",
+        "officerId": "dianwei"
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "dianwei",
+              "text": "…….조조님. 문은…… 지켰소……."
+            },
+            {
+              "speaker": null,
+              "text": "전위는 무릎을 꺾은 채로 쓰러지지 않았다. 진문에 등을 대고, 그대로 서서 숨을 놓았다."
+            },
+            {
+              "speaker": null,
+              "text": "적병은 그 앞으로 한 걸음도 나아가지 못한 채 시체를 돌아서 지나갔다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "전위!! 전위――!!"
+            },
+            {
+              "speaker": "caocao",
+              "text": "…….일어나시오. 명령이오. 일어나시오!"
+            }
+          ]
+        },
+        {
+          "type": "giveItem",
+          "itemId": "phoenixRobe",
+          "kind": "equipment"
+        }
+      ]
+    },
+    {
+      "id": "s13-gate-out",
+      "trigger": {
+        "type": "reachArea",
+        "area": [
+          { "x": 4, "y": 3 },
+          { "x": 3, "y": 2 },
+          { "x": 3, "y": 3 },
+          { "x": 3, "y": 4 },
+          { "x": 2, "y": 3 }
+        ],
+        "faction": "player",
+        "count": 1
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "caoAnMin",
+              "text": "숙부님! 말은 제가 끌었습니다. 서쪽 길로 나가십시오!"
+            },
+            {
+              "speaker": "caocao",
+              "text": "…….안민. 앞장서지 마시오. 그대는 내 뒤에 서시오."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s13-rescue-call",
+      "trigger": {
+        "type": "reachArea",
+        "area": [
+          { "x": 0, "y": 9 },
+          { "x": 1, "y": 9 },
+          { "x": 0, "y": 10 },
+          { "x": 1, "y": 10 },
+          { "x": 0, "y": 11 },
+          { "x": 1, "y": 11 }
+        ],
+        "faction": "player",
+        "count": 1
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "caocao",
+              "text": "여기까지오. 북을 울리시오 — 뒤에 남은 부대에 우리가 여기 있다고 알리시오."
+            },
+            {
+              "speaker": null,
+              "text": "북소리가 어둠을 두 번 갈랐다. 서쪽 들에서 응답하는 북이 되돌아왔다."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s13-rescue",
+      "trigger": { "type": "turnStart", "turn": 4 },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": null,
+              "text": "서쪽 들에서 조조군의 깃발이 올라왔다. 밤을 새워 달려온 구원대다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "늦었소. …….그래도 왔으니 되었소. 진문 쪽을 치시오!"
+            }
+          ]
+        },
+        {
+          "type": "spawnUnits",
+          "units": [
+            {
+              "officerId": "weiInfantry",
+              "faction": "ally",
+              "pos": { "x": 0, "y": 6 },
+              "level": 16,
+              "behavior": "pursue"
+            },
+            {
+              "officerId": "weiCavalry",
+              "faction": "ally",
+              "pos": { "x": 0, "y": 7 },
+              "level": 16,
+              "behavior": "pursue"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

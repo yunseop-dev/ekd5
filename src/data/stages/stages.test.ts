@@ -5,12 +5,19 @@ import { decideUnit, runAiPhase } from '../../core/ai'
 import { applyAction, livingUnits, movementRangeOf, startBattle, unitAt } from '../../core/battle'
 import { toEquipmentMap } from '../../core/campaign'
 import { autoResolveEvents } from '../../core/events'
-import type { BattleAction, BattleState } from '../../core/types'
+import type { BattleAction, BattleState, EventAction } from '../../core/types'
 import { CLASSES } from '../classes'
+import { CONSUMABLES } from '../consumables'
+import { EQUIPMENT } from '../equipment'
 import { OFFICERS } from '../officers'
 import { STRATEGIES } from '../strategies'
 import { TERRAIN } from '../terrain'
 import { STAGES, stageById } from './index'
+import { validateStageVerbose } from './validateStage'
+
+// 번들 json 원본 — 로더(index.ts)는 검증 실패를 조용히 드롭하므로,
+// "왜 드롭됐는지"를 알려면 원본을 직접 검증해야 한다 (v1.2에서 스테이지가 15개로 늘며 추가).
+const STAGE_JSON = import.meta.glob<{ default: unknown }>('./json/*.json', { eager: true })
 
 // v1.1: 스테이지 정의가 json/*.json으로 이관되어 named import가 사라졌다.
 // 로더(validateStage)를 통과한 것만 여기 잡히므로 이 상수 자체가 이관 검증기다 — 아래 단정은 무수정.
@@ -25,6 +32,11 @@ const STAGE_08 = stageById('stage08')!
 const STAGE_09 = stageById('stage09')!
 const STAGE_10 = stageById('stage10')!
 const STAGE_11 = stageById('stage11')!
+// v1.2 W-content — 원작 미구현 4전투 (제3부 「허도 천도」)
+const STAGE_12 = stageById('stage12')!
+const STAGE_13 = stageById('stage13')!
+const STAGE_14 = stageById('stage14')!
+const STAGE_15 = stageById('stage15')!
 
 /**
  * 아군도 AI로 조작해 전투를 완주시키는 헬퍼.
@@ -81,6 +93,77 @@ const unitOf = (state: BattleState, officerId: string) =>
 const tileAt = (state: BattleState, x: number, y: number) => state.map.tiles[y][x]
 
 describe('스테이지 데이터 무결성', () => {
+  it('번들 json 15개가 전부 검증기를 통과한다 (드롭 사유를 그대로 노출한다)', () => {
+    const paths = Object.keys(STAGE_JSON).sort()
+    expect(paths).toHaveLength(15)
+    for (const path of paths) {
+      const { stage, errors } = validateStageVerbose(STAGE_JSON[path].default)
+      expect(errors, path).toEqual([])
+      expect(stage, path).not.toBeNull()
+    }
+    expect(STAGES.map((s) => s.id)).toEqual([
+      'stage01', 'stage02', 'stage03', 'stage04', 'stage05', 'stage06', 'stage07', 'stage08',
+      'stage09', 'stage10', 'stage11', 'stage12', 'stage13', 'stage14', 'stage15',
+    ])
+  })
+
+  it('스테이지 명칭 — v1.2 교정분 포함', () => {
+    expect(STAGES.map((s) => s.name)).toEqual([
+      '연습전 — 강가의 황건적',
+      '관문 방어전',
+      '황건 본진 소탕',
+      '사수관 전투',
+      '호로관 전투',
+      '동탁 추격전',
+      '청주 황건적 토벌전',
+      '서주 보복전',
+      '복양 전투',
+      '서주 구원전',
+      '여포 포위전',
+      '헌제 구출전',
+      '장수 토벌전',
+      '원술 정벌전',
+      '장수 토벌전 2',
+    ])
+  })
+
+  it('패배 조건 — stage02만 turnLimit이 없다 (victory surviveTurns와 배타)', () => {
+    for (const stage of STAGES) {
+      const limit = (stage.defeat ?? []).find((d) => d.type === 'turnLimit')
+      if (stage.id === 'stage02') {
+        // surviveTurns(8턴 버티면 승리)와 turnLimit은 검증기가 함께 두지 못하게 막는다
+        expect(stage.victory.some((v) => v.type === 'surviveTurns'), stage.id).toBe(true)
+        expect(stage.defeat, stage.id).toBeUndefined()
+        continue
+      }
+      expect(limit, `${stage.id} turnLimit`).toBeDefined()
+      expect(limit?.type === 'turnLimit' && limit.turns, stage.id).toBe(20)
+    }
+    // 호위 대상 사망 패배는 stage12(헌제)뿐이다
+    const escorts = STAGES.flatMap((s) => (s.defeat ?? []).map((d) => [s.id, d] as const))
+      .filter(([, d]) => d.type === 'unitDies')
+    expect(escorts.map(([id, d]) => [id, d.type === 'unitDies' && d.officerId])).toEqual([['stage12', 'xianDi']])
+  })
+
+  it('이벤트가 지급하는 아이템 id는 모두 실재한다 (validateStage가 보지 않는 giveItem/dropItem)', () => {
+    const known = (itemId: string) => EQUIPMENT[itemId] !== undefined || CONSUMABLES[itemId] !== undefined
+    const walk = (actions: EventAction[], where: string): void => {
+      for (const action of actions) {
+        if (action.type === 'choice') {
+          for (const option of action.options) walk(option.actions, `${where}/${option.text}`)
+          continue
+        }
+        if (action.type === 'giveItem' || action.type === 'dropItem') {
+          expect(known(action.itemId), `${where}: ${action.itemId}`).toBe(true)
+        }
+      }
+    }
+    for (const stage of STAGES) {
+      for (const event of stage.events ?? []) walk(event.actions, `${stage.id}/${event.id}`)
+      for (const g of stage.groundItems ?? []) expect(known(g.itemId), `${stage.id} groundItems`).toBe(true)
+    }
+  })
+
   it('모든 스테이지: 장수/병과/책략 참조가 유효하다', () => {
     for (const stage of STAGES) {
       const all = [...stage.units, ...stage.reinforcements.flatMap((r) => r.units)]
@@ -262,6 +345,21 @@ describe('스테이지 4 — 사수관 전투', () => {
     }
   })
 
+  it('선봉 손견의 우군 3기가 관 안쪽 동측에 갇혀 있고, 생존 시 고정도가 나온다 (v1.2)', () => {
+    const allies = STAGE_04.units.filter((u) => u.faction === 'ally')
+    expect(allies.map((u) => u.officerId)).toEqual(['sunJian', 'jingInfantry', 'jingCavalry'])
+    for (const a of allies) {
+      // 관문 벽은 x=11 — 우군은 그 동쪽(관 안)에 있다
+      expect(a.pos.x, a.officerId).toBeGreaterThan(11)
+      expect(a.behavior, a.officerId).toBe('guard')
+      // HP 손실 상태를 표현할 수 없어 저레벨로 "이미 반 이상 잃은 선봉"을 표현한다
+      expect(a.level!, a.officerId).toBeLessThanOrEqual(5)
+    }
+    expect(STAGE_04.loot).toEqual([{ trigger: 'allySurvived', officerId: 'sunJian', itemId: 'gudingDao' }])
+    // 우군은 아군 리더 판정에 끼지 않는다
+    expect(STAGE_04.units.filter((u) => u.faction === 'player' && u.isLeader)).toHaveLength(1)
+  })
+
   it('stage03 클리어 로스터(Lv7 + 장비)면 관문을 뚫고 승리한다', () => {
     // 밸런스 기준선 — 직전 스테이지를 클리어한 실플레이 조건에서 이길 수 있어야 한다
     const grown = simulate(startBattle(STAGE_04, 42, rosterAt(STAGE_04, 7)), 400)
@@ -301,9 +399,26 @@ describe('스테이지 6 — 동탁 추격전', () => {
       { type: 'turnStart', turn: 3 },
     ])
     expect(waves.reduce((n, w) => n + w.units.length, 0)).toBeGreaterThanOrEqual(8)
-    // 후방 본대는 이유가 이끈다
+    // 후방 본대는 이유가 이끌고, v1.2부터 서영이 함께 온다
     expect(waves[1].units.some((u) => u.officerId === 'liRu')).toBe(true)
+    expect(waves[1].units.some((u) => u.officerId === 'xuRong')).toBe(true)
     expect(STAGE_06.victory).toEqual([{ type: 'annihilation' }])
+  })
+
+  it('서영 격파 = 가죽 방패 / 이유 격파 = 절영 (stage13 전위 구출의 핵심템, v1.2)', () => {
+    expect((STAGE_06.events ?? []).map((e) => e.id)).toEqual([
+      's06-open',
+      's06-ambush',
+      's06-xurong-fall',
+      's06-liru-fall',
+    ])
+    const rewardOf = (eventId: string) =>
+      (STAGE_06.events ?? [])
+        .find((e) => e.id === eventId)!
+        .actions.flatMap((a) => (a.type === 'giveItem' ? [a.itemId] : []))
+    expect(rewardOf('s06-xurong-fall')).toEqual(['leatherShield'])
+    expect(rewardOf('s06-liru-fall')).toEqual(['jueYing'])
+    expect(EQUIPMENT.jueYing.moveBonus).toBeGreaterThan(0) // 이동력 — 불길을 돌아 전위에게 붙는 데 쓰인다
   })
 
   it('AI vs AI 시뮬레이션이 크래시 없이 승패를 낸다 (고난도 — 양쪽 허용)', () => {
@@ -316,7 +431,7 @@ describe('스테이지 6 — 동탁 추격전', () => {
 // 밸런스 방침: 초·중반(stage07/08/10)은 직전 클리어 로스터로 고정 시드 승리를 단정하고,
 // 고난도(stage09 여포 조우 · stage11 최종전)는 양쪽 허용 + 크래시 없음만 단정한다.
 
-describe('스테이지 7 — 청주 평정', () => {
+describe('스테이지 7 — 청주 황건적 토벌전', () => {
   it('원작 c04 충실: 적장이 한 명도 없고 승리조건은 전멸 단일이다 (보너스도 없다)', () => {
     // 관해(管亥)·조표(曹豹)는 원작 512인 명부에 없다 — 청주는 황건 익명 부대만 (statuses.md §4)
     expect(STAGE_07.units.some((u) => u.isBoss)).toBe(false)
@@ -354,7 +469,7 @@ describe('스테이지 7 — 청주 평정', () => {
   })
 })
 
-describe('스테이지 8 — 서주 침공', () => {
+describe('스테이지 8 — 서주 보복전', () => {
   it('도하 구조: 강이 전장을 가르고 다리는 정확히 2칸뿐이다', () => {
     const bridges: string[] = []
     let rivers = 0
@@ -448,7 +563,7 @@ describe('스테이지 9 — 복양 전투', () => {
   })
 })
 
-describe('스테이지 10 — 서주 구원', () => {
+describe('스테이지 10 — 서주 구원전', () => {
   it('우군(ally) 유비·관우·장비 3기가 북쪽 마을에 고립돼 있다', () => {
     const allies = STAGE_10.units.filter((u) => u.faction === 'ally')
     expect(allies.map((u) => u.officerId)).toEqual(['liuBei', 'guanYu', 'zhangFei'])
@@ -478,7 +593,7 @@ describe('스테이지 10 — 서주 구원', () => {
   })
 })
 
-describe('스테이지 11 — 하비 여포 포위전', () => {
+describe('스테이지 11 — 여포 포위전 (하비)', () => {
   it('원작 c14 충실: 설원 + 강 + 다리 2개, 성문 1개, 악천후로 화계 봉쇄', () => {
     const gates: string[] = []
     const bridges: string[] = []
@@ -513,6 +628,336 @@ describe('스테이지 11 — 하비 여포 포위전', () => {
   })
 })
 
+// ---------- 제3부 「허도 천도」 — 원작 미구현 4전투 (v1.2 W-content) ----------
+// 밸런스 방침: stage12/13/15는 예상 로스터로 고정 시드 승리를 단정하고,
+// stage14 옵션 1(12턴 상한)은 고위험 갈래라 양쪽 허용 + 크래시 없음만 단정한다.
+
+describe('스테이지 12 — 헌제 구출전', () => {
+  it('호위 기믹: 헌제는 비무장 우군(마을)이고 그 사망이 패배 조건에 들어 있다', () => {
+    const xianDi = STAGE_12.units.find((u) => u.officerId === 'xianDi')!
+    expect(xianDi.faction).toBe('ally')
+    expect(xianDi.behavior).toBe('guard')
+    expect(xianDi.equipment).toEqual({}) // 비무장
+    expect(STAGE_12.map.tiles[xianDi.pos.y][xianDi.pos.x]).toBe('village') // 매턴 회복
+    expect(STAGE_12.defeat).toEqual([
+      { type: 'turnLimit', turns: 20 },
+      { type: 'unitDies', officerId: 'xianDi' },
+    ])
+    expect(STAGE_12.victory).toEqual([{ type: 'annihilation' }, { type: 'defeatBoss' }])
+    expect(STAGE_12.units.find((u) => u.isBoss)!.officerId).toBe('liJue')
+    // 북동 (12,1) = 동쪽 길(피신 지점) — 황토 개활지 속 유일한 평지
+    expect(STAGE_12.map.tiles[1][12]).toBe('plain')
+  })
+
+  it('적은 전원 북서 진채(y≤2)에 guard로 서서 헌제를 즉살할 수 없다 [의도적 이탈]', () => {
+    for (const u of STAGE_12.units.filter((u) => u.faction === 'enemy')) {
+      // 궁병 사거리 2 + 헌제 y=5 → y≤2면 첫 턴부터 닿지 않는다. 이 제약을 깨면 회피 불가 패배가 생긴다
+      expect(u.pos.y, u.officerId).toBeLessThanOrEqual(2)
+      expect(u.behavior, u.officerId).toBe('guard')
+    }
+    expect(STAGE_12.units.some((u) => u.officerId === 'xuHuang' && u.faction === 'enemy')).toBe(true)
+  })
+
+  it('Lv16 로스터면 헌제를 지킨 채 이긴다 (2시드)', () => {
+    for (const seed of [42, 7]) {
+      const result = simulate(startBattle(STAGE_12, seed, rosterAt(STAGE_12, 16)), 800)
+      expect(result.result, `seed ${seed}`).toBe('victory')
+      expect(unitOf(result, 'xianDi').hp, `seed ${seed}`).toBeGreaterThan(0)
+      expect(result.turn, `seed ${seed}`).toBeLessThanOrEqual(20)
+    }
+  })
+
+  it('헌제가 실제로 쓰러지면 그 자리에서 패배한다 (unitDies)', () => {
+    const state = autoResolveEvents(startBattle(STAGE_12, 1, rosterAt(STAGE_12, 16)))
+    // 마을 회복(매턴 20%)이 있어 잔 HP 조작만으로는 죽지 않는다 — 실제로 8방을 에워싸게 두고
+    // 격파는 전부 적 AI에 맡긴다 (격파 처리를 위조하지 않는다). 아군은 아무것도 하지 않는다.
+    const around = [
+      { x: 1, y: 4 }, { x: 2, y: 4 }, { x: 3, y: 4 },
+      { x: 1, y: 5 }, { x: 3, y: 5 },
+      { x: 1, y: 6 }, { x: 2, y: 6 }, { x: 3, y: 6 },
+    ]
+    let current = situate(state, (s) => {
+      s.units
+        .filter((u) => u.faction === 'enemy')
+        .slice(0, around.length)
+        .forEach((u, i) => {
+          u.pos = around[i]
+        })
+    })
+    for (let i = 0; i < 40 && current.result === 'ongoing'; i++) {
+      current =
+        current.phase === 'player'
+          ? autoResolveEvents(applyAction(current, { type: 'endPhase' }))
+          : autoResolveEvents(runAiPhase(current, current.phase))
+    }
+    expect(current.units.find((u) => u.officerId === 'xianDi')!.hp).toBe(0)
+    expect(current.result).toBe('defeat')
+    expect(current.log.at(-1)!.type).toBe('defeat')
+  })
+
+  it('조조×헌제 조우 선택지 ①호송: 헌제가 전장을 떠나고 승리·패배 조건이 갈린다', () => {
+    const state = autoResolveEvents(startBattle(STAGE_12, 1, rosterAt(STAGE_12, 16)))
+    const meet = situate(state, (s) => {
+      unitOf(s, 'caocao').pos = { x: 3, y: 5 } // 헌제 (2,5) 인접
+    })
+    const escort = autoResolveEvents(applyAction(meet, { type: 'endPhase' }), 0)
+    expect(escort.firedEvents).toContain('s12-emperor')
+    // removeUnits로 전장을 떠난 유닛은 unitDies를 영구히 발동시키지 않는다 (types.ts 계약)
+    expect(escort.units.some((u) => u.officerId === 'xianDi')).toBe(false)
+    expect(escort.defeatOverride).toEqual([{ type: 'turnLimit', turns: 20 }])
+    expect(escort.victoryOverride).toEqual([
+      { type: 'reachPoint', pos: { x: 12, y: 1 }, unitId: 'caocao' },
+      { type: 'annihilation' },
+    ])
+    expect(escort.pendingRewards).toEqual([{ itemId: 'goldenArmor', kind: 'equipment' }])
+  })
+
+  it('선택지 ②소탕: 성자보검을 받고 호위 패배 조건이 그대로 남는다', () => {
+    const state = autoResolveEvents(startBattle(STAGE_12, 1, rosterAt(STAGE_12, 16)))
+    const meet = situate(state, (s) => {
+      unitOf(s, 'caocao').pos = { x: 3, y: 5 }
+    })
+    const stay = autoResolveEvents(applyAction(meet, { type: 'endPhase' }), 1)
+    expect(stay.firedEvents).toContain('s12-emperor')
+    expect(stay.units.some((u) => u.officerId === 'xianDi')).toBe(true)
+    expect(stay.victoryOverride).toBeUndefined()
+    expect(stay.defeatOverride).toBeUndefined()
+    expect(stay.pendingRewards).toEqual([{ itemId: 'holySword', kind: 'equipment' }])
+  })
+})
+
+describe('스테이지 13 — 장수 토벌전 (완성 야습)', () => {
+  it('야영지 구조: 진문 (4,3) 하나, 강제출진 조조①·전위②, 전위 슬롯이 진문에 붙어 있다', () => {
+    const gates: string[] = []
+    for (let y = 0; y < STAGE_13.map.height; y++) {
+      for (let x = 0; x < STAGE_13.map.width; x++) {
+        if (STAGE_13.map.tiles[y][x] === 'gate') gates.push(`${x},${y}`)
+      }
+    }
+    expect(gates).toEqual(['4,3'])
+    expect(STAGE_13.forcedOfficers).toEqual(['caocao', 'dianwei'])
+    expect(STAGE_13.playerSlots![0]).toEqual({ x: 8, y: 6 }) // ①조조 = 진영 안쪽
+    expect(STAGE_13.playerSlots![1]).toEqual({ x: 5, y: 3 }) // ②전위 = 진문 바로 안쪽
+    expect(STAGE_13.deployMin).toBe(5)
+    expect(STAGE_13.deployMax).toBe(6)
+    expect(STAGE_13.victory).toEqual([
+      { type: 'annihilation' },
+      { type: 'reachPoint', pos: { x: 1, y: 10 }, unitId: 'caocao' },
+    ])
+  })
+
+  it('턴 2·3의 화염이 전위의 후퇴로를 태워 진입 불가로 만든다', () => {
+    const turn2 = advanceToTurn(startBattle(STAGE_13, 1, rosterAt(STAGE_13, 17)), 2)
+    expect(turn2.firedEvents).toContain('s13-fire-1')
+    expect(turn2.hazards.map((h) => `${h.pos.x},${h.pos.y}`).sort()).toEqual(['5,4', '6,3', '6,4'])
+    expect(turn2.hazards.every((h) => h.kind === 'fire')).toBe(true)
+    // 불길 칸은 이동 후보에서 사라진다 (진입·통과 불가)
+    const dianwei = unitOf(turn2, 'dianwei')
+    const reach = [...movementRangeOf(turn2, dianwei).values()].map((c) => `${c.pos.x},${c.pos.y}`)
+    expect(reach).not.toContain('5,4')
+    expect(reach).not.toContain('6,4')
+
+    const turn3 = advanceToTurn(turn2, 3)
+    expect(turn3.firedEvents).toContain('s13-fire-2')
+    expect(turn3.hazards.length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('전위 생존 갈래(seed 7): 전위가 살아남고 승리한다', () => {
+    const result = simulate(startBattle(STAGE_13, 7, rosterAt(STAGE_13, 17)), 800)
+    expect(result.result).toBe('victory')
+    expect(unitOf(result, 'dianwei').hp).toBeGreaterThan(0)
+    expect(result.firedEvents).not.toContain('s13-dianwei-fall')
+    // 호거아를 잡으면 비룡도복
+    expect(result.firedEvents).toContain('s13-hucheer-fall')
+    expect(result.pendingRewards).toContainEqual({ itemId: 'flyingDragonRobe', kind: 'equipment' })
+  })
+
+  it('전위 전사 갈래(seed 42): 진문에서 쓰러지지만 그래도 승리한다 + 봉황깃옷', () => {
+    const result = simulate(startBattle(STAGE_13, 42, rosterAt(STAGE_13, 17)), 800)
+    expect(result.result).toBe('victory')
+    expect(result.units.find((u) => u.officerId === 'dianwei')!.hp).toBe(0)
+    expect(result.firedEvents).toContain('s13-dianwei-fall')
+    expect(result.pendingRewards).toContainEqual({ itemId: 'phoenixRobe', kind: 'equipment' })
+  })
+
+  it('전위를 잔 HP 1로 몰아넣어 확실히 전사시켜도 완주해 이긴다', () => {
+    const base = autoResolveEvents(startBattle(STAGE_13, 7, rosterAt(STAGE_13, 17)))
+    const doomed = situate(base, (s) => {
+      unitOf(s, 'dianwei').hp = 1
+    })
+    const result = simulate(doomed, 800)
+    expect(result.units.find((u) => u.officerId === 'dianwei')!.hp).toBe(0)
+    expect(result.firedEvents).toContain('s13-dianwei-fall')
+    expect(result.result).toBe('victory')
+  })
+
+  it('전위×호거아 인접 → 일기토 무승부 (무기 도난은 대사로만 — 데미지·경험치 없음)', () => {
+    const state = autoResolveEvents(startBattle(STAGE_13, 1, rosterAt(STAGE_13, 17)))
+    const meet = situate(state, (s) => {
+      unitOf(s, 'huCheEr').pos = { x: 4, y: 3 } // 진문 위 — 전위 (5,3) 인접
+    })
+    const after = autoResolveEvents(applyAction(meet, { type: 'endPhase' }))
+    expect(after.firedEvents).toContain('s13-duel-hucheer')
+    expect(unitOf(after, 'dianwei').hp).toBeGreaterThan(0)
+    expect(unitOf(after, 'huCheEr').hp).toBeGreaterThan(0)
+    expect(unitOf(after, 'dianwei').exp).toBe(0)
+  })
+
+  it('턴 4 구원대는 ally 진영으로 들어온다 (player 스폰 금지)', () => {
+    const rescue = (STAGE_13.events ?? []).find((e) => e.id === 's13-rescue')!
+    const spawn = rescue.actions.find((a) => a.type === 'spawnUnits')!
+    expect(spawn.type === 'spawnUnits' && spawn.units.map((u) => [u.officerId, u.faction])).toEqual([
+      ['weiInfantry', 'ally'],
+      ['weiCavalry', 'ally'],
+    ])
+    let alliesSeen = 0
+    const result = simulate(startBattle(STAGE_13, 7, rosterAt(STAGE_13, 17)), 800, (s) => {
+      alliesSeen = Math.max(alliesSeen, livingUnits(s, 'ally').length)
+    })
+    expect(result.firedEvents).toContain('s13-rescue')
+    expect(alliesSeen).toBeGreaterThan(0)
+  })
+})
+
+describe('스테이지 14 — 원술 정벌전', () => {
+  it('늪·강 구조: 여울 다수 + 다리 2개 + 요새 성문 1개, 우군 3방향', () => {
+    let fords = 0
+    const bridges: string[] = []
+    const gates: string[] = []
+    for (let y = 0; y < STAGE_14.map.height; y++) {
+      for (let x = 0; x < STAGE_14.map.width; x++) {
+        const t = STAGE_14.map.tiles[y][x]
+        if (t === 'ford') fords += 1
+        if (t === 'bridge') bridges.push(`${x},${y}`)
+        if (t === 'gate') gates.push(`${x},${y}`)
+      }
+    }
+    expect(fords).toBeGreaterThanOrEqual(20) // 기병 성능 80% 지대
+    expect(bridges).toEqual(['4,6', '11,6'])
+    expect(gates).toEqual(['6,2'])
+    const allies = STAGE_14.units.filter((u) => u.faction === 'ally')
+    expect(allies.map((u) => u.officerId)).toEqual(['lüBu', 'sunCe', 'liuBei', 'guanYu', 'zhangFei'])
+    for (const a of allies) expect(a.behavior, a.officerId).toBe('guard')
+    expect(STAGE_14.units.find((u) => u.isBoss)!.officerId).toBe('yuanShu')
+    expect(STAGE_14.loot).toEqual([{ trigger: 'bossKill', itemId: 'moYuJian' }])
+  })
+
+  it('옵션 0(내탕을 푼다): 조건은 그대로, 보물 2점 + Lv18 로스터로 승리한다', () => {
+    for (const seed of [42, 7]) {
+      const result = simulate(startBattle(STAGE_14, seed, rosterAt(STAGE_14, 18)), 800, undefined, 0)
+      expect(result.result, `seed ${seed}`).toBe('victory')
+      expect(result.victoryOverride, `seed ${seed}`).toBeUndefined()
+      expect(result.defeatOverride, `seed ${seed}`).toBeUndefined()
+      expect(result.pendingRewards, `seed ${seed}`).toEqual([
+        { itemId: 'windWheel', kind: 'equipment' },
+        { itemId: 'bashoFan', kind: 'equipment' },
+      ])
+    }
+  })
+
+  it('옵션 1(책임관 처형): 승리 = 보스 단일 / 패배 = 12턴으로 조여지고 인수가 나온다', () => {
+    const opened = autoResolveEvents(startBattle(STAGE_14, 42, rosterAt(STAGE_14, 18)), 1)
+    expect(opened.firedEvents).toContain('s14-open')
+    expect(opened.victoryOverride).toEqual([{ type: 'defeatBoss' }])
+    expect(opened.defeatOverride).toEqual([{ type: 'turnLimit', turns: 12 }])
+    expect(opened.pendingRewards).toEqual([{ itemId: 'insu', kind: 'consumable' }])
+    // 12턴 상한은 빡빡하다 — 고위험 갈래라 시드에 따라 승패가 갈린다 (양쪽 허용)
+    for (const seed of [42, 7]) {
+      const result = simulate(startBattle(STAGE_14, seed, rosterAt(STAGE_14, 18)), 800, undefined, 1)
+      expect(['victory', 'defeat'], `seed ${seed}`).toContain(result.result)
+      expect(result.turn, `seed ${seed}`).toBeLessThanOrEqual(13) // 12턴을 넘기면 곧바로 패배 판정
+    }
+  })
+
+  it('서쪽 여울목에 아군이 닿으면 여포가 농성을 풀고 참전한다', () => {
+    const state = autoResolveEvents(startBattle(STAGE_14, 1, rosterAt(STAGE_14, 18)))
+    expect(unitOf(state, 'lüBu').behavior).toBe('guard')
+    const west = situate(state, (s) => {
+      unitOf(s, 'caocao').pos = { x: 1, y: 7 }
+    })
+    const after = autoResolveEvents(applyAction(west, { type: 'endPhase' }))
+    expect(after.firedEvents).toContain('s14-lubu-join')
+    expect(unitOf(after, 'lüBu').behavior).toBe('pursue')
+  })
+
+  it('조조×원술 인접 → 설전 무승부 (원작에 승패 기록이 없다)', () => {
+    const state = autoResolveEvents(startBattle(STAGE_14, 1, rosterAt(STAGE_14, 18)))
+    const meet = situate(state, (s) => {
+      unitOf(s, 'caocao').pos = { x: 6, y: 2 } // 성문 위 — 원술 (6,1) 인접
+    })
+    const after = autoResolveEvents(applyAction(meet, { type: 'endPhase' }))
+    expect(after.firedEvents).toContain('s14-yuanshu-debate')
+    expect(unitOf(after, 'yuanShu').hp).toBeGreaterThan(0)
+    expect(unitOf(after, 'caocao').hp).toBeGreaterThan(0)
+    expect(unitOf(after, 'caocao').exp).toBe(0)
+  })
+})
+
+describe('스테이지 15 — 장수 토벌전 2 (완성 재정벌)', () => {
+  it('성 구조: 남문 (4,4) + 동측 트임 (8,3), 보스 2명, 보스 전멸 전리품이 인수다', () => {
+    const gates: string[] = []
+    for (let y = 0; y < STAGE_15.map.height; y++) {
+      for (let x = 0; x < STAGE_15.map.width; x++) {
+        if (STAGE_15.map.tiles[y][x] === 'gate') gates.push(`${x},${y}`)
+      }
+    }
+    expect(gates).toEqual(['4,4'])
+    expect(STAGE_15.map.tiles[3][8]).toBe('castle') // 동측 성벽이 끊긴 트임 — AI 병목 완화
+    expect(STAGE_15.map.tiles[2][8]).toBe('wall')
+    const bosses = STAGE_15.units.filter((u) => u.isBoss).map((u) => u.officerId)
+    expect(bosses).toEqual(['zhangXiu', 'jiaXu'])
+    // 원작 "전멸 시 인수" 재현 — bossKill은 isBoss 전원 격파를 요구한다
+    expect(STAGE_15.loot).toEqual([{ trigger: 'bossKill', itemId: 'insu' }])
+    expect(STAGE_15.victory).toEqual([
+      { type: 'annihilation' },
+      { type: 'reachPoint', pos: { x: 12, y: 1 }, unitId: 'caocao' },
+    ])
+  })
+
+  it('성내 진입 선택지 — 양쪽 다 복병 4기가 붙고, 물러서면 아군 전체 방어 +10(2턴)', () => {
+    const state = autoResolveEvents(startBattle(STAGE_15, 1, rosterAt(STAGE_15, 19)))
+    const before = livingUnits(state, 'enemy').length
+    const atGate = situate(state, (s) => {
+      unitOf(s, 'caocao').pos = { x: 4, y: 4 }
+    })
+
+    const push = autoResolveEvents(applyAction(atGate, { type: 'endPhase' }), 0)
+    expect(push.firedEvents).toContain('s15-southgate')
+    expect(livingUnits(push, 'enemy').length).toBe(before + 4)
+    expect(livingUnits(push, 'player').every((u) => u.buffs.length === 0)).toBe(true)
+
+    const hold = autoResolveEvents(applyAction(atGate, { type: 'endPhase' }), 1)
+    expect(livingUnits(hold, 'enemy').length).toBe(before + 4)
+    for (const u of livingUnits(hold, 'player')) {
+      expect(u.buffs.some((b) => b.stat === 'def' && b.amount === 10 && b.remainingTurns === 2), u.officerId).toBe(true)
+    }
+  })
+
+  it('가후 주변에 닿으면 가후가 부동을 푼다 (인접 설전과 별개로 발동한다)', () => {
+    const state = autoResolveEvents(startBattle(STAGE_15, 1, rosterAt(STAGE_15, 19)))
+    expect(unitOf(state, 'jiaXu').behavior).toBe('guard')
+    // (3,0) = 가후 (1,1)에서 체비쇼프 2 — 인접이 아니므로 설전은 아직 발동하지 않는다
+    const near = situate(state, (s) => {
+      unitOf(s, 'caocao').pos = { x: 3, y: 0 }
+    })
+    const after = autoResolveEvents(applyAction(near, { type: 'endPhase' }))
+    expect(after.firedEvents).toContain('s15-jiaxu-move')
+    expect(after.firedEvents).not.toContain('s15-jiaxu-debate')
+    expect(unitOf(after, 'jiaXu').behavior).toBe('pursue')
+  })
+
+  it('Lv19 로스터면 4시드 모두 20턴 안에 보스 2명을 잡고 이긴다 (턴 7 유표 원군 포함)', () => {
+    for (const seed of [42, 7, 1, 99]) {
+      const result = simulate(startBattle(STAGE_15, seed, rosterAt(STAGE_15, 19)), 900)
+      expect(result.result, `seed ${seed}`).toBe('victory')
+      expect(result.turn, `seed ${seed}`).toBeLessThanOrEqual(20)
+      expect(result.units.filter((u) => u.isBoss).every((u) => u.hp === 0), `seed ${seed}`).toBe(true)
+      expect(result.firedEvents, `seed ${seed}`).toContain('s15-liubiao')
+      expect(result.pendingRewards, `seed ${seed}`).toContainEqual({ itemId: 'serpentSpear', kind: 'equipment' })
+    }
+  })
+})
+
 // ---------- 전투 내 이벤트 (v1.1) ----------
 // 소급 콘텐츠 26건의 발동·효과 회귀. 대사 텍스트는 단정하지 않는다(창작물이라 바뀔 수 있다) —
 // 발동 조건, 상태 변화, 시뮬 완주 가능성만 본다.
@@ -530,21 +975,22 @@ function advanceToTurn(state: BattleState, turn: number, pick = 0): BattleState 
   return current
 }
 
-describe('이벤트 데이터 — 소급 콘텐츠 26건', () => {
-  it('11스테이지 전부 이벤트를 갖고 id는 스테이지 안에서 유일하다', () => {
+describe('이벤트 데이터 — v1.2 전량 54건', () => {
+  it('15스테이지 전부 이벤트를 갖고 id는 스테이지 안에서 유일하다', () => {
     const counts = STAGES.map((s) => [s.id, (s.events ?? []).length] as const)
     expect(counts).toEqual([
-      ['stage01', 2], ['stage02', 2], ['stage03', 2], ['stage04', 2], ['stage05', 2], ['stage06', 2],
-      ['stage07', 1], ['stage08', 3], ['stage09', 2], ['stage10', 2], ['stage11', 6],
+      ['stage01', 2], ['stage02', 2], ['stage03', 2], ['stage04', 2], ['stage05', 2], ['stage06', 4],
+      ['stage07', 1], ['stage08', 3], ['stage09', 3], ['stage10', 2], ['stage11', 9],
+      ['stage12', 3], ['stage13', 10], ['stage14', 3], ['stage15', 6],
     ])
-    expect(counts.reduce((n, [, c]) => n + c, 0)).toBe(26)
+    expect(counts.reduce((n, [, c]) => n + c, 0)).toBe(54)
     for (const stage of STAGES) {
       const ids = (stage.events ?? []).map((e) => e.id)
       expect(new Set(ids).size, stage.id).toBe(ids.length)
     }
   })
 
-  it('이벤트가 AI 시뮬을 막지 않는다 — 11스테이지 전부 승패가 나고 대기 큐가 비어 끝난다', () => {
+  it('이벤트가 AI 시뮬을 막지 않는다 — 15스테이지 전부 승패가 나고 대기 큐가 비어 끝난다', () => {
     // 리듀서는 pendingEvents가 남아 있으면 전 액션을 거부한다 — 끝까지 소화되는지가 이 테스트의 핵심
     for (const stage of STAGES) {
       const result = simulate(startBattle(stage, 42, rosterAt(stage, 18)), 800)
@@ -678,6 +1124,49 @@ describe('stage07 — 청주 3책 (원작 c04)', () => {
       const result = simulate(startBattle(STAGE_07, 42, rosterAt(STAGE_07, 14)), 600, undefined, pick)
       expect(result.result, `선택 ${pick}`).toBe('victory')
     }
+  })
+})
+
+describe('stage09 — 부호의 처분 (v1.2)', () => {
+  it('성내 북쪽 골목에 닿으면 선택지가 뜬다 — 용서 = 여포궁 / 추방 = 군자금 3000', () => {
+    const state = autoResolveEvents(startBattle(STAGE_09, 1, rosterAt(STAGE_09, 16)))
+    const inside = situate(state, (s) => {
+      unitOf(s, 'caocao').pos = { x: 7, y: 0 }
+    })
+
+    const spare = autoResolveEvents(applyAction(inside, { type: 'endPhase' }), 0)
+    expect(spare.firedEvents).toContain('s09-fuhao')
+    expect(spare.pendingRewards).toEqual([{ itemId: 'lüBuBow', kind: 'equipment' }])
+    expect(spare.pendingGold).toBe(0)
+
+    const expel = autoResolveEvents(applyAction(inside, { type: 'endPhase' }), 1)
+    expect(expel.firedEvents).toContain('s09-fuhao')
+    expect(expel.pendingRewards).toEqual([])
+    expect(expel.pendingGold).toBe(3000)
+  })
+})
+
+describe('stage11 — 여포군 장수 격파 전리품 (v1.2)', () => {
+  it('진궁·후성·고순 격파 이벤트가 각각 보물을 지급한다', () => {
+    const rewardOf = (eventId: string) =>
+      (STAGE_11.events ?? [])
+        .find((e) => e.id === eventId)!
+        .actions.flatMap((a) => (a.type === 'giveItem' ? [a.itemId] : []))
+    expect(rewardOf('s11-chengong-fall')).toEqual(['fuJin'])
+    expect(rewardOf('s11-houcheng-fall')).toEqual(['leatherHorseArmor'])
+    expect(rewardOf('s11-gaoshun-fall')).toEqual(['bronzeShield'])
+  })
+
+  it('일기토 사망(후성)도 unitDefeated 경로를 타 전리품이 나온다', () => {
+    const state = autoResolveEvents(startBattle(STAGE_11, 1, rosterAt(STAGE_11, 18)))
+    const meet = situate(state, (s) => {
+      unitOf(s, 'caocao').pos = { x: 5, y: 4 } // 후성 (4,4) 인접
+    })
+    const after = autoResolveEvents(applyAction(meet, { type: 'endPhase' }))
+    expect(after.firedEvents).toContain('s11-duel-houcheng')
+    expect(after.firedEvents).toContain('s11-houcheng-fall')
+    expect(after.units.find((u) => u.officerId === 'houCheng')!.hp).toBe(0)
+    expect(after.pendingRewards).toContainEqual({ itemId: 'leatherHorseArmor', kind: 'equipment' })
   })
 })
 

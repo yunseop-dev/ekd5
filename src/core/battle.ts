@@ -1293,9 +1293,11 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
         // 표시형 승격 (v1.2) — UI가 「손에 넣었습니다!」 모달을 띄우고 이 소비로 실제 적재된다.
         // 전투 중 획득은 보류 목록에 쌓이고 승리 시 applyVictory가 회수한다 (패배 시 소멸).
         case 'giveItem': {
-          const name = head.kind === 'equipment' ? EQUIPMENT[head.itemId]?.name : CONSUMABLES[head.itemId]?.name
+          const name =
+            (head.kind === 'equipment' ? EQUIPMENT[head.itemId]?.name : CONSUMABLES[head.itemId]?.name) ??
+            head.itemId
           state.pendingRewards.push({ itemId: head.itemId, kind: head.kind })
-          log(state, 'event', `${name ?? head.itemId}을(를) 손에 넣었다!`)
+          log(state, 'event', `${name}${objectParticle(name)} 손에 넣었다!`)
           pending.queue.shift()
           break
         }

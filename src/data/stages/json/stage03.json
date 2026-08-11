@@ -134,6 +134,9 @@
     { "type": "defeatBoss" }
   ],
   "bonusExp": 150,
+  "defeat": [
+    { "type": "turnLimit", "turns": 20 }
+  ],
   "reinforcements": [
     {
       "trigger": {

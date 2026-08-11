@@ -1,0 +1,440 @@
+{
+  "id": "stage15",
+  "name": "장수 토벌전 2",
+  "weather": "clear",
+  "notes": "스테이지 15 \"장수 토벌전 2\" — 제3부 마지막 전투 (원작 완성 재정벌, 난이도 A)\n검증 목표: **성내 복병(choice 뒤에 공통으로 붙는 spawnUnits)** + **턴 7 제3세력 원군(유표군)**.\n           보스가 2명(장수·가후)이라 bossKill 전리품(인수)은 둘을 모두 잡아야 나온다 —\n           원작 \"전멸 시 인수\" 규칙의 재현이다.\n지형 구성: 북서 성(성내 C 4행 x0~7) + 남문 (4,4) gate D + 동측 성벽 x=8(y0~2),\n           (8,3)은 성벽이 끊긴 트임이다 — 성문 하나만 두면 AI가 병목에서 한 기씩 갈려 5시드 전패였다,\n           성 밖 동쪽·남쪽 개활지에 숲 두 덤불, 북동 (12,1) = 퇴각 승리 지점, 남쪽에서 출진.\n배치 의도: 아군은 남문 (4,4) 또는 동측 트임 (8,3)으로 들어가고, 들어선 순간 성내 좌우에서 복병 4기가 붙는다.\n           선택지는 그 복병을 맞는 자세만 바꾼다 — 「진격한다」는 대사뿐, 「일단 물러선다」는 방어 +10(2턴).\n밸런스: 아군 예상 Lv18~19. 장수·가후 Lv18(둘 다 보스) / 성내 서량병 Lv17 / 야전 2기 Lv16 / 복병·유표 원군 Lv17.\n        가후는 접근 전까지 부동(guard)이며, 그 주변 칸(x0~3·y0~2)에 아군이 닿으면 pursue로 바뀐다.\n        [밸런스 조정] 가후를 (5,1)에 두면 남문 바로 안쪽이 화룡(사거리 3) 사정권이라\n        문을 지난 조조가 그대로 타 죽었다 — 성 북서 구석 (1,1)로 물려 \"깊이 들어가야 만나는 참모\"로 바꿨다.\n        조정 후 5시드 전승(11~18턴). turnLimit 20 + 턴 7 원군 4기라 여유는 없다 — 퇴각 지점 (12,1)이 보험이다.\n---\nv1.2 이벤트 6건\n  ① 개전 대사\n  ② 남문 안쪽 도달 → 급보 대사 + 선택지(진격 / 물러선다=방어 버프) → **양쪽 공통으로 복병 4기 등장**\n     (choice 뒤에 남은 액션은 옵션 소화 후 이어서 실행되므로 spawnUnits를 한 번만 쓴다)\n  ③ 턴 7 유표 원군(형주보병·형주기병 4기, 남서 스폰, pursue) + 대사\n  ④ 조조×가후 인접 → 설전 (duel draw)\n  ⑤ 가후 주변 도달 → 가후 pursue\n  ⑥ 장수 격파 → 사모(serpentSpear)\n  전리품: 보스(장수+가후) 전원 격파 시 인수\n[의도적 이탈] 유표군의 개입은 원작 완성 재정벌에 없다 — 원작의 \"장수+유표 연합\" 설정을\n  턴 7 원군으로 옮긴 창작이다. 형주 부대는 명부의 jingInfantry/jingCavalry를 쓴다.",
+  "map": {
+    "rows": [
+      "CCCCCCCCXPPPPP",
+      "CCCCCCCCXPPPPP",
+      "CCCCCCCCXPPPPP",
+      "CCCCCCCCCPPPPP",
+      "XXXXDXXXXPPPPP",
+      "PPPPPPPPPPPPPP",
+      "PPPFFPPPPFFPPP",
+      "PPPFFPPPPFFPPP",
+      "PPPPPPPPPPPPPP",
+      "PPPPPPPPPPPPPP",
+      "GPPPPPPPPPPPPG",
+      "GGPPPPPPPPPPGG"
+    ]
+  },
+  "playerSlots": [
+    { "x": 6, "y": 10 },
+    { "x": 5, "y": 10 },
+    { "x": 7, "y": 10 },
+    { "x": 4, "y": 10 },
+    { "x": 8, "y": 10 },
+    { "x": 6, "y": 11 },
+    { "x": 7, "y": 11 }
+  ],
+  "deployMin": 5,
+  "deployMax": 7,
+  "forcedOfficers": [
+    "caocao"
+  ],
+  "units": [
+    {
+      "officerId": "caocao",
+      "faction": "player",
+      "pos": { "x": 6, "y": 10 },
+      "isLeader": true
+    },
+    {
+      "officerId": "xiahoudun",
+      "faction": "player",
+      "pos": { "x": 5, "y": 10 }
+    },
+    {
+      "officerId": "xuChu",
+      "faction": "player",
+      "pos": { "x": 7, "y": 10 }
+    },
+    {
+      "officerId": "xiahouyuan",
+      "faction": "player",
+      "pos": { "x": 4, "y": 10 }
+    },
+    {
+      "officerId": "guojia",
+      "faction": "player",
+      "pos": { "x": 8, "y": 10 }
+    },
+    {
+      "officerId": "xunyu",
+      "faction": "player",
+      "pos": { "x": 6, "y": 11 }
+    },
+    {
+      "officerId": "xuHuang",
+      "faction": "player",
+      "pos": { "x": 7, "y": 11 }
+    },
+    {
+      "officerId": "zhangXiu",
+      "faction": "enemy",
+      "pos": { "x": 4, "y": 1 },
+      "level": 18,
+      "isBoss": true,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "jiaXu",
+      "faction": "enemy",
+      "pos": { "x": 1, "y": 1 },
+      "level": 18,
+      "isBoss": true,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": { "x": 3, "y": 3 },
+      "level": 17,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": { "x": 5, "y": 3 },
+      "level": 17,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westArcher",
+      "faction": "enemy",
+      "pos": { "x": 3, "y": 2 },
+      "level": 17,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westArcher",
+      "faction": "enemy",
+      "pos": { "x": 6, "y": 2 },
+      "level": 17,
+      "behavior": "guard"
+    },
+    {
+      "officerId": "westCavalry",
+      "faction": "enemy",
+      "pos": { "x": 10, "y": 4 },
+      "level": 16,
+      "behavior": "pursue"
+    },
+    {
+      "officerId": "westInfantry",
+      "faction": "enemy",
+      "pos": { "x": 11, "y": 5 },
+      "level": 16,
+      "behavior": "pursue"
+    }
+  ],
+  "victory": [
+    { "type": "annihilation" },
+    { "type": "reachPoint", "pos": { "x": 12, "y": 1 }, "unitId": "caocao" }
+  ],
+  "bonusExp": 250,
+  "defeat": [
+    { "type": "turnLimit", "turns": 20 }
+  ],
+  "reinforcements": [],
+  "loot": [
+    {
+      "trigger": "bossKill",
+      "itemId": "insu"
+    }
+  ],
+  "events": [
+    {
+      "id": "s15-open",
+      "trigger": { "type": "battleStart" },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "caocao",
+              "text": "완성이오. …….이 성문 앞에서 전위를 두고 갔소."
+            },
+            {
+              "speaker": "zhangXiu",
+              "text": "또 왔군, 조조! 이번에도 밤에 도망칠 셈이냐!"
+            },
+            {
+              "speaker": "caocao",
+              "text": "…….장수. 오늘은 남문으로 들어가서, 남문으로 나오지 않겠소."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s15-southgate",
+      "trigger": {
+        "type": "reachArea",
+        "area": [
+          { "x": 4, "y": 4 },
+          { "x": 4, "y": 3 },
+          { "x": 8, "y": 3 }
+        ],
+        "faction": "player",
+        "count": 1
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": null,
+              "text": "남문을 지난 순간, 성내 좌우 천막에서 창날이 한꺼번에 일어섰다."
+            },
+            {
+              "speaker": "guojia",
+              "text": "조조님, 복병입니다! 문 안쪽을 비워 두고 기다린 것입니다!"
+            }
+          ]
+        },
+        {
+          "type": "choice",
+          "prompt": "복병이 좌우에서 일어섰다. 어찌할 것인가.",
+          "speaker": "caocao",
+          "options": [
+            {
+              "text": "진격한다. 문은 이미 우리 뒤에 있다.",
+              "actions": [
+                {
+                  "type": "dialogue",
+                  "lines": [
+                    {
+                      "speaker": "caocao",
+                      "text": "…….물러설 문이 아니오. 그대로 밀어붙이시오!"
+                    },
+                    {
+                      "speaker": "xuChu",
+                      "text": "앞은 제가 엽니다. 주공은 제 등 뒤에 붙으십시오."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "일단 물러선다. 진형을 다시 짠다.",
+              "actions": [
+                {
+                  "type": "dialogue",
+                  "lines": [
+                    {
+                      "speaker": "caocao",
+                      "text": "반 걸음 물러서시오. 방패를 앞으로 — 창은 그다음이오."
+                    },
+                    {
+                      "speaker": "guojia",
+                      "text": "옳습니다. 좁은 문 안에서는 먼저 치는 쪽이 손해입니다."
+                    }
+                  ]
+                },
+                {
+                  "type": "buff",
+                  "target": "playerAll",
+                  "stat": "def",
+                  "amount": 10,
+                  "duration": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "spawnUnits",
+          "units": [
+            {
+              "officerId": "westInfantry",
+              "faction": "enemy",
+              "pos": { "x": 1, "y": 3 },
+              "level": 17,
+              "behavior": "pursue"
+            },
+            {
+              "officerId": "westInfantry",
+              "faction": "enemy",
+              "pos": { "x": 7, "y": 3 },
+              "level": 17,
+              "behavior": "pursue"
+            },
+            {
+              "officerId": "westCavalry",
+              "faction": "enemy",
+              "pos": { "x": 2, "y": 3 },
+              "level": 17,
+              "behavior": "pursue"
+            },
+            {
+              "officerId": "westCavalry",
+              "faction": "enemy",
+              "pos": { "x": 6, "y": 3 },
+              "level": 17,
+              "behavior": "pursue"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s15-liubiao",
+      "trigger": { "type": "turnStart", "turn": 7 },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": null,
+              "text": "남서 들에서 낯선 깃발이 올라왔다. 형주의 문양이다."
+            },
+            {
+              "speaker": "xunyu",
+              "text": "유표군입니다. 장수를 버리지 않았습니다 — 뒤가 열렸습니다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "…….유표. 이 싸움을 길게 끌 이유가 하나 더 늘었소. 서둘러 끝내시오!"
+            }
+          ]
+        },
+        {
+          "type": "spawnUnits",
+          "units": [
+            {
+              "officerId": "jingInfantry",
+              "faction": "enemy",
+              "pos": { "x": 0, "y": 9 },
+              "level": 17,
+              "behavior": "pursue"
+            },
+            {
+              "officerId": "jingInfantry",
+              "faction": "enemy",
+              "pos": { "x": 2, "y": 11 },
+              "level": 17,
+              "behavior": "pursue"
+            },
+            {
+              "officerId": "jingCavalry",
+              "faction": "enemy",
+              "pos": { "x": 0, "y": 10 },
+              "level": 17,
+              "behavior": "pursue"
+            },
+            {
+              "officerId": "jingCavalry",
+              "faction": "enemy",
+              "pos": { "x": 1, "y": 11 },
+              "level": 17,
+              "behavior": "pursue"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s15-jiaxu-debate",
+      "trigger": {
+        "type": "unitsMeet",
+        "a": "caocao",
+        "b": "jiaXu"
+      },
+      "actions": [
+        {
+          "type": "duel",
+          "a": "caocao",
+          "b": "jiaXu",
+          "lines": [
+            {
+              "speaker": "jiaXu",
+              "text": "조공. 완성의 그 밤을 짠 것은 장수가 아니라 저입니다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "…….알고 있소. 그래서 그대를 먼저 찾아왔소."
+            },
+            {
+              "speaker": "jiaXu",
+              "text": "그러면 베십시오. 다만 하나만 아십시오 — 저는 이길 쪽만 섬깁니다."
+            },
+            {
+              "speaker": "caocao",
+              "text": "…….그 말이 오늘 그대를 살리는군. 살아서 다시 답하시오."
+            }
+          ],
+          "outcome": {
+            "draw": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "s15-jiaxu-move",
+      "trigger": {
+        "type": "reachArea",
+        "area": [
+          { "x": 0, "y": 0 },
+          { "x": 1, "y": 0 },
+          { "x": 2, "y": 0 },
+          { "x": 3, "y": 0 },
+          { "x": 0, "y": 1 },
+          { "x": 1, "y": 1 },
+          { "x": 2, "y": 1 },
+          { "x": 3, "y": 1 },
+          { "x": 0, "y": 2 },
+          { "x": 1, "y": 2 },
+          { "x": 2, "y": 2 },
+          { "x": 3, "y": 2 }
+        ],
+        "faction": "player",
+        "count": 1
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "jiaXu",
+              "text": "…….여기까지 들어왔습니까. 그러면 저도 앉아 있을 수는 없군요."
+            }
+          ]
+        },
+        {
+          "type": "setBehavior",
+          "officerIds": ["jiaXu"],
+          "behavior": "pursue"
+        }
+      ]
+    },
+    {
+      "id": "s15-zhangxiu-fall",
+      "trigger": {
+        "type": "unitDefeated",
+        "officerId": "zhangXiu"
+      },
+      "actions": [
+        {
+          "type": "dialogue",
+          "lines": [
+            {
+              "speaker": "zhangXiu",
+              "text": "…….가후. 네 말을 들은 것이…… 여기까지였나……."
+            },
+            {
+              "speaker": "caocao",
+              "text": "장수. 그 창은 내가 거두오 — 완성에서 잃은 사람의 값이오."
+            }
+          ]
+        },
+        {
+          "type": "giveItem",
+          "itemId": "serpentSpear",
+          "kind": "equipment"
+        }
+      ]
+    }
+  ]
+}

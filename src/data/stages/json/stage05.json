@@ -132,6 +132,9 @@
     { "type": "annihilation" }
   ],
   "bonusExp": 150,
+  "defeat": [
+    { "type": "turnLimit", "turns": 20 }
+  ],
   "reinforcements": [],
   "loot": [
     {
