@@ -66,6 +66,13 @@ export function DeployScreen({ stage, roster, onConfirm, onBack }: Props) {
   // 강제 제외한 "직접 고른" 장수들 — 배열 순서 = 선택 순서
   const [picked, setPicked] = useState<string[]>([])
   const [sortMode, setSortMode] = useState<SortMode>('default')
+  /**
+   * 「슬롯 순번 = 배치 위치」 인과를 보여주는 양방향 하이라이트 (원작 전술의 절반이 이 규칙이다 —
+   * 2~3번째 자리는 선봉이라 방어가 높은 장수를 넣는다).
+   * 로스터/출진 카드에 올리면 hoverOfficerId, 프리뷰 슬롯에 올리면 hoverSlotIndex 가 선다.
+   */
+  const [hoverOfficerId, setHoverOfficerId] = useState<string | null>(null)
+  const [hoverSlotIndex, setHoverSlotIndex] = useState<number | null>(null)
 
   const deployment = useMemo(() => [...forced, ...picked.filter((id) => !forced.includes(id))], [forced, picked])
 
@@ -120,6 +127,16 @@ export function DeployScreen({ stage, roster, onConfirm, onBack }: Props) {
     return s
   }, [stage.units])
 
+  /**
+   * 지금 강조할 슬롯/장수 — 어느 쪽에서 hover가 들어왔든 같은 한 쌍으로 수렴시킨다.
+   * (장수 → 슬롯 / 슬롯 → 장수 양방향이 한 계산으로 처리된다)
+   */
+  const hoverPairSlot =
+    hoverSlotIndex ??
+    (hoverOfficerId && deployment.includes(hoverOfficerId) ? deployment.indexOf(hoverOfficerId) : null)
+  const hoverPairOfficer =
+    hoverOfficerId ?? (hoverSlotIndex === null ? null : (deployment[hoverSlotIndex] ?? null))
+
   const { width, height, tiles } = stage.map
   const count = deployment.length
   const ok = count >= min && count <= max
@@ -136,7 +153,9 @@ export function DeployScreen({ stage, roster, onConfirm, onBack }: Props) {
       <header className="deploy-header">
         <h2>출진 준비</h2>
         <span className="deploy-stage-name">{stage.name}</span>
-        <span className="deploy-hint">클릭 = 선택/해제 · 우클릭 = 마지막 선택 해제</span>
+        <span className="deploy-hint">
+          클릭 = 선택/해제 · 슬롯 클릭 = 해제 · 우클릭 = 마지막 선택 해제
+        </span>
       </header>
 
       <div className="deploy-grid">
@@ -168,11 +187,20 @@ export function DeployScreen({ stage, roster, onConfirm, onBack }: Props) {
                     'deploy-row',
                     order > 0 ? 'selected' : '',
                     isForced ? 'locked' : '',
+                    hoverPairOfficer === r.officerId ? 'hover-linked' : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
                   onClick={() => toggle(r.officerId)}
-                  title={isForced ? '강제 출진 — 해제할 수 없습니다' : undefined}
+                  onMouseEnter={() => setHoverOfficerId(r.officerId)}
+                  onMouseLeave={() => setHoverOfficerId(null)}
+                  title={
+                    isForced
+                      ? '강제 출진 — 해제할 수 없습니다'
+                      : order > 0
+                        ? `출진 슬롯 ${order} — 클릭하면 해제`
+                        : undefined
+                  }
                 >
                   <span className="roster-icon f-player">{classIcon(cls)}</span>
                   <span className="roster-name">{officer.name}</span>
@@ -205,15 +233,33 @@ export function DeployScreen({ stage, roster, onConfirm, onBack }: Props) {
                   const slotIndex = slotIndexByCell.get(key)
                   const occupantId = slotIndex === undefined ? undefined : deployment[slotIndex]
                   const occupant = occupantId ? OFFICERS[occupantId] : undefined
+                  const isLocked = occupantId ? forced.includes(occupantId) : false
                   return (
                     <div
                       key={key}
-                      className={`dp-tile dt-${terrain.id}`}
+                      className={[
+                        'dp-tile',
+                        `dt-${terrain.id}`,
+                        // 슬롯 칸에만 hover/클릭 반응을 준다 (일반 지형은 정보 표시뿐)
+                        slotIndex === undefined ? '' : 'is-slot',
+                        slotIndex !== undefined && slotIndex === hoverPairSlot ? 'slot-hl' : '',
+                        occupantId && !isLocked ? 'slot-clickable' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
                       style={{ width: PREVIEW_TILE, height: PREVIEW_TILE }}
+                      onMouseEnter={
+                        slotIndex === undefined ? undefined : () => setHoverSlotIndex(slotIndex)
+                      }
+                      onMouseLeave={slotIndex === undefined ? undefined : () => setHoverSlotIndex(null)}
+                      // 채워진 슬롯 클릭 = 그 장수 선택 해제 (강제 출진은 잠금 유지)
+                      onClick={occupantId ? () => toggle(occupantId) : undefined}
                       title={
                         slotIndex === undefined
                           ? `${terrain.name} (${x},${y})`
-                          : `출진 슬롯 ${slotIndex + 1} — ${occupant ? occupant.name : '비어 있음'}`
+                          : occupant
+                            ? `출진 슬롯 ${slotIndex + 1} — ${occupant.name}${isLocked ? ' (강제 출진 — 해제 불가)' : ' · 클릭하면 해제'}`
+                            : `출진 슬롯 ${slotIndex + 1} — 비어 있음`
                       }
                     >
                       {slotIndex !== undefined && (
@@ -252,9 +298,17 @@ export function DeployScreen({ stage, roster, onConfirm, onBack }: Props) {
           <div className={`deploy-count${ok ? '' : ' bad'}`}>
             출진 {count} / {min === max ? min : `${min}~${max}`}
           </div>
+          {/* 순번이 곧 맵 위치라는 사실 — 원작 전술의 절반이 여기서 결정된다 */}
+          <p className="deploy-vanguard-hint">앞 순번이 최전선에 섭니다</p>
           <ol className="deploy-order">
             {deployment.map((id, i) => (
-              <li key={id}>
+              <li
+                key={id}
+                className={hoverPairOfficer === id ? 'hover-linked' : undefined}
+                onMouseEnter={() => setHoverOfficerId(id)}
+                onMouseLeave={() => setHoverOfficerId(null)}
+                title={`출진 슬롯 ${i + 1} — 미리보기에서 위치를 확인하세요`}
+              >
                 <span className="deploy-order-no">{circled(i + 1)}</span>
                 {OFFICERS[id].name}
                 {(() => {

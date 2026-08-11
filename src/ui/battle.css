@@ -37,8 +37,18 @@
   margin: 0 auto;
 }
 
+/* ---------- 상단 정보 스트립 (v1.2 — 원작 확정 2단) ---------- */
+/* 1행: 남색 전투명 바 + 「턴 수 n/최대」 + 페이즈/날씨 + 버튼
+   2행: 승리·패배 조건 상시 노출 (원작은 이 두 줄을 전투 내내 화면 위에 붙여 둔다) */
+
 .battle-header {
   grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.battle-header-top {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -47,6 +57,18 @@
 .battle-header h2 {
   margin: 0;
   font-size: 18px;
+}
+
+/* 전투명 — 원작은 짙은 남색 바 위 흰 글자다 (제목이 아니라 "표지판"처럼 보인다) */
+.stage-name-bar {
+  padding: 5px 14px;
+  background: var(--ekd-navy);
+  border: 1px solid #4a6ba8;
+  border-radius: 3px;
+  color: #fff;
+  letter-spacing: 0.06em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  white-space: nowrap;
 }
 
 .turn-banner {
@@ -59,8 +81,89 @@
 .turn-banner .phase-player { color: #6ab0f3; font-weight: 700; }
 .turn-banner .phase-enemy { color: #e06c5a; font-weight: 700; }
 
-.speed-btn {
+/* 「턴 수 2/20」 — 최대 턴은 곧 패배 조건이라 현재/최대를 늘 함께 보여준다 */
+.turn-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  color: #e8dcc8;
+  white-space: nowrap;
+}
+/* 붉은 아이콘 (원작: 턴 수 앞의 작은 붉은 표식) */
+.turn-count .turn-mark {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  background: #d0392b;
+  border: 1px solid #ffb09c;
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+/* 남은 3턴 — 숫자 자체를 붉게 */
+.turn-count.urgent {
+  color: #ff8a7a;
+  animation: turn-urgent 1.2s ease-in-out infinite;
+}
+.turn-count.urgent .turn-mark { background: #ff5a3c; }
+
+@keyframes turn-urgent {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turn-count.urgent { animation: none; }
+}
+
+/* 승패 조건 줄 — 크림 정보창 톤(원작 정보 스트립)으로 본문과 구분한다 */
+.condition-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 5px 10px;
+  background: rgba(242, 230, 196, 0.08);
+  border: 1px solid #4a4132;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #e2d6bd;
+}
+
+.condition-strip .cond-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.condition-strip .cond-label {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 2px;
+  background: var(--ekd-navy);
+  color: #fff;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.condition-strip .cond-label.defeat { background: #7a2a20; }
+
+/* 지도(줌아웃) 버튼 — 연출 버튼과 같은 톤. 오른쪽 정렬 시작점은 이 버튼이 잡는다 */
+.map-btn {
   margin-left: auto;
+  padding: 8px 12px;
+  background: #3d3527;
+  color: #e8dcc8;
+  border: 1px solid #6a5c40;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.map-btn:hover:not(:disabled) { background: #55482f; }
+.map-btn:disabled { opacity: 0.4; cursor: default; }
+
+.speed-btn {
   padding: 8px 12px;
   background: #3d3527;
   color: #e8dcc8;
@@ -630,6 +733,132 @@
   cursor: pointer;
 }
 
+/* ---------- 줌아웃 전체 지도 (v1.2 — 원작 「지도」) ---------- */
+/* z-index 11 — 결과 오버레이(10) 위, 이벤트 오버레이(12·13) 아래.
+   지형색은 `.tile.t-*` 를 그대로 재사용하고(ZoomMapOverlay가 같은 클래스를 붙인다)
+   여기서는 크기·유닛 블록만 정한다 — 색 값을 두 번 적지 않는다. */
+
+.zoom-map-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 11;
+  cursor: pointer;
+}
+
+.zoom-map-box {
+  max-width: min(92vw, 900px);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: #262119;
+  border: 2px solid #d8b96a;
+  border-radius: 10px;
+  cursor: default;
+}
+
+.zoom-map-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.zoom-map-head h3 {
+  margin: 0;
+  font-size: 14px;
+  color: #d8b96a;
+}
+.zoom-map-size {
+  font-size: 12px;
+  color: #857a66;
+}
+.zoom-map-close {
+  margin-left: auto;
+  padding: 4px 12px;
+  background: #3d3527;
+  color: #e8dcc8;
+  border: 1px solid #6a5c40;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.zoom-map-close:hover { background: #55482f; }
+
+.zoom-map-scroll {
+  overflow: auto;
+  padding: 2px;
+  background: #14100b;
+  border: 1px solid #3a3226;
+  border-radius: 6px;
+}
+
+.zoom-map-grid {
+  display: grid;
+  gap: 1px;
+  width: max-content;
+  /* 좁은 맵은 가운데로 (넘칠 때 auto 마진은 0이 되므로 스크롤이 잘리지 않는다) */
+  margin: 0 auto;
+}
+
+/* `.tile` 의 44px·커서를 축소 지도용으로 덮는다 (크기는 인라인 스타일이 최종 결정) */
+.zoom-map-grid .zm-tile {
+  cursor: default;
+}
+/* 축소 지도에서는 지형 글자·숲 캐노피가 노이즈다 — 색만 남긴다 */
+.zoom-map-grid .zm-tile .terrain-mark { display: none; }
+.zoom-map-grid .zm-tile.t-forest::after { background: rgba(30, 74, 26, 0.2); }
+
+/* 유닛 = 진영색 2×2 블록 (원작 줌아웃은 스프라이트를 그리지 않는다) */
+.zoom-map-grid .zm-unit {
+  position: absolute;
+  inset: 3px;
+  border-radius: 1px;
+  z-index: 4;
+}
+.zm-unit.zu-player,
+.zm-lg.zu-player { background: #3b6fd4; }
+.zm-unit.zu-enemy,
+.zm-lg.zu-enemy { background: #d0392b; }
+.zm-unit.zu-ally,
+.zm-lg.zu-ally { background: #2e9e5b; }
+/* 리더 금테 / 보스 적테 — 전투 보드의 leader·boss 규칙과 같은 색 언어 */
+.zoom-map-grid .zm-unit.leader { box-shadow: 0 0 0 1px #ffd76a; }
+.zoom-map-grid .zm-unit.boss { box-shadow: 0 0 0 1px #ff5a3c; }
+
+/* 불길 — 유닛 아래 층의 주황 블록 */
+.zoom-map-grid .zm-hazard {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 140, 40, 0.75);
+  z-index: 3;
+}
+
+.zoom-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+  color: #bfb39c;
+}
+.zoom-map-legend i.zm-lg {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 4px;
+  border-radius: 1px;
+  vertical-align: -1px;
+}
+.zoom-map-legend i.zm-lg-hazard { background: rgba(255, 140, 40, 0.85); }
+.zoom-map-legend .zoom-map-hint {
+  margin-left: auto;
+  color: #857a66;
+}
+
 /* ---------- 전면 배너 (페이즈 전환 / 승패) ---------- */
 
 .banner-overlay {
@@ -768,36 +997,287 @@
 .stage-card:hover { border-color: #d8b96a; }
 .stage-card .stage-desc { font-size: 13px; color: #bfb39c; margin-top: 4px; }
 
-/* ---------- 전투 내 이벤트 오버레이 (v1.1) ---------- */
-/* DialogueScreen/ChoiceScreen을 그대로 재사용하고, 전장이 보이도록 배경만 반투명으로 덮는다. */
+/* ---------- 전투 내 이벤트 (v1.2 — 원작 말풍선) ---------- */
+/* 대사는 전면 화면이 아니라 맵 위 말풍선이다. 좌표 계산은 SpeechBubble.tsx가 소유하고
+   (TILE 상수 공유) 여기서는 색·테두리·꼬리 모양만 정한다 — 숫자를 두 곳에 적지 않는다. */
 
 .event-overlay {
   position: fixed;
   inset: 0;
-  /* 결과 오버레이(10)·배너(9) 위 — 이벤트 중에는 전장 조작을 막는 최상단 레이어 */
+  /* 결과 오버레이(10)·배너(9) 위 — 이벤트 중에는 전장 조작을 막는 투명 차단막 */
   z-index: 12;
 }
 
-.event-overlay .dialogue-screen {
+/* 보드(.board) 좌표계 표시 레이어 — 차단막보다 위여야 말풍선·버튼이 실제로 눌린다 */
+.event-layer {
   position: absolute;
   inset: 0;
-  z-index: auto; /* 래퍼가 층위를 결정한다 */
-  background: linear-gradient(
-    to bottom,
-    rgba(8, 6, 4, 0.15) 0%,
-    rgba(8, 6, 4, 0.45) 55%,
-    rgba(8, 6, 4, 0.88) 100%
-  );
+  z-index: 13;
 }
 
-.event-overlay .dialogue-top {
-  background: rgba(13, 11, 8, 0.72);
-  border-bottom: 1px solid #4a4132;
+/* 보드 전체를 덮는 「다음」 판정막 (클릭/우클릭 = 한 줄 진행) */
+.sb-catcher {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
 }
 
-.event-overlay .dialogue-box {
-  min-height: 132px;
-  background: rgba(30, 26, 19, 0.97);
+/* 상단 얇은 라벨 — 제목 + 진행 + 건너뛰기 (원작에는 없는 우리 편의 장치라 최소 크기로 둔다) */
+.sb-topbar {
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  pointer-events: none; /* 말풍선/판정막으로 클릭이 흘러가야 한다 */
+}
+/* 라벨은 밝은 지형 위에 얹히므로 어두운 알약 배경으로 대비를 만든다 */
+.sb-title,
+.sb-progress,
+.event-layer .choice-screen .choice-hint {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(13, 11, 8, 0.78);
+}
+.sb-title { color: #f0e2c0; }
+.sb-progress { color: #d3c3a0; }
+.sb-skip {
+  margin-left: auto;
+  pointer-events: auto;
+  padding: 2px 8px;
+  background: rgba(13, 11, 8, 0.8);
+  border: 1px solid #6a5c40;
+  border-radius: 4px;
+  color: #e8dcc8;
+  font-size: 11px;
+  cursor: pointer;
+}
+.sb-skip:hover { background: #55482f; }
+
+/* ----- 말풍선 본체 ----- */
+
+.speech-bubble {
+  position: absolute;
+  cursor: pointer;
 }
 
-.event-overlay .dialogue-text { font-size: 16px; }
+.sb-win {
+  position: relative;
+  background: var(--ekd-cream);
+  border: 2px solid var(--ekd-cream-edge);
+  border-radius: 4px;
+  padding: 8px 12px 10px 10px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55);
+}
+
+/* 화자 이름 — 창 **밖** 좌상단 파란 글자 (원작 확정: 창 안이 아니다) */
+.sb-name {
+  position: absolute;
+  left: 4px;
+  top: -17px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ekd-name-blue);
+  white-space: nowrap;
+  /* 맵 위에 그대로 얹히므로 흰 외곽선으로 지형색과 분리한다 */
+  text-shadow:
+    0 1px 0 #fff,
+    0 -1px 0 #fff,
+    1px 0 0 #fff,
+    -1px 0 0 #fff;
+}
+
+.sb-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+/* 화자가 맵 오른쪽에 있으면 초상도 오른쪽 (원작: 초상이 화자 쪽을 향한다) */
+.speech-bubble.portrait-right .sb-row { flex-direction: row-reverse; }
+
+.sb-portrait {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--ekd-navy);
+  border: 2px solid var(--ekd-cream-edge);
+}
+
+.sb-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ekd-ink);
+  white-space: pre-wrap;
+  /* 본문 최대 3줄 (원작) */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+/* 내레이션 — 이름·초상 없이 이탤릭 (하단 중앙 폴백에서만 나온다) */
+.speech-bubble.narration .sb-text { font-style: italic; text-align: center; }
+
+.sb-next {
+  position: absolute;
+  right: 4px;
+  bottom: 0;
+  font-size: 10px;
+  color: var(--ekd-cream-edge);
+  animation: sb-blink 1s steps(1, end) infinite;
+}
+
+@keyframes sb-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+
+/* 꼬리 — 화자 타일을 지목한다. left는 인라인(tailX)이고 여기서는 모양만 잡는다 */
+.sb-tail {
+  position: absolute;
+  bottom: -9px;
+  margin-left: -8px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 9px solid var(--ekd-cream-edge);
+}
+.sb-tail::after {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: -9px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 7px solid var(--ekd-cream);
+}
+
+/* 위로 뒤집힌 경우(맵 최상단 화자) — 꼬리도 위를 향한다 */
+.speech-bubble.flip .sb-tail {
+  bottom: auto;
+  top: -9px;
+  border-top: none;
+  border-bottom: 9px solid var(--ekd-cream-edge);
+}
+.speech-bubble.flip .sb-tail::after {
+  top: 2px;
+  border-top: none;
+  border-bottom: 7px solid var(--ekd-cream);
+}
+
+/* ----- 아이템 획득 — 초상 없는 중앙 1줄 창 (원작) ----- */
+
+.item-get-window {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100% - 24px);
+  padding: 10px 18px;
+  background: var(--ekd-cream);
+  border: 2px solid var(--ekd-cream-edge);
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  color: var(--ekd-ink);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+/* ----- 전투 내 선택지 — 보드 하단 소형 크림 창 (전면 dim 아님) ----- */
+/* 구조는 ChoiceScreen을 그대로 쓰고 톤만 바꾼다. 캠페인 전면 화면 스타일은 건드리지 않는다. */
+
+.event-layer .choice-screen {
+  position: absolute;
+  inset: auto 0 8px;
+  display: block;
+  z-index: auto;
+  background: none;
+  cursor: default;
+}
+
+.event-layer .choice-screen .dialogue-top {
+  padding: 0 10px 3px;
+  gap: 8px;
+}
+/* 스테이지 이름은 전투 헤더에 이미 있다 — 창 밖 좌상단은 화자 이름(파랑) 자리다 */
+.event-layer .choice-screen .dialogue-title { display: none; }
+.event-layer .choice-screen .choice-hint {
+  font-size: 10px;
+  color: #d3c3a0;
+}
+
+.event-layer .choice-box {
+  position: relative;
+  align-self: auto;
+  width: auto;
+  min-height: 0;
+  margin: 0 8px;
+  padding: 8px 10px;
+  background: var(--ekd-cream);
+  border: 2px solid var(--ekd-cream-edge);
+  border-radius: 4px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.55);
+}
+
+/* 화자 이름은 말풍선과 같은 규칙 — 창 밖 좌상단 파란 글자 (초상 원형은 생략) */
+.event-layer .choice-box .dialogue-portrait-wrap {
+  position: absolute;
+  left: 4px;
+  top: -17px;
+  width: auto;
+  text-align: left;
+}
+.event-layer .choice-box .dialogue-portrait { display: none; }
+.event-layer .choice-box .dialogue-speaker {
+  font-size: 12px;
+  color: var(--ekd-name-blue);
+  text-shadow:
+    0 1px 0 #fff,
+    0 -1px 0 #fff,
+    1px 0 0 #fff,
+    -1px 0 0 #fff;
+}
+
+.event-layer .choice-prompt {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ekd-ink);
+}
+
+.event-layer .choice-option {
+  padding: 4px 8px;
+  border-radius: 2px;
+  font-size: 13px;
+  color: var(--ekd-ink);
+}
+/* 커서 = 풀폭 파란 바 + 흰 글자 (원작) */
+.event-layer .choice-option.active {
+  background: var(--ekd-bar-blue);
+  border-color: var(--ekd-bar-blue);
+  color: #fff;
+}
+.event-layer .choice-num { color: var(--ekd-cream-edge); }
+.event-layer .choice-option.active .choice-num { color: #fff; }

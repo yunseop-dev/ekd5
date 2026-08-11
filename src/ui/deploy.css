@@ -86,6 +86,13 @@
 .deploy-row.locked { cursor: not-allowed; }
 .deploy-row.locked .roster-name { color: #d8b96a; }
 
+/* 양방향 하이라이트 — 로스터 행 ↔ 프리뷰 슬롯이 같은 금색 언어를 쓴다.
+   "이 장수가 맵의 저 자리에 선다"를 색 하나로 잇는다 (원작 전술의 핵심 규칙) */
+.deploy-row.hover-linked {
+  border-color: #ffd76a;
+  box-shadow: 0 0 0 1px rgba(255, 215, 106, 0.55);
+}
+
 .deploy-badge {
   display: flex;
   align-items: center;
@@ -166,6 +173,31 @@
   font-size: 10px;
 }
 
+/* 슬롯 칸 상호작용 — 채워진 슬롯은 클릭으로 해제한다 (강제 출진 슬롯은 커서를 주지 않는다) */
+.dp-tile.is-slot { cursor: default; }
+.dp-tile.slot-clickable { cursor: pointer; }
+
+/* 강조된 슬롯 — 금색 아웃라인 + 펄스. 타일이 16px이라 outline이 안쪽을 먹지 않게 바깥으로 뺀다 */
+.dp-tile.slot-hl {
+  z-index: 2;
+  outline: 2px solid #ffd76a;
+  outline-offset: 0;
+  animation: dp-slot-pulse 1s ease-in-out infinite;
+}
+.dp-tile.slot-hl .dp-slot {
+  border-color: #ffd76a;
+  box-shadow: 0 0 4px 1px rgba(255, 215, 106, 0.75);
+}
+
+@keyframes dp-slot-pulse {
+  0%, 100% { outline-color: rgba(255, 215, 106, 1); }
+  50% { outline-color: rgba(255, 215, 106, 0.35); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dp-tile.slot-hl { animation: none; }
+}
+
 .dp-enemy {
   position: absolute;
   width: 8px;
@@ -203,14 +235,34 @@
   border: 1px solid #ffb09c;
 }
 
-/* 출진 카드 */
+/* 출진 카드 — 원작 출진 화면은 파란 물결 배경 위에 회색 받침대 슬롯이 늘어선다.
+   그 톤을 남색 물결(repeating-linear-gradient) + 항목 하단 타원 그림자로 옮겼다. */
+.deploy-confirm {
+  background:
+    repeating-linear-gradient(
+      115deg,
+      rgba(45, 93, 168, 0.16) 0 6px,
+      rgba(26, 45, 88, 0.16) 6px 14px
+    ),
+    #262119;
+  border-color: #4a5a7a;
+}
+
 .deploy-count {
   font-size: 18px;
   font-weight: 700;
   color: #d8b96a;
-  margin: 4px 0 10px;
+  margin: 4px 0 4px;
 }
 .deploy-count.bad { color: #ff8a7a; }
+
+/* 선봉 안내 — 순번이 곧 최전선이라는 규칙을 한 줄로 못 박는다 */
+.deploy-vanguard-hint {
+  margin: 0 0 10px;
+  font-size: 11px;
+  color: #9cc2ff;
+  letter-spacing: 0.02em;
+}
 
 .deploy-order {
   list-style: none;
@@ -221,11 +273,30 @@
   overflow-y: auto;
 }
 .deploy-order li {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 2px;
+  padding: 4px 2px 7px;
   border-bottom: 1px solid #3a3226;
+}
+/* 받침대 — 순번 아이콘 아래 얕은 타원 그림자 (원작 회색 받침대 슬롯의 느낌만 남긴다) */
+.deploy-order li::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  bottom: 3px;
+  width: 16px;
+  height: 4px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 70%);
+  pointer-events: none;
+}
+.deploy-order li.dim::after { display: none; }
+/* 프리뷰 슬롯 hover와 짝을 이루는 역방향 강조 */
+.deploy-order li.hover-linked {
+  background: rgba(255, 215, 106, 0.14);
+  box-shadow: inset 2px 0 0 #ffd76a;
 }
 .deploy-order-no {
   color: #9cc2ff;

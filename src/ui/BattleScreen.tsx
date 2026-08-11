@@ -6,6 +6,8 @@ import {
   canCast,
   canMove,
   classOf,
+  effectiveDefeat,
+  effectiveVictory,
   isHostile,
   knownStrategies,
   livingUnits,
@@ -46,11 +48,13 @@ import { TERRAIN } from '../data/terrain'
 import { Banner, type BannerProps } from './Banner'
 import { BattleBoard, CLASS_ICON } from './BattleBoard'
 import { BattleLog } from './BattleLog'
+import { defeatText, leaderNameOf, turnLimitOf, victoryText } from './conditionText'
 import { EventOverlay } from './EventOverlay'
 import { ForecastPanel } from './ForecastPanel'
 import { euroRo } from './josa'
 import { TerrainInfoPanel } from './TerrainInfoPanel'
 import { UnitInfoPanel } from './UnitInfoPanel'
+import { ZoomMapOverlay } from './ZoomMapOverlay'
 import './battle.css'
 
 /**
@@ -295,6 +299,8 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
   const [floaters, setFloaters] = useState<Floater[]>([])
   const [banner, setBanner] = useState<BannerSpec | null>(null)
   const [resultShown, setResultShown] = useState(false)
+  /** 줌아웃 전체 지도 (원작 「지도」) — 헤더 버튼으로만 열고 닫는다 */
+  const [zoomMap, setZoomMap] = useState(false)
   const floaterSeq = useRef(0)
   const prevLogLen = useRef(state.log.length)
   const prevPhaseKey = useRef<string | null>(null)
@@ -364,6 +370,12 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
     setPromoteConfirm(null)
     setConfirmEnd(false)
     setInspectId(null)
+  }, [state.pendingEvents.length])
+
+  // 이벤트가 발동하면 전체 지도는 접는다 — 이벤트 오버레이(z 12·13)가 지도(11)를 덮어
+  // "닫을 수 없는 창"처럼 보이는 상태를 만들지 않는다
+  useEffect(() => {
+    if (state.pendingEvents.length > 0) setZoomMap(false)
   }, [state.pendingEvents.length])
 
   // 승급 확인 오버레이 — Escape 로 닫기
@@ -764,8 +776,12 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
 
   // ---------- 키보드 조작 (원작 방향키 + 결정/취소) ----------
 
-  /** 확인창·배너·결과창이 떠 있는가. 이벤트 오버레이는 isPlayerTurn이 이미 걸러낸다 */
-  const overlayOpen = promoteConfirm !== null || confirmEnd || banner !== null || resultShown
+  /**
+   * 확인창·배너·결과창·전체 지도가 떠 있는가. 이벤트 오버레이는 isPlayerTurn이 이미 걸러낸다.
+   * 전체 지도가 여기 포함되어야 Escape가 지도만 닫고 턴 종료 확인창을 열지 않는다.
+   */
+  const overlayOpen =
+    promoteConfirm !== null || confirmEnd || banner !== null || resultShown || zoomMap
 
   /**
    * 화살표 = 커서 이동, Enter/Space = 클릭, Escape = 우클릭(취소).
@@ -889,6 +905,22 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
     }
   }
 
+  /**
+   * 상단 정보 스트립 (원작 확정) — 승리/패배 조건을 전투 내내 상시 노출한다.
+   * effectiveVictory/effectiveDefeat를 매 렌더 읽으므로 setVictory/setDefeat 런타임 교체가
+   * 즉시 반영된다 (원작: 퇴각 선택 → 승리조건 변경, 원술전 → 12턴 상한).
+   */
+  const victory = effectiveVictory(state, stage)
+  const defeat = effectiveDefeat(state, stage)
+  const turnLimit = turnLimitOf(defeat)
+  const conditionVictory = victoryText(victory, state)
+  const conditionDefeat = defeatText(defeat, state, leaderNameOf(state))
+  /** 상한까지 3턴 이하 — 붉게 강조해서 "시간이 없다"를 시각으로 알린다 */
+  const turnUrgent = turnLimit !== null && turnLimit - state.turn <= 2
+
+  /** 이벤트 오버레이가 떠 있으면 지도를 열 수 없다 (오버레이가 12·13을 쓰고 조작을 잠근다) */
+  const mapBlocked = state.pendingEvents.length > 0
+
   /** 대상 지정 중 안내 — 무엇의 대상을 고르는 중인지 + 취소 방법 (빈 칸 클릭은 무반응이다) */
   const targetHint =
     sel?.mode === 'attackTarget'
@@ -904,23 +936,52 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
 
   return (
     <div className="battle-screen">
+      {/*
+        상단 정보 스트립 (원작 확정 2단):
+          1행 — 남색 전투명 바 / 「턴 수 n/최대」 / 페이즈 / 날씨 / 지도·연출·턴 종료
+          2행 — 승리조건·패배조건 상시 노출 (최대 턴이 패배 조건이므로 1행 턴 표시와 짝을 이룬다)
+      */}
       <header className="battle-header">
-        <h2>{stage.name}</h2>
-        <div className="turn-banner">
-          <span>턴 {state.turn}</span>
-          <span className={`phase-${state.phase}`}>{PHASE_LABEL[state.phase]}</span>
-          <span>{state.weather === 'clear' ? '맑음' : '비'}</span>
+        <div className="battle-header-top">
+          <h2 className="stage-name-bar">{stage.name}</h2>
+          <div className="turn-banner">
+            <span className={`turn-count${turnUrgent ? ' urgent' : ''}`}>
+              <i className="turn-mark" aria-hidden="true" />
+              턴 수 {state.turn}
+              {turnLimit !== null && `/${turnLimit}`}
+            </span>
+            <span className={`phase-${state.phase}`}>{PHASE_LABEL[state.phase]}</span>
+            <span>{state.weather === 'clear' ? '맑음' : '비'}</span>
+          </div>
+          <button
+            className="map-btn"
+            onClick={() => setZoomMap(true)}
+            disabled={mapBlocked}
+            title="전체 지도 (줌아웃)"
+          >
+            지도
+          </button>
+          <button
+            className="speed-btn"
+            onClick={() => setSpeed((s) => (s === 1 ? 2 : s === 2 ? 0 : 1))}
+            title="적 턴 연출 속도"
+          >
+            연출: {speed === 1 ? '보통' : speed === 2 ? '빠름' : '생략'}
+          </button>
+          <button className="end-turn-btn" onClick={handleEndTurn} disabled={!isPlayerTurn}>
+            턴 종료
+          </button>
         </div>
-        <button
-          className="speed-btn"
-          onClick={() => setSpeed((s) => (s === 1 ? 2 : s === 2 ? 0 : 1))}
-          title="적 턴 연출 속도"
-        >
-          연출: {speed === 1 ? '보통' : speed === 2 ? '빠름' : '생략'}
-        </button>
-        <button className="end-turn-btn" onClick={handleEndTurn} disabled={!isPlayerTurn}>
-          턴 종료
-        </button>
+        <div className="condition-strip">
+          <span className="cond-item">
+            <em className="cond-label">승리조건</em>
+            {conditionVictory}
+          </span>
+          <span className="cond-item">
+            <em className="cond-label defeat">패배조건</em>
+            {conditionDefeat}
+          </span>
+        </div>
       </header>
 
       <BattleBoard
@@ -939,7 +1000,14 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
         onCellClick={handleCellClick}
         onCellHover={setCursor}
         onCellRightClick={handleRightClick}
-      />
+      >
+        {/*
+          전투 내 이벤트 — 대사 말풍선/선택지/일기토/아이템 획득.
+          보드 안에 두어야 말풍선이 타일 좌표를 그대로 쓰고 보드 스크롤을 따라간다.
+          입력 차단막은 position:fixed 라 여전히 뷰포트 전체를 덮는다 (결과창·배너보다 위).
+        */}
+        <EventOverlay state={state} title={stage.name} onContinue={continueEvent} />
+      </BattleBoard>
 
       <aside className="side-panel">
         {/* ⓞ 대상 지정 안내 — 유효한 칸만 반응하므로 무엇을 찍어야 하는지 알려준다 */}
@@ -1056,6 +1124,9 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
         <BattleLog log={state.log} />
       </aside>
 
+      {/* 줌아웃 전체 지도 (z-index 11) — 이벤트 오버레이(12·13) 아래, 결과창(10) 위 */}
+      {zoomMap && !mapBlocked && <ZoomMapOverlay state={state} onClose={() => setZoomMap(false)} />}
+
       {/* 인수 승급 확인 — 되돌릴 수 없는 조작이라 확인 후 확정. 대상은 사용자와 다를 수 있다 */}
       {promoteConfirm && promoteDef && promoteUser && promoteTargetUnit && promo?.ok && promo.target && (
         <div
@@ -1133,9 +1204,6 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
           onDone={handleBannerDone}
         />
       )}
-
-      {/* 전투 내 이벤트 — 대사/선택지/일기토. 결과창·배너보다 위에 온다 (계약상 동시 표시는 없다) */}
-      <EventOverlay state={state} title={stage.name} onContinue={continueEvent} />
 
       {state.result !== 'ongoing' && resultShown && state.pendingEvents.length === 0 && (
         <div className="result-overlay">

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { classOf, unitAt } from '../core/battle'
 import { keyOf } from '../core/movement'
 import type { BattleState, Hazard, StatusId, UnitState, Vec2 } from '../core/types'
@@ -6,7 +6,8 @@ import { STATUSES } from '../data/statuses'
 import { TERRAIN } from '../data/terrain'
 import type { Floater } from './BattleScreen'
 
-const TILE = 45 // 44px 타일 + 1px gap
+/** 44px 타일 + 1px gap — 보드 좌표계의 단일 출처 (말풍선 앵커 계산도 이 값을 쓴다) */
+export const TILE = 45
 
 const CLASS_ICON: Record<string, string> = {
   lord: '主',
@@ -60,6 +61,8 @@ interface Props {
   onCellClick: (pos: Vec2) => void
   onCellHover: (pos: Vec2 | null) => void
   onCellRightClick?: (pos: Vec2) => void
+  /** 보드 좌표계에 얹히는 레이어 (이벤트 말풍선 등) — .board 마지막 자식으로 들어간다 */
+  children?: ReactNode
 }
 
 function UnitToken({ unit, active }: { unit: UnitState; active: boolean }) {
@@ -124,6 +127,7 @@ export function BattleBoard({
   onCellClick,
   onCellHover,
   onCellRightClick,
+  children,
 }: Props) {
   const { width, height, tiles } = state.map
 
@@ -194,6 +198,7 @@ export function BattleBoard({
             {f.text}
           </div>
         ))}
+        {children}
       </div>
     </div>
   )
