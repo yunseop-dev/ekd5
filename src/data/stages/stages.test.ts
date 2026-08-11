@@ -1190,16 +1190,41 @@ describe('stage11 — 여포군 장수 격파 전리품 (v1.2)', () => {
 })
 
 describe('stage09 / stage11 — 일기토 (원작 확정 결과)', () => {
-  it('stage09 조조×여포: 인접만으로 자동 발동하고 무승부로 끝난다 (경험치 없음)', () => {
+  it('duel 액션은 원작 1장 일기토 목록 안에서만 쓰인다 (kr-blog §R1의 11건 중 6건)', () => {
+    const duels: string[] = []
+    for (const stage of STAGES) {
+      for (const e of stage.events ?? []) {
+        for (const a of e.actions) if (a.type === 'duel') duels.push(`${stage.id}:${a.a}×${a.b}`)
+      }
+    }
+    // 원작 11건 중 우리가 재현한 6건. 나머지 5건(관우×화웅, 여포×유비/관우/장비, 전위×장료)은
+    // 해당 장수가 그 스테이지에 배치되지 않아 미구현이다 — kr-blog.md §R1의 미구현 목록 참조.
+    expect(duels.sort()).toEqual([
+      'stage10:xiahoudun×caoXing',   // 서주 구원전 — 개전 동시, 무승부 + 하후돈 실명 (원작 확정)
+      'stage11:caocao×diaochan',     // 여포 포위전 — 무승부
+      'stage11:caocao×houCheng',     // 여포 포위전 — 후성 사망
+      'stage11:xiahoudun×weiXu',     // 여포 포위전 — 위속 사망
+      'stage11:xiahouyuan×songXian', // 여포 포위전 — 송헌 사망
+      'stage13:dianwei×huCheEr',     // 장수 토벌전 — 무승부 (호거아는 통상 전투로 잡아야 비룡도복)
+      'stage14:caocao×yuanShu',      // [창작] 원술 설전 — 원작에 승패 기록이 없어 무승부로 고정
+      'stage15:caocao×jiaXu',        // [창작] 가후 설전 — 원작 장수 토벌전 2도 일기토는 없다
+    ].sort())
+  })
+
+  it('stage09 조조×여포: 일기토가 아니라 대사 연출이다 (원작 복양 3연전은 일기토 없음)', () => {
+    // 원작 1장의 정식 일기토는 11건이고 복양전은 그 목록에 없다 — biglobe도 thewiki도 「일기토 없음」이며
+    // 한국어 공략은 접촉 장면을 「단순히 칼을 주고 받습니다」로만 적는다 (kr-blog §R1).
     const state = autoResolveEvents(startBattle(STAGE_09, 1, rosterAt(STAGE_09, 16)))
     const meet = situate(state, (s) => {
       unitOf(s, 'caocao').pos = { x: 5, y: 4 } // 여포 (5,3) 인접
     })
     const after = autoResolveEvents(applyAction(meet, { type: 'endPhase' }))
-    expect(after.firedEvents).toContain('s09-lubu-duel')
+    expect(after.firedEvents).toContain('s09-lubu-clash')
+    expect((STAGE_09.events ?? []).find((e) => e.id === 's09-lubu-clash')!.actions.map((a) => a.type))
+      .toEqual(['dialogue'])
     expect(unitOf(after, 'lüBu').hp).toBeGreaterThan(0)
     expect(unitOf(after, 'caocao').hp).toBeGreaterThan(0)
-    expect(unitOf(after, 'caocao').exp).toBe(0) // 무승부는 무보상
+    expect(unitOf(after, 'caocao').exp).toBe(0) // 연출이라 무보상
   })
 
   it('stage11 위속×하후돈: 아군이 이기고 적장이 죽는다 (배반·투항이 아니다)', () => {
