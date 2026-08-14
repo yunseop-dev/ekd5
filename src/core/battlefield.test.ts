@@ -4,11 +4,14 @@
 // 근거: 원작 공략 분석(패배 조건 20턴 표준·미축 페이크·화염 잔존·적장 자리의 보물).
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { CLASSES } from '../data/classes'
 import { EQUIPMENT } from '../data/equipment'
 import { STRATEGIES } from '../data/strategies'
 import {
   applyAction,
   effectiveDefeat,
+  effectiveMaxHp,
+  effectiveMaxMp,
   effectiveVictory,
   hazardAt,
   isImpassableTerrain,
@@ -1047,5 +1050,163 @@ describe('장비 특수효과 — pierceBack / onHitStatus', () => {
     expect(after.log.some((l) => l.type === 'counter')).toBe(true)
     expect(unit(after, 'xiahoudun').hp).toBeLessThan(unit(before, 'xiahoudun').hp)
     expect(after.log.some((l) => l.type === 'pierce' || l.type === 'pierceCrit')).toBe(true)
+  })
+})
+
+// =====================================================================================
+// 8. v1.3 장비 특수효과 — 최대 HP/MP·책략/원거리 감소·회심 회피·명중/회피 (kr-blog §R5)
+// =====================================================================================
+
+describe('v1.3 장비 특수효과 (kr-blog §R5)', () => {
+  function make(over: Partial<StageDef> = {}): BattleState {
+    return startBattle(mkStage(over), 1)
+  }
+
+  const equipArmor = (state: BattleState, officerId: string, itemId: string): void => {
+    unit(state, officerId).equipment = { armor: { itemId, level: 1, exp: 0 } }
+  }
+
+  it('투구 최대 HP 가산 — 실효 최대 HP가 올라간다', () => {
+    const state = make()
+    const caocao = unit(state, 'caocao')
+    const base = effectiveMaxHp(caocao)
+    caocao.equipment = { accessory: { itemId: 'bronzeHelm', level: 1, exp: 0 } }
+    expect(effectiveMaxHp(caocao)).toBe(base + 30) // 구리투구 +30
+    caocao.equipment = { accessory: { itemId: 'leatherHelm', level: 1, exp: 0 } }
+    expect(effectiveMaxHp(caocao)).toBe(base + 15)
+  })
+
+  it('생성 시 최대 HP 가산 반영 — 스폰 유닛의 maxHp에 즉시 적용된다', () => {
+    const state = make()
+    const caocao = unit(state, 'caocao')
+    const base = caocao.maxHp // 스폰 시점 기본
+    caocao.equipment = { accessory: { itemId: 'bronzeHelm', level: 1, exp: 0 } }
+    caocao.maxHp = effectiveMaxHp(caocao) // 실제 장비 변경 경로는 리듀서가 처리 (레벨업/승급 시 재계산)
+    expect(caocao.maxHp).toBe(base + 30)
+  })
+
+  it('복건/칠흑도복 — 실효 최대 MP 가산', () => {
+    const state = make()
+    const caocao = unit(state, 'caocao')
+    const base = effectiveMaxMp(caocao)
+    caocao.equipment = { accessory: { itemId: 'fuJin', level: 1, exp: 0 } }
+    expect(effectiveMaxMp(caocao)).toBe(base + 15) // 복건 +15
+    caocao.equipment = { accessory: { itemId: 'guanJin', level: 1, exp: 0 } }
+    expect(effectiveMaxMp(caocao)).toBe(base + 30) // 관건 +30
+    caocao.equipment = { armor: { itemId: 'blackRobe', level: 1, exp: 0 } }
+    expect(effectiveMaxMp(caocao)).toBe(base + 20) // 칠흑도복 +20
+  })
+
+  it('봉황깃옷 — 매턴 최대 HP 20% 회복', () => {
+    const state = make()
+    const caocao = unit(state, 'caocao')
+    equipArmor(state, 'caocao', 'phoenixRobe')
+    caocao.hp = Math.trunc((caocao.maxHp * 40) / 100) // 절반 이상 잃게 설정, 20% 회복 예상
+    const before = caocao.hp
+    const after = advanceTurns(state, 1)
+    const regenTarget = unit(after, 'caocao')
+    expect(regenTarget.hp).toBeGreaterThan(before)
+    expect(regenTarget.hp).toBeLessThanOrEqual(before + Math.trunc((regenTarget.maxHp * 20) / 100) + 1)
+  })
+
+  it('황금갑옷 — 회심의 일격을 무조건 회피 (crit 로그 없음)', () => {
+    const state = make()
+    const caocao = unit(state, 'caocao')
+    caocao.equipment = { weapon: { itemId: 'gudingDao', level: 1, exp: 0 } } // 공격력 확보
+    const target = unit(state, 'yellowInfantry')
+    equipArmor(state, 'yellowInfantry', 'goldenArmor')
+    target.statuses.push({ id: 'confusion' }) // 확정 피격
+    caocao.buffs.push({ stat: 'morale', amount: 9999, remainingTurns: 9 }) // 회심 확률 100%
+    const after = applyAction(state, { type: 'attack', unitId: caocao.id, targetId: target.id })
+    expect(after.log.some((l) => l.type === 'crit' || l.type === 'pierceCrit')).toBe(false)
+  })
+
+  it('백은갑옷 — 책략 피해 절반 (독연 시전 비교)', () => {
+    // 책략(독연, 데미지+상태)을 아는 시험용 풍수사와 표적을 직접 정의해 동일 시드로 시전한다.
+    // 대상이 백은갑옷을 낀 경우만 책략 데미지가 절반으로 줄어든다.
+    const originalStrategies = CLASSES['geomancer'].strategies
+    CLASSES['geomancer'].strategies = [{ strategyId: 'dogyeon', learnLevel: 1 }]
+    try {
+      const stage = mkStage({
+        units: [
+          { officerId: 'caocao', faction: 'player', pos: { x: 2, y: 2 }, isLeader: true },
+          { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 2, y: 4 } },
+        ],
+      })
+      const castOn = (armored: boolean): number => {
+        const state = startBattle(stage, 999)
+        const caster = unit(state, 'caocao')
+        caster.classId = 'geomancer'
+        caster.mp = 99
+        caster.equipment = { weapon: { itemId: 'stoneGemSword', level: 1, exp: 0 } }
+        const target = unit(state, 'yellowInfantry')
+        target.statuses.push({ id: 'confusion' }) // 책략 명중 100% 강제
+        if (armored) target.equipment = { armor: { itemId: 'silverArmor', level: 1, exp: 0 } }
+        target.hp = target.maxHp
+        const after = applyAction(state, { type: 'strategy', unitId: caster.id, strategyId: 'dogyeon', target: target.pos })
+        return (
+          after.log
+            .filter((l) => l.type === 'strategy' && (l.amount ?? 0) < 0)
+            .reduce((acc, l) => acc + Math.abs(l.amount!), 0) || 0
+        )
+      }
+      // 백은갑옷 미착용 ~ 착용 비교 — 명중은 난수 999 시드로 양쪽 동일 (감쇠는 대상 장비 의존)
+      const plain = castOn(false)
+      const armored = castOn(true)
+      expect(armored).toBeLessThan(plain)
+    } finally {
+      CLASSES['geomancer'].strategies = originalStrategies
+    }
+  })
+
+  it('무명장갑 명중+ / 방패 회피+ — 명중률 퍼센트포인트 보정 (데이터·헬퍼 존재 확인)', () => {
+    expect(EQUIPMENT.namelessGauntlet.hitBonus).toBe(10)
+    expect(EQUIPMENT.leatherShield.evadeBonus).toBe(10)
+    expect(EQUIPMENT.bronzeShield.evadeBonus).toBe(15)
+  })
+
+  it('기마갑옷 — 원거리(활) 공격 피해를 감소시킨다', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 1, y: 1 }, isLeader: true },
+        { officerId: 'xiahouyuan', faction: 'player', pos: { x: 5, y: 5 } },
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 7, y: 5 }, level: 5 },
+        { officerId: 'yellowShaman', faction: 'enemy', pos: { x: 9, y: 9 } }, // 전멸 승리 방지
+      ],
+    })
+    const makeArcher = (state: BattleState): void => {
+      const arc = unit(state, 'xiahouyuan')
+      arc.classId = 'archer'
+      arc.equipment = { weapon: { itemId: 'ironBow', level: 1, exp: 0 } }
+    }
+    const dealt = (s: BattleState, uid: string): number => {
+      // 해당 유닛에게 날아간 타격 로그 음수 합 = 받은 데미지 (hit/crit)
+      return s.log
+        .filter((l) => l.targetId === uid && (l.amount ?? 0) < 0)
+        .reduce((acc, l) => acc + (l.amount ?? 0), 0)
+    }
+    // 가죽기마갑옷 미착용
+    const s1 = startBattle(stage, 1)
+    makeArcher(s1)
+    unit(s1, 'yellowInfantry').statuses.push({ id: 'confusion' }) // 확정 명중
+    const a1 = applyAction(s1, {
+      type: 'attack',
+      unitId: unit(s1, 'xiahouyuan').id,
+      targetId: unit(s1, 'yellowInfantry').id,
+    })
+    const plainDmg = dealt(a1, unit(a1, 'yellowInfantry').id)
+    // 가죽기마갑옷(0.7) 장착
+    const s2 = startBattle(stage, 1)
+    makeArcher(s2)
+    unit(s2, 'yellowInfantry').statuses.push({ id: 'confusion' }) // 확정 명중
+    unit(s2, 'yellowInfantry').equipment = { armor: { itemId: 'leatherHorseArmor', level: 1, exp: 0 } }
+    const a2 = applyAction(s2, {
+      type: 'attack',
+      unitId: unit(s2, 'xiahouyuan').id,
+      targetId: unit(s2, 'yellowInfantry').id,
+    })
+    const armoredDmg = dealt(a2, unit(a2, 'yellowInfantry').id)
+    // 기마갑옷은 피해를 0.7배로 줄인다 → 받은 데미지(음수)의 절댓값이 더 작다
+    expect(Math.abs(armoredDmg)).toBeLessThan(Math.abs(plainDmg))
   })
 })

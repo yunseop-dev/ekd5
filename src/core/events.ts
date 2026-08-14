@@ -8,15 +8,14 @@
 // events → battle: applyAction). 양쪽 모두 **함수 선언**만 참조하고 모듈 초기화 시점에
 // 호출하지 않으므로 ESM 호이스팅으로 안전하다.
 
-import { CLASSES } from '../data/classes'
 import { CONSUMABLES } from '../data/consumables'
 import { EQUIPMENT } from '../data/equipment'
 import { OFFICERS } from '../data/officers'
 import { statusName } from '../data/statuses'
 import { TERRAIN } from '../data/terrain'
-import { applyAction, hazardAt, isImpassableTerrain } from './battle'
+import { applyAction, effectiveMaxHp, effectiveMaxMp, hazardAt, isImpassableTerrain } from './battle'
 import { itemKindOf, toEquipmentMap } from './campaign'
-import { applyExp, maxHp, maxMp } from './formulas'
+import { applyExp } from './formulas'
 import { chebyshev } from './movement'
 import type {
   BattleState,
@@ -108,9 +107,9 @@ export function spawnStageUnit(state: BattleState, def: StageUnitDef, id: string
   if (occupied(state, def.pos)) return false
   const officer = OFFICERS[def.officerId]
   if (!officer) return false
-  const cls = CLASSES[officer.classId]
   const level = def.level ?? officer.level
-  state.units.push({
+  const equipment = toEquipmentMap(def.equipment ?? officer.initialEquipment)
+  const unit: UnitState = {
     id,
     officerId: def.officerId,
     classId: officer.classId,
@@ -118,19 +117,25 @@ export function spawnStageUnit(state: BattleState, def: StageUnitDef, id: string
     pos: { ...def.pos },
     level,
     exp: 0,
-    hp: maxHp(cls, level),
-    maxHp: maxHp(cls, level),
-    mp: maxMp(cls, level),
-    maxMp: maxMp(cls, level),
+    hp: 0,
+    maxHp: 0,
+    mp: 0,
+    maxMp: 0,
     moved: false,
     acted: false,
     statuses: [],
     buffs: [],
-    equipment: toEquipmentMap(def.equipment ?? officer.initialEquipment),
+    equipment,
     isLeader: def.isLeader,
     isBoss: def.isBoss,
     behavior: def.behavior,
-  })
+  }
+  // 장비 특수효과(최대 HP/MP 가산) 포함 실효 최대치 (v1.3 — kr-blog §R5)
+  unit.maxHp = effectiveMaxHp(unit)
+  unit.maxMp = effectiveMaxMp(unit)
+  unit.hp = unit.maxHp
+  unit.mp = unit.maxMp
+  state.units.push(unit)
   return true
 }
 
@@ -284,9 +289,9 @@ function runImmediate(state: BattleState, eventId: string, action: EventAction):
       if (targets.length === 0 || action.amount === 0) return
       for (const unit of targets) {
         unit.level = Math.min(MAX_LEVEL, Math.max(1, unit.level + action.amount))
-        const cls = CLASSES[unit.classId]
-        unit.maxHp = maxHp(cls, unit.level)
-        unit.maxMp = maxMp(cls, unit.level)
+        // 적도 장비(적장 장비) 최대치 가산을 받는다 — 실효 계산 유지 (v1.3, kr-blog §R5)
+        unit.maxHp = effectiveMaxHp(unit)
+        unit.maxMp = effectiveMaxMp(unit)
         // 원작 정예화 연출과 동일하게 완전회복시킨다 (승급/인수와 같은 처리)
         unit.hp = unit.maxHp
         unit.mp = unit.maxMp
@@ -362,14 +367,13 @@ function runImmediate(state: BattleState, eventId: string, action: EventAction):
       unit.exp = progress.exp
       log(state, `${nameOf(unit)} — 경험치 +${action.amount}`)
       if (progress.levelsGained > 0) {
-        const cls = CLASSES[unit.classId]
-        const newMaxHp = maxHp(cls, progress.level)
-        const newMaxMp = maxMp(cls, progress.level)
+        unit.level = progress.level
+        const newMaxHp = effectiveMaxHp(unit)
+        const newMaxMp = effectiveMaxMp(unit)
         unit.hp += newMaxHp - unit.maxHp
         unit.mp += newMaxMp - unit.maxMp
         unit.maxHp = newMaxHp
         unit.maxMp = newMaxMp
-        unit.level = progress.level
         state.log.push({ type: 'levelUp', message: `${nameOf(unit)} 레벨 ${progress.level} 달성!` })
       }
       return

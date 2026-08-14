@@ -143,6 +143,32 @@ describe('EQUIPMENT — v1.2 신규 20종', () => {
     expect(Object.values(EQUIPMENT).filter((i) => i.onHitStatus).map((i) => i.id)).toEqual(['lüBuBow'])
     expect(Object.values(EQUIPMENT).filter((i) => i.rangedAttack).map((i) => i.id)).toEqual(['moYuJian'])
   })
+
+  it('v1.3 특수효과 필드 — 최대 HP/MP·책략·원거리·회심·회피·명중 (kr-blog §R5 확정)', () => {
+    // 최대 HP/MP 가산
+    expect(EQUIPMENT.leatherHelm.maxHpBonus).toBe(15)
+    expect(EQUIPMENT.bronzeHelm.maxHpBonus).toBe(30)
+    expect(EQUIPMENT.fuJin.maxMpBonus).toBe(15)
+    expect(EQUIPMENT.guanJin.maxMpBonus).toBe(30)
+    expect(EQUIPMENT.blackRobe.maxMpBonus).toBe(20)
+    // 매턴 회복
+    expect(EQUIPMENT.phoenixRobe.hpRegenPercent).toBe(20)
+    // 회심/연속공격 방어
+    expect(EQUIPMENT.goldenArmor.critImmune).toBe(true)
+    expect(EQUIPMENT.chainArmor.secondHitEvade).toBe(true)
+    // 책략/원거리 피해 감소
+    expect(EQUIPMENT.silverArmor.strategyDamageScale).toBe(0.5)
+    expect(EQUIPMENT.leatherHorseArmor.rangedDamageScale).toBe(0.7)
+    expect(EQUIPMENT.bronzeHorseArmor.rangedDamageScale).toBe(0.5)
+    // 명중/회피 보정
+    expect(EQUIPMENT.namelessGauntlet.hitBonus).toBe(10)
+    expect(EQUIPMENT.leatherShield.evadeBonus).toBe(10)
+    expect(EQUIPMENT.bronzeShield.evadeBonus).toBe(15)
+    // 특정 필드는 해당 장비에만 붙는다
+    expect(Object.values(EQUIPMENT).filter((i) => i.critImmune).map((i) => i.id)).toEqual(['goldenArmor'])
+    expect(Object.values(EQUIPMENT).filter((i) => i.secondHitEvade).map((i) => i.id)).toEqual(['chainArmor'])
+    expect(Object.values(EQUIPMENT).filter((i) => i.strategyDamageScale).map((i) => i.id)).toEqual(['silverArmor'])
+  })
 })
 
 // ---------- 장수 (v1.2 신규 21명) ----------

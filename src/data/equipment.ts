@@ -267,10 +267,12 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     id: 'leatherShield',
     name: '가죽 방패',
     slot: 'accessory',
+    // 원작 확정: 물리 회피 +10% (kr-blog §R5 방패 / equipment.md §2 +15% 표준의 하위)
     bonus: { def: 8 },
+    evadeBonus: 10,
     price: 500,
     tier: 1,
-    description: '가죽을 덧댄 작은 방패.',
+    description: '가죽을 덧댄 작은 방패. 뒤로 물러서며 화살을 비껴낸다.',
   },
   swiftHorse: {
     id: 'swiftHorse',
@@ -289,37 +291,45 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     id: 'namelessGauntlet',
     name: '무명장갑',
     slot: 'accessory',
-    bonus: { atk: 3 }, // [설계값]
+    // 원작 확정: 명중률 +10% (kr-blog §R5 — 「무명」은 무명천의 그 무명)
+    bonus: { atk: 3 },
+    hitBonus: 10,
     price: 200,
     tier: 1,
-    description: '이름 없는 장인이 지은 가죽 장갑. 손아귀에 힘이 들어간다.',
+    description: '이름 없는 장인이 지은 가죽 장갑. 팔이 안정돼 화살이 정확히 나간다.',
   },
   leatherHelm: {
     id: 'leatherHelm',
     name: '가죽투구',
     slot: 'accessory',
-    bonus: { def: 3 }, // [설계값]
+    // 원작 확정: 최대 HP +15 (kr-blog §R5 — 보병계 투구는 HP 최대치를 올린다)
+    bonus: { def: 3 },
+    maxHpBonus: 15,
     price: 250,
     tier: 1,
-    description: '가죽을 겹쳐 만든 투구. 머리부터 지키는 것이 병법이다.',
+    description: '가죽을 겹쳐 만든 투구. 머리를 지키고 숨통을 트이게 한다.',
   },
   bronzeHelm: {
     id: 'bronzeHelm',
     name: '구리투구',
     slot: 'accessory',
-    bonus: { def: 6 }, // [설계값]
+    // 원작 확정: 최대 HP +30 (kr-blog §R5)
+    bonus: { def: 6 },
+    maxHpBonus: 30,
     price: 500,
     tier: 2,
-    description: '구리를 두드려 만든 투구. 화살을 비껴낸다.',
+    description: '구리를 두드려 만든 투구. 화살을 비껴내고 자세도 잡아준다.',
   },
   bronzeShield: {
     id: 'bronzeShield',
     name: '구리방패',
     slot: 'accessory',
-    bonus: { def: 8 }, // [설계값]
+    // 원작 확정: 물리 회피 +15% (kr-blog §R5 방패 / equipment.md §2 +15% 표준)
+    bonus: { def: 8 },
+    evadeBonus: 15,
     price: 600,
     tier: 2,
-    description: '구리를 덧댄 방패. 한 몸을 가리기에 넉넉하다.',
+    description: '구리를 덧댄 방패. 창끝·화살을 넓게 비껴낸다.',
   },
 
   // ---------- 보물 (비매품 · 판매 불가) ----------
@@ -424,14 +434,14 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     name: '칠흑도복',
     slot: 'armor',
     classes: ['strategist', 'geomancer'],
-    // 원작 방어 12(+9) — 도복 3종 중 최하. 본체 효과는 **MP 최대치 +20**이나 우리 EquipmentDef에
-    // 최대 MP 가산 필드가 없어 미반영이다 [알려진 갭 — kr-blog.md §R5]
+    // 원작 방어 12(+9) — 도복 3종 중 최하. 본체 효과: **최대 MP +20** (kr-blog §R5 확정)
     bonus: { def: 28 },
+    maxMpBonus: 20,
     price: null,
     tier: 2,
     isTreasure: true,
     growthStat: 'def',
-    description: '먹을 들인 검은 도복. 문관의 몸을 화살로부터 가린다.',
+    description: '먹을 들인 검은 도복. 문관의 몸을 화살로부터 가리고 묵은 기운을 머금는다.',
   },
   flyingDragonRobe: {
     id: 'flyingDragonRobe',
@@ -451,64 +461,85 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     name: '봉황깃옷',
     slot: 'armor',
     classes: ['strategist', 'geomancer'],
-    // 원작 방어 12(+9) — 칠흑과 동급이고 비룡보다 낮다. 값이 아니라 **매 턴 최대 HP 20% 회복**이
-    // 이 옷의 본체다(청낭서와 비중첩, 회복 지형과 중첩) — 우리는 hpRegen 필드가 없어 미반영
-    // [알려진 갭 — kr-blog.md §R5]
+    // 원작 방어 12(+9) — 칠흑과 동급. 값은 **매 턴 최대 HP 20% 회복**이 본체 (kr-blog §R5:
+    // 청낭서와 비중첩, 회복 지형과 중첩) — hpRegenPercent로 구현
     bonus: { def: 28 },
+    hpRegenPercent: 20,
     price: null,
     tier: 3,
     isTreasure: true,
     growthStat: 'def',
-    description: '봉황의 깃을 엮어 지은 옷. 문관이 걸치는 최상의 방어구다.',
+    description: '봉황의 깃을 엮어 지은 옷. 걸치면 상처가 어느새 아문다.',
   },
   silverArmor: {
     id: 'silverArmor',
     name: '백은갑옷',
     slot: 'armor',
     classes: ['lord', 'heavyInfantry'],
-    bonus: { def: 42 }, // [설계값]
+    // 원작 확정: 방 18(+9) + **책략 피해 1/2** (kr-blog §R5) — strategyDamageScale로 구현
+    bonus: { def: 42 },
+    strategyDamageScale: 0.5,
     price: null,
     tier: 3,
     isTreasure: true,
     growthStat: 'def',
-    description: '흰 은으로 벼린 갑옷. 진중에서 멀리서도 눈에 띈다.',
+    description: '흰 은으로 벼린 갑옷. 요술·책략의 기운이 스민 화살을 무디게 한다.',
   },
   chainArmor: {
     id: 'chainArmor',
     name: '연환갑옷',
     slot: 'armor',
     classes: ['lord', 'heavyInfantry'],
+    // 원작 확정: 방 18(+9) + **연속공격 2번째 타격만 회피** (kr-blog §R5) — secondHitEvade로 구현.
     // 원작 복양 3연전의 보물 3종 분기 중 하나 (statuses.md §복양 — 이광궁/연환갑/여포궁)
-    bonus: { def: 46 }, // [설계값]
+    bonus: { def: 46 },
+    secondHitEvade: true,
     price: null,
     tier: 3,
     isTreasure: true,
     growthStat: 'def',
-    description: '고리를 이어 붙인 갑옷. 창날이 고리 사이에서 멎는다.',
+    description: '고리를 이어 붙인 갑옷. 창날이 고리 사이에서 멎고 두 번째 번쩍임을 비껴낸다.',
   },
   leatherHorseArmor: {
     id: 'leatherHorseArmor',
     name: '가죽기마갑옷',
     slot: 'armor',
     classes: ['lightCavalry'],
-    // 원작 기마갑옷은 간접 피해 -50%가 본질이나 우리에겐 해당 필드가 없어 방어치로 환산 [의도적 단순화]
-    bonus: { def: 30 }, // [설계값]
+    // 원작 기마갑옷 본질은 **간접 피해 감소** (kr-blog §R5: 가죽 −30%) — rangedDamageScale로 구현
+    bonus: { def: 30 },
+    rangedDamageScale: 0.7,
     price: null,
     tier: 2,
     isTreasure: true,
     growthStat: 'def',
-    description: '말까지 감싸는 가죽 갑옷. 화살이 말을 노려도 견딘다.',
+    description: '말까지 감싸는 가죽 갑옷. 활·포차의 화살을 견디며 기마의 민첩을 살린다.',
+  },
+  bronzeHorseArmor: {
+    id: 'bronzeHorseArmor',
+    name: '구리기마갑옷',
+    slot: 'armor',
+    classes: ['lightCavalry'],
+    // 원작 확정: 간접 피해 −50% (kr-blog §R5) — 가죽 갑옷의 상위
+    bonus: { def: 52 },
+    rangedDamageScale: 0.5,
+    price: null,
+    tier: 3,
+    isTreasure: true,
+    growthStat: 'def',
+    description: '구리 비늘로 말을 두른 갑옷. 비 오듯 쏟아지는 화살도 걷어낸다.',
   },
   goldenArmor: {
     id: 'goldenArmor',
     name: '황금갑옷',
     slot: 'armor',
-    bonus: { def: 50 }, // [설계값] — 병과 무관 최상급 갑옷
+    bonus: { def: 50 },
+    // 원작 확정: **회심의 일격 무조건 회피** (kr-blog §R5) — critImmune로 구현
+    critImmune: true,
     price: null,
     tier: 3,
     isTreasure: true,
     growthStat: 'def',
-    description: '황금을 입힌 갑옷. 값으로 매길 수 없는 물건이다.',
+    description: '황금을 입힌 갑옷. 칼집이 들어와도 그 맞은 자리에서 빗나간다.',
   },
 
   // 무기
@@ -600,11 +631,25 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     id: 'fuJin',
     name: '복건',
     slot: 'accessory',
-    bonus: { mind: 8 }, // [설계값]
+    bonus: {},
+    // 원작 확정: 최대 MP +15 (kr-blog §R5 — 복건/관건은 MP 최대치를 올린다)
+    maxMpBonus: 15,
     price: null,
     tier: 2,
     isTreasure: true,
-    description: '문사가 머리에 두르는 두건. 생각이 흐트러지지 않는다.',
+    description: '문사가 머리에 두르는 두건. 생각이 맑아져 책략치가 늘어난다.',
+  },
+  guanJin: {
+    id: 'guanJin',
+    name: '관건',
+    slot: 'accessory',
+    bonus: {},
+    // 원작 확정: 최대 MP +30 (kr-blog §R5 — 복건의 상위)
+    maxMpBonus: 30,
+    price: null,
+    tier: 2,
+    isTreasure: true,
+    description: '녹색 실로 장식한 관. 덕망을 더해 책략치가 크게 늘어난다.',
   },
   jueYing: {
     id: 'jueYing',
