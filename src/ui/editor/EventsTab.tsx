@@ -38,6 +38,7 @@ const TRIGGER_TYPES: EventTrigger['type'][] = [
   'unitDefeated',
   'unitsMeet',
   'reachArea',
+  'victory',
 ]
 
 const TRIGGER_LABEL: Record<EventTrigger['type'], string> = {
@@ -46,6 +47,7 @@ const TRIGGER_LABEL: Record<EventTrigger['type'], string> = {
   unitDefeated: '유닛 격파',
   unitsMeet: '두 유닛 인접 (일기토/설전)',
   reachArea: '지정 구역 도달',
+  victory: '승리 시',
 }
 
 const ACTION_TYPES: EventAction['type'][] = [

@@ -923,7 +923,7 @@ function resolveDuel(
 }
 
 export function applyAction(prev: BattleState, action: BattleAction): BattleState {
-  if (prev.result !== 'ongoing') return prev
+  if (prev.result !== 'ongoing' && !(action.type === 'eventContinue' && prev.pendingEvents.length > 0)) return prev
   // 표시 대기 이벤트가 있으면 eventContinue 외 전 액션을 봉쇄한다 (AI 포함 — v1.1)
   if (prev.pendingEvents.length > 0 && action.type !== 'eventContinue') return prev
   const stage = prev.__stage
@@ -1388,6 +1388,9 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
   if (stage) {
     runEvents(state, stage, occurred)
     if (state.pendingEvents.length === 0) checkVictory(state, stage)
+    // v1.3 — 승리 확정 직후 승리 이벤트(victory 트리거) 발화. 원작 "승리 후 전리품/대사" 표현
+    // (kr-blog §R3 — 청주 도복 분기가 여기에 막혀 있었다). 전투당 1회 (firedEvents 가드).
+    if (state.result === 'victory') runEvents(state, stage, [{ type: 'victory' }])
   }
   return state
 }

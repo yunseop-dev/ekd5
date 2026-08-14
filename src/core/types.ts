@@ -365,6 +365,8 @@ export type EventTrigger =
   | { type: 'unitDefeated'; officerId: string }
   | { type: 'unitsMeet'; a: string; b: string } // 체비쇼프 거리 1 (인접 8방) — 일기토/설전/조우
   | { type: 'reachArea'; area: Vec2[]; faction: Faction; count?: number } // 지정 칸 위 생존 유닛 ≥ count(기본 1)
+  // v1.3 — 승리 확정 직후 발화 (원작 "승리 후 전리품/대사", kr-blog §R3). 전투당 1회.
+  | { type: 'victory' }
 
 export type EventAction =
   | { type: 'dialogue'; lines: DialogueLine[] }

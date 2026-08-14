@@ -35,6 +35,7 @@ export type OccurredEvent =
   | { type: 'battleStart' }
   | { type: 'turnStart'; turn: number }
   | { type: 'unitDefeated'; officerId: string }
+  | { type: 'victory' } // v1.3 — 승리 확정 시 (checkVictory 직후 호출)
 
 // ---------- 내부 유틸 ----------
 
@@ -149,6 +150,8 @@ function triggerMatches(state: BattleState, trigger: EventTrigger, occurred: Occ
       return occurred.some((o) => o.type === 'turnStart' && o.turn === trigger.turn)
     case 'unitDefeated':
       return occurred.some((o) => o.type === 'unitDefeated' && o.officerId === trigger.officerId)
+    case 'victory':
+      return occurred.some((o) => o.type === 'victory')
     case 'unitsMeet': {
       // 체비쇼프 거리 1 = 인접 8방(대각 포함). 두 유닛 모두 생존해 있어야 한다.
       const a = livingByOfficer(state, trigger.a)

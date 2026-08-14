@@ -428,6 +428,8 @@ export function validateStageVerbose(data: unknown): StageValidation {
         if (!area) return null
         return { type: 'reachArea', area, faction: value.faction, ...(count !== undefined ? { count } : {}) }
       }
+      case 'victory':
+        return { type: 'victory' }
       default:
         return fail(`${where}.type: 알 수 없는 트리거 '${String(value.type)}'`)
     }
