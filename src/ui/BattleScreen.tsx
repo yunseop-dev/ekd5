@@ -6,6 +6,7 @@ import {
   canCast,
   canMove,
   classOf,
+  effectiveAttackRanges,
   effectiveDefeat,
   effectiveVictory,
   isHostile,
@@ -493,14 +494,14 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
   const attackCells = useMemo(() => {
     const set = new Set<string>()
     if (!selectedUnit) return set
-    const cls = classOf(selectedUnit)
+    const { minRange, maxRange } = effectiveAttackRanges(selectedUnit)
     if (sel?.mode === 'attackTarget') {
-      for (const p of attackableCells(selectedUnit.pos, cls.minRange, cls.maxRange, state.map.width, state.map.height)) {
+      for (const p of attackableCells(selectedUnit.pos, minRange, maxRange, state.map.width, state.map.height)) {
         set.add(keyOf(p))
       }
     } else if (sel?.mode === 'move' && moveRange) {
       // 이동 범위 밖 공격 가능 영역 표시 (정보용)
-      const union = attackRangeUnion(moveRange, cls.minRange, cls.maxRange, state.map.width, state.map.height)
+      const union = attackRangeUnion(moveRange, minRange, maxRange, state.map.width, state.map.height)
       for (const k of union) if (!moveCells.has(k)) set.add(k)
     }
     return set
@@ -828,12 +829,12 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
 
   const enemiesInRange =
     selectedUnit &&
-    livingUnits(state).filter(
-      (u) =>
-        isHostile(selectedUnit, u) &&
-        manhattan(selectedUnit.pos, u.pos) >= classOf(selectedUnit).minRange &&
-        manhattan(selectedUnit.pos, u.pos) <= classOf(selectedUnit).maxRange,
-    )
+    livingUnits(state).filter((u) => {
+      if (!isHostile(selectedUnit, u)) return false
+      const { minRange, maxRange } = effectiveAttackRanges(selectedUnit)
+      const d = manhattan(selectedUnit.pos, u.pos)
+      return d >= minRange && d <= maxRange
+    })
 
   const forecastTarget =
     sel?.mode === 'attackTarget' && selectedUnit && cursorUnit && isHostile(selectedUnit, cursorUnit)

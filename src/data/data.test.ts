@@ -136,7 +136,7 @@ describe('EQUIPMENT — v1.2 신규 20종', () => {
     expect(EQUIPMENT.jueYing.moveBonus).toBe(1)
     expect(EQUIPMENT.windWheel.moveBonus).toBe(2)
     expect(EQUIPMENT.holySword.bonus.mind).toBe(10)
-    // 몰우전은 원작 확정 효과지만 엔진 미반영 — 데이터에만 존재한다
+    // 몰우전 — 근접 병과에 원거리 공격 부여 (v1.3에서 엔진 반영 — effectiveAttackRanges)
     expect(EQUIPMENT.moYuJian.rangedAttack).toBe(true)
     // 특수 효과는 지정된 장비에만 붙는다
     expect(Object.values(EQUIPMENT).filter((i) => i.pierceBack).map((i) => i.id)).toEqual(['serpentSpear'])

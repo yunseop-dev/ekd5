@@ -623,7 +623,7 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     tier: 2,
     isTreasure: true,
     // 원작 확정: 근접 병과에 원거리 공격을 부여한다.
-    // ※ 엔진 미반영 — 현재 코어는 이 플래그를 읽지 않는다 (사거리 계산은 병과 기준, 후속 과제)
+    // v1.3: 엔진 반영 — effectiveAttackRanges가 근접 병과에 사거리 2~3을 부여한다 (kr-blog §R5)
     rangedAttack: true,
     description: '깃 없이도 날아가는 화살. 창칼밖에 모르던 손이 멀리 닿는다.',
   },

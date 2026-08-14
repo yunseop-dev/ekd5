@@ -153,7 +153,7 @@ export interface EquipmentDef {
   pierceBack?: boolean
   /** 여포궁 등 — 명중 시 상태이상 확정 부여 (원작: 보물은 100% 부여, v1.2) */
   onHitStatus?: StatusId
-  /** 몰우전 — 근접 병과에 원거리 공격을 부여 (원작 확정. 엔진 반영은 후속) */
+  /** 몰우전 — 근접 병과에 원거리 공격을 부여 (원작 확정. v1.3 엔진 반영 — effectiveAttackRanges) */
   rangedAttack?: boolean
   description: string
 }

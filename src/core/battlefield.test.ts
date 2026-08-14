@@ -1210,3 +1210,44 @@ describe('v1.3 장비 특수효과 (kr-blog §R5)', () => {
     expect(Math.abs(armoredDmg)).toBeLessThan(Math.abs(plainDmg))
   })
 })
+
+// =====================================================================================
+// v1.3 몰우전 — 근접 병과에 원거리 공격 부여 (kr-blog §R5)
+// =====================================================================================
+
+describe('몰우전 rangedAttack (v1.3)', () => {
+  it('근접 병과가 몰우전을 장착하면 2~3칸의 원거리 공격이 가능하다', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 1, y: 1 }, isLeader: true },
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 3, y: 1 } }, // 거리 2
+        { officerId: 'yellowShaman', faction: 'enemy', pos: { x: 9, y: 9 } }, // 전멸 승리 방지
+      ],
+    })
+    const state = startBattle(stage, 1)
+    const caocao = unit(state, 'caocao') // lord — 근접(minRange 1)
+    caocao.equipment = { accessory: { itemId: 'moYuJian', level: 1, exp: 0 }, weapon: { itemId: 'ironSword', level: 1, exp: 0 } }
+    const target = unit(state, 'yellowInfantry')
+    target.statuses.push({ id: 'confusion' }) // 확정 명중
+    // 거리 2에서 공격 시도 — 근접 병과지만 몰우전으로 유효해야 한다
+    const after = applyAction(state, { type: 'attack', unitId: caocao.id, targetId: target.id })
+    expect(after.log.some((l) => l.type === 'hit' || l.type === 'crit' || l.type === 'miss')).toBe(true)
+    expect(unit(after, 'yellowInfantry').hp).toBeLessThan(target.maxHp)
+  })
+
+  it('몰우전 없이는 거리 2 공격이 거부된다 (근접 병과)', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 1, y: 1 }, isLeader: true },
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 3, y: 1 } },
+        { officerId: 'yellowShaman', faction: 'enemy', pos: { x: 9, y: 9 } },
+      ],
+    })
+    const state = startBattle(stage, 1)
+    const caocao = unit(state, 'caocao')
+    const target = unit(state, 'yellowInfantry')
+    target.hp = target.maxHp
+    const after = applyAction(state, { type: 'attack', unitId: caocao.id, targetId: target.id })
+    expect(unit(after, 'yellowInfantry').hp).toBe(target.maxHp) // 공격 무효
+  })
+})
