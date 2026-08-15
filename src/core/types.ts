@@ -318,10 +318,20 @@ export interface Hazard {
   remainingTurns: number
 }
 
+// 타일 위에 놓이는 맵 오브젝트 — 원작 "스프라이트가 타일 위" (kr-blog §59).
+// 지형 레이어와 별개 오버레이. objective 목책(fence)만 이동 차단, 나머지(천막·깃발·사당)는 연출용.
+export type MapObjectKind = 'fence' | 'tent' | 'standard' | 'shrine'
+export interface MapObjectDef {
+  pos: Vec2
+  kind: MapObjectKind
+}
+
 export interface MapDef {
   width: number
   height: number
   tiles: TerrainId[][] // [y][x]
+  /** 맵 오브젝트 레이어 (v1.3-objects) — 각 타일 위에 올려지는 오브젝트. 옵션(없으면 회귀 없음). */
+  objects?: MapObjectDef[]
 }
 
 export type VictoryCondition =

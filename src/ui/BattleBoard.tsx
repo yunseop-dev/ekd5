@@ -3,7 +3,7 @@ import { classOf, unitAt } from '../core/battle'
 import { keyOf } from '../core/movement'
 import type { BattleState, Hazard, StatusId, UnitState, Vec2 } from '../core/types'
 import { STATUSES } from '../data/statuses'
-import { TERRAIN } from '../data/terrain'
+import { MAP_OBJECTS, objectAt, TERRAIN } from '../data/terrain'
 import type { Floater } from './BattleScreen'
 
 /** 44px 타일 + 1px gap — 보드 좌표계의 단일 출처 (말풍선 앵커 계산도 이 값을 쓴다) */
@@ -150,6 +150,7 @@ export function BattleBoard({
             const pos = { x, y }
             const key = keyOf(pos)
             const terrain = TERRAIN[tiles[y][x]]
+            const obj = objectAt(state.map, pos) // 맵 오브젝트 (v1.3-objects)
             const unit = unitAt(state, pos)
             const isSelected = unit && unit.id === selectedUnitId
             const isInspected = unit && unit.id === inspectUnitId
@@ -169,6 +170,7 @@ export function BattleBoard({
                 title={`${terrain.name} (${x},${y})${hazardText ? `\n${hazardText}` : ''}`}
               >
                 <span className="terrain-mark">{terrain.name[0]}</span>
+                {obj && <span className={`object o-${obj.kind}`}>{MAP_OBJECTS[obj.kind].mark}</span>}
                 {moveCells.has(key) && <div className="overlay move" />}
                 {attackCells.has(key) && <div className="overlay attack" />}
                 {strategyCells.has(key) && <div className="overlay strategy" />}

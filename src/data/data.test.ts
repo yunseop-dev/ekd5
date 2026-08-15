@@ -7,7 +7,7 @@ import { CLASSES } from './classes'
 import { EQUIPMENT } from './equipment'
 import { OFFICERS } from './officers'
 import { STRATEGIES } from './strategies'
-import { TERRAIN } from './terrain'
+import { MAP_OBJECTS, TERRAIN } from './terrain'
 
 // ---------- 지형 (원작 확정치 교정) ----------
 
@@ -282,5 +282,17 @@ describe('STRATEGIES — 화계 화염 잔존 (v1.2)', () => {
       expect(s.element, s.id).toBe('fire')
       expect(s.area, s.id).toBe('cross')
     }
+  })
+})
+
+// ---------- 맵 오브젝트 (v1.3-objects) ----------
+
+describe('맵 오브젝트 데이터', () => {
+  it('4종 정의 — 목책만 이동 차단, 나머지(천막·깃발·사당)는 비차단 연출', () => {
+    expect(Object.keys(MAP_OBJECTS).sort()).toEqual(['fence', 'shrine', 'standard', 'tent'])
+    expect(MAP_OBJECTS.fence.blocks).toBe(true)
+    expect(MAP_OBJECTS.tent.blocks).toBe(false)
+    expect(MAP_OBJECTS.standard.blocks).toBe(false)
+    expect(MAP_OBJECTS.shrine.blocks).toBe(false)
   })
 })
