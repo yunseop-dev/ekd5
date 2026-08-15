@@ -287,4 +287,347 @@ export const CLASSES: Record<string, UnitClassDef> = {
       { strategyId: 'dogyeon', learnLevel: 16 }, // 승급 해금 — 방해(독) [설계값]
     ],
   },
+
+  // ==========================================================================
+  // v1.3: STEP 5 — 원작 13개 아군 계열(궁기병·포차·무도가·적병·무희·기마책사·도사)
+  //       + 황제 추가로 원작 13계열 전무를 갖춘다.
+  // 근거: docs/research/classes.md §1~3. 성장등급·HP/MP·이동·사거리는 classes.md §1/§2 값.
+  // 3차 병과명(권성/무녀/벽력차/기마군사/요술사 등)은 tier-3(Lv30) 확장 시 일괄 적용 —
+  // 여기서는 1차→2차 깊이(기존 6계열과 동일 패턴)만 추가.
+  // --------------------------------------------------------------------------
+
+  // 궁기병계 — 활+기병. 성장 S/B/B/B/A, 기동 6 (classes.md §2)
+  mountedArcher: {
+    id: 'mountedArcher',
+    lineage: 'mountedArcher',
+    promotesTo: 'crossbowRider',
+    name: '궁기병',
+    tier: 1,
+    category: 'archer',
+    mounted: true,
+    ranged: true,
+    move: 6,
+    minRange: 2,
+    maxRange: 2, // 원작 궁기병 6-ハ(직선2)→맨해튼2 근사
+    moveProfile: 'horse',
+    growth: { atk: 'S', def: 'B', mind: 'B', agi: 'B', morale: 'A' },
+    hpBase: 100,
+    hpGrowth: 5,
+    mpBase: 10,
+    mpGrowth: 1,
+    strategies: [],
+  },
+  crossbowRider: {
+    id: 'crossbowRider',
+    lineage: 'mountedArcher',
+    name: '노기병',
+    tier: 2,
+    category: 'archer',
+    mounted: true,
+    ranged: true,
+    move: 6,
+    minRange: 2,
+    maxRange: 3, // 원작 노기병 6-ニ→맨해튼2..3
+    moveProfile: 'horse',
+    growth: { atk: 'S', def: 'B', mind: 'B', agi: 'B', morale: 'A' },
+    hpBase: 110, // 100 + 5×2
+    hpGrowth: 5,
+    mpBase: 12, // 10 + 1×2
+    mpGrowth: 1,
+    strategies: [],
+  },
+
+  // 포차계 — 전 병과 최장 사거리 간접(광역), 이동 좁음. wheel (classes.md §3)
+  catapult: {
+    id: 'catapult',
+    lineage: 'catapult',
+    promotesTo: 'heavyCatapult',
+    name: '경포차',
+    tier: 1,
+    category: 'archer',
+    mounted: false,
+    ranged: true,
+    move: 3,
+    minRange: 3,
+    maxRange: 5, // 원작 전 병과 최장 사거리 [설계값 — 정확 칸수 미확보]
+    moveProfile: 'wheel',
+    growth: { atk: 'S', def: 'B', mind: 'A', agi: 'C', morale: 'A' },
+    hpBase: 90,
+    hpGrowth: 4,
+    mpBase: 10,
+    mpGrowth: 1,
+    strategies: [],
+  },
+  heavyCatapult: {
+    id: 'heavyCatapult',
+    lineage: 'catapult',
+    name: '중포차',
+    tier: 2,
+    category: 'archer',
+    mounted: false,
+    ranged: true,
+    move: 3, // 원작 포차 3→3(2차 무변화)→4(3차 +1)
+    minRange: 3,
+    maxRange: 5,
+    moveProfile: 'wheel',
+    growth: { atk: 'S', def: 'B', mind: 'A', agi: 'C', morale: 'A' },
+    hpBase: 98, // 90 + 4×2
+    hpGrowth: 4,
+    mpBase: 12, // 10 + 1×2
+    mpGrowth: 1,
+    strategies: [],
+  },
+
+  // 무도가계 — 곤봉, 순발 S(연속공격/회피), 수상 적성↑, 8방 공격 (classes.md §3)
+  martialArtist: {
+    id: 'martialArtist',
+    lineage: 'martialArtist',
+    promotesTo: 'boxer',
+    name: '무도가',
+    tier: 1,
+    category: 'infantry',
+    mounted: false,
+    ranged: false,
+    move: 5,
+    minRange: 1,
+    maxRange: 1,
+    attackShape: 'chebyshev', // 8방(ロ)
+    moveProfile: 'foot',
+    growth: { atk: 'A', def: 'C', mind: 'A', agi: 'S', morale: 'B' },
+    hpBase: 90,
+    hpGrowth: 4,
+    mpBase: 20,
+    mpGrowth: 1,
+    strategies: [],
+  },
+  boxer: {
+    id: 'boxer',
+    lineage: 'martialArtist',
+    name: '권법가',
+    tier: 2,
+    category: 'infantry',
+    mounted: false,
+    ranged: false,
+    move: 5,
+    minRange: 1,
+    maxRange: 1,
+    attackShape: 'chebyshev',
+    moveProfile: 'foot',
+    growth: { atk: 'A', def: 'C', mind: 'A', agi: 'S', morale: 'B' },
+    hpBase: 98, // 90 + 4×2
+    hpGrowth: 4,
+    mpBase: 22, // 20 + 1×2
+    mpGrowth: 1,
+    strategies: [],
+  },
+
+  // 적병계 — 검, 공S·사기S, 숲/산악 적성↑, 지계 책략, 8방 (classes.md §3)
+  bandit: {
+    id: 'bandit',
+    lineage: 'bandit',
+    promotesTo: 'righteousBandit',
+    name: '적병',
+    tier: 1,
+    category: 'infantry',
+    mounted: false,
+    ranged: false,
+    move: 5,
+    minRange: 1,
+    maxRange: 1,
+    attackShape: 'chebyshev', // 8방(ロ)
+    moveProfile: 'foot',
+    growth: { atk: 'S', def: 'C', mind: 'B', agi: 'B', morale: 'S' },
+    hpBase: 100,
+    hpGrowth: 5,
+    mpBase: 20,
+    mpGrowth: 1,
+    strategies: [],
+  },
+  righteousBandit: {
+    id: 'righteousBandit',
+    lineage: 'bandit',
+    name: '의적',
+    tier: 2,
+    category: 'infantry',
+    mounted: false,
+    ranged: false,
+    move: 5,
+    minRange: 1,
+    maxRange: 1,
+    attackShape: 'chebyshev',
+    moveProfile: 'foot',
+    growth: { atk: 'S', def: 'C', mind: 'B', agi: 'B', morale: 'S' },
+    hpBase: 110, // 100 + 5×2
+    hpGrowth: 5,
+    mpBase: 22, // 20 + 1×2
+    mpGrowth: 1,
+    strategies: [],
+  },
+
+  // 무희계 — 곤봉, 순발 S, HP 낮음, 상태이상 아군 회복 패시브 (classes.md §3)
+  dancer: {
+    id: 'dancer',
+    lineage: 'dancer',
+    promotesTo: 'primaDancer',
+    name: '무희',
+    tier: 1,
+    category: 'support',
+    mounted: false,
+    ranged: false,
+    move: 5,
+    minRange: 1,
+    maxRange: 1,
+    attackShape: 'chebyshev', // 8방(ロ)
+    moveProfile: 'foot',
+    growth: { atk: 'A', def: 'B', mind: 'B', agi: 'S', morale: 'B' },
+    hpBase: 90,
+    hpGrowth: 3, // HP 낮음 (classes.md §2: +3)
+    mpBase: 35,
+    mpGrowth: 1,
+    strategies: [],
+  },
+  primaDancer: {
+    id: 'primaDancer',
+    lineage: 'dancer',
+    name: '무희(舞姬)',
+    tier: 2,
+    category: 'support',
+    mounted: false,
+    ranged: false,
+    move: 5,
+    minRange: 1,
+    maxRange: 1,
+    attackShape: 'chebyshev',
+    moveProfile: 'foot',
+    growth: { atk: 'A', def: 'B', mind: 'B', agi: 'S', morale: 'B' },
+    hpBase: 96, // 90 + 3×2
+    hpGrowth: 3,
+    mpBase: 37, // 35 + 1×2
+    mpGrowth: 1,
+    strategies: [],
+  },
+
+  // 기마책사계 — 부채, 기동 문관 (classes.md §3)
+  cavalryStrategist: {
+    id: 'cavalryStrategist',
+    lineage: 'cavalryStrategist',
+    promotesTo: 'cavalryCounselor',
+    name: '기마책사',
+    tier: 1,
+    category: 'strategist',
+    mounted: true,
+    ranged: false,
+    move: 6,
+    minRange: 1,
+    maxRange: 1,
+    moveProfile: 'horse',
+    growth: { atk: 'C', def: 'S', mind: 'C', agi: 'B', morale: 'B' },
+    hpBase: 90,
+    hpGrowth: 4,
+    mpBase: 40,
+    mpGrowth: 2,
+    strategies: [
+      { strategyId: 'seonpung', learnLevel: 1 },
+      { strategyId: 'dunbyeong', learnLevel: 5 },
+      { strategyId: 'hwajin', learnLevel: 9 },
+    ],
+  },
+  cavalryCounselor: {
+    id: 'cavalryCounselor',
+    lineage: 'cavalryStrategist',
+    name: '기마참모',
+    tier: 2,
+    category: 'strategist',
+    mounted: true,
+    ranged: false,
+    move: 6,
+    minRange: 1,
+    maxRange: 1,
+    moveProfile: 'horse',
+    growth: { atk: 'C', def: 'S', mind: 'C', agi: 'B', morale: 'B' },
+    hpBase: 98, // 90 + 4×2
+    hpGrowth: 4,
+    mpBase: 44, // 40 + 2×2
+    mpGrowth: 2,
+    strategies: [
+      { strategyId: 'seonpung', learnLevel: 1 },
+      { strategyId: 'dunbyeong', learnLevel: 5 },
+      { strategyId: 'hwajin', learnLevel: 9 },
+    ],
+  },
+
+  // 도사계 — 보검(검), 정신 S 문관, 화·독계 책략 특화, 4-이 (classes.md §1/§2)
+  // 성장등급: 공C · 정신S · 방B · 순A · 사기B → growth { atk:C, mind:S, def:B, agi:A, morale:B }
+  taoist: {
+    id: 'taoist',
+    lineage: 'taoist',
+    promotesTo: 'illusionist',
+    name: '도사',
+    tier: 1,
+    category: 'strategist',
+    mounted: false,
+    ranged: false,
+    move: 4,
+    minRange: 1,
+    maxRange: 1,
+    moveProfile: 'mage',
+    growth: { atk: 'C', def: 'B', mind: 'S', agi: 'A', morale: 'B' },
+    hpBase: 80, // 80~227(+3) (classes.md §2)
+    hpGrowth: 3,
+    mpBase: 40, // 40~138(+2) (classes.md §2)
+    mpGrowth: 2,
+    strategies: [
+      { strategyId: 'choyeol', learnLevel: 1 },
+      { strategyId: 'pungjin', learnLevel: 5 },
+      { strategyId: 'eophwa', learnLevel: 9 },
+      { strategyId: 'heobo', learnLevel: 12 }, // 방해(혼란) [설계값]
+    ],
+  },
+  illusionist: {
+    id: 'illusionist',
+    lineage: 'taoist',
+    name: '환술사',
+    tier: 2,
+    category: 'strategist',
+    mounted: false,
+    ranged: false,
+    move: 4,
+    minRange: 1,
+    maxRange: 1,
+    moveProfile: 'mage',
+    growth: { atk: 'C', def: 'B', mind: 'S', agi: 'A', morale: 'B' },
+    hpBase: 86, // 80 + 3×2
+    hpGrowth: 3,
+    mpBase: 44, // 40 + 2×2
+    mpGrowth: 2,
+    strategies: [
+      { strategyId: 'choyeol', learnLevel: 1 },
+      { strategyId: 'pungjin', learnLevel: 5 },
+      { strategyId: 'eophwa', learnLevel: 9 },
+      { strategyId: 'heobo', learnLevel: 12 }, // 1차 전승
+      { strategyId: 'hwaryong', learnLevel: 15 }, // 승급 해금 — 화계 특화 "한층 더 강력해진 공격계 책략"
+      { strategyId: 'dogyeon', learnLevel: 16 }, // 승급 해금 — 방해(독) [설계값]
+    ],
+  },
+
+  // 황제 — 비무장 호송 유닛. 공격 불가(범위 0·1), 승급 없음 (classes.md §3)
+  emperor: {
+    id: 'emperor',
+    lineage: 'emperor',
+    name: '황제',
+    tier: 1,
+    category: 'lord',
+    mounted: false,
+    ranged: false,
+    move: 4,
+    minRange: 0,
+    maxRange: 0, // 공격 불가
+    moveProfile: 'foot',
+    growth: { atk: 'C', def: 'B', mind: 'A', agi: 'B', morale: 'S' },
+    hpBase: 90,
+    hpGrowth: 4,
+    mpBase: 20,
+    mpGrowth: 1,
+    strategies: [],
+  },
 }
