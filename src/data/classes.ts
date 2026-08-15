@@ -158,6 +158,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     lineage: 'lord',
     name: '영웅',
     tier: 2,
+    promotesTo: 'overlord', // 3차(패왕) — v1.3-tier3
     category: 'lord',
     mounted: false,
     ranged: false,
@@ -180,6 +181,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     lineage: 'lightCavalry',
     name: '중기병',
     tier: 2,
+    promotesTo: 'royalGuard', // 3차(친위대) — v1.3-tier3
     category: 'cavalry',
     mounted: true,
     ranged: false,
@@ -199,6 +201,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     lineage: 'heavyInfantry',
     name: '중보병',
     tier: 2,
+    promotesTo: 'royalInfantry', // 3차(근위병) — v1.3-tier3
     category: 'infantry',
     mounted: false,
     ranged: false,
@@ -218,6 +221,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     lineage: 'archer',
     name: '노병',
     tier: 2,
+    promotesTo: 'repeaterCrossbow', // 3차(연노병) — v1.3-tier3
     category: 'archer',
     mounted: false,
     ranged: true,
@@ -237,6 +241,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     lineage: 'strategist',
     name: '참모',
     tier: 2,
+    promotesTo: 'grandStrategist', // 3차(군사) — v1.3-tier3
     category: 'strategist',
     mounted: false,
     ranged: false,
@@ -266,6 +271,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     lineage: 'geomancer',
     name: '방술사',
     tier: 2,
+    promotesTo: 'hermit', // 3차(선술사) — v1.3-tier3
     category: 'support',
     mounted: false,
     ranged: false,
@@ -322,6 +328,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     lineage: 'mountedArcher',
     name: '노기병',
     tier: 2,
+    promotesTo: 'repeaterRider', // 3차(연노기병) — v1.3-tier3
     category: 'archer',
     mounted: true,
     ranged: true,
@@ -363,6 +370,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     lineage: 'catapult',
     name: '중포차',
     tier: 2,
+    promotesTo: 'thunderCart', // 3차(벽력차) — v1.3-tier3
     category: 'archer',
     mounted: false,
     ranged: true,
@@ -406,6 +414,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     lineage: 'martialArtist',
     name: '권법가',
     tier: 2,
+    promotesTo: 'fistMaster', // 3차(권성) — v1.3-tier3
     category: 'infantry',
     mounted: false,
     ranged: false,
@@ -449,6 +458,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     lineage: 'bandit',
     name: '의적',
     tier: 2,
+    promotesTo: 'mountainHero', // 3차(호걸) — v1.3-tier3
     category: 'infantry',
     mounted: false,
     ranged: false,
@@ -492,6 +502,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     lineage: 'dancer',
     name: '무희(舞姬)',
     tier: 2,
+    promotesTo: 'shrineMaiden', // 3차(무녀) — v1.3-tier3
     category: 'support',
     mounted: false,
     ranged: false,
@@ -538,6 +549,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     lineage: 'cavalryStrategist',
     name: '기마참모',
     tier: 2,
+    promotesTo: 'cavalryCommander', // 3차(기마군사) — v1.3-tier3
     category: 'strategist',
     mounted: true,
     ranged: false,
@@ -589,6 +601,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     lineage: 'taoist',
     name: '환술사',
     tier: 2,
+    promotesTo: 'sorcerer', // 3차(요술사) — v1.3-tier3
     category: 'strategist',
     mounted: false,
     ranged: false,
@@ -630,5 +643,324 @@ export const CLASSES: Record<string, UnitClassDef> = {
     mpBase: 20,
     mpGrowth: 1,
     strategies: [],
+  },
+
+  // ==========================================================================
+  // v1.3-tier3: 3차 병과 13종 (Lv30 + 인수 승급, PROMOTION_LEVELS.tier3)
+  // 근거: docs/research/classes.md §1 승급 표. 3차명·이동·공격범위·사거리는 표 그대로,
+  //       성장등급·이동프로필·책략은 **계열 2차와 동일**(승급은 능력치·성장률 불변 계약).
+  //       HP/MP = 2차 기본치 + 성장치×2 (클래스업 보너스 공식 재적용).
+  // 사거리 코드(items.md에 준함): イ=맨해튼1 / ロ=체비쇼프1(8방) / ト=맨해튼2..3 / ヌ=맨해튼2..4
+  // --------------------------------------------------------------------------
+
+  // 군주계 3차 — 패왕 7-로. 이동 7, 8방 (classes.md §1)
+  overlord: {
+    id: 'overlord',
+    lineage: 'lord',
+    name: '패왕',
+    tier: 3,
+    category: 'lord',
+    mounted: false,
+    ranged: false,
+    move: 7,
+    minRange: 1,
+    maxRange: 1,
+    attackShape: 'chebyshev',
+    moveProfile: 'foot',
+    growth: { atk: 'A', def: 'A', mind: 'A', agi: 'B', morale: 'S' },
+    hpBase: 148, // 134 + 7×2
+    hpGrowth: 7,
+    mpBase: 28, // 24 + 2×2
+    mpGrowth: 2,
+    strategies: [
+      { strategyId: 'goyang', learnLevel: 1 },
+      { strategyId: 'seonpung', learnLevel: 8 },
+    ],
+  },
+
+  // 기병계 3차 — 친위대 7-로. 이동 7, 8방. 기병 3차는 8방 (classes.md §4.1)
+  royalGuard: {
+    id: 'royalGuard',
+    lineage: 'lightCavalry',
+    name: '친위대',
+    tier: 3,
+    category: 'cavalry',
+    mounted: true,
+    ranged: false,
+    move: 7,
+    minRange: 1,
+    maxRange: 1,
+    attackShape: 'chebyshev',
+    moveProfile: 'horse',
+    growth: { atk: 'A', def: 'B', mind: 'C', agi: 'A', morale: 'B' },
+    hpBase: 134, // 122 + 6×2
+    hpGrowth: 6,
+    mpBase: 14, // 12 + 1×2
+    mpGrowth: 1,
+    strategies: [],
+  },
+
+  // 궁기병계 3차 — 연노기병 7-ト. 이동 7, 맨해튼 2..3
+  repeaterRider: {
+    id: 'repeaterRider',
+    lineage: 'mountedArcher',
+    name: '연노기병',
+    tier: 3,
+    category: 'archer',
+    mounted: true,
+    ranged: true,
+    move: 7,
+    minRange: 2,
+    maxRange: 3,
+    moveProfile: 'horse',
+    growth: { atk: 'S', def: 'B', mind: 'B', agi: 'B', morale: 'A' },
+    hpBase: 120, // 110 + 5×2
+    hpGrowth: 5,
+    mpBase: 14, // 12 + 1×2
+    mpGrowth: 1,
+    strategies: [],
+  },
+
+  // 보병계 3차 — 근위병 5-로. 이동 5, 8방
+  royalInfantry: {
+    id: 'royalInfantry',
+    lineage: 'heavyInfantry',
+    name: '근위병',
+    tier: 3,
+    category: 'infantry',
+    mounted: false,
+    ranged: false,
+    move: 5,
+    minRange: 1,
+    maxRange: 1,
+    attackShape: 'chebyshev',
+    moveProfile: 'foot',
+    growth: { atk: 'B', def: 'S', mind: 'C', agi: 'C', morale: 'B' },
+    hpBase: 158, // 144 + 7×2
+    hpGrowth: 7,
+    mpBase: 14, // 12 + 1×2
+    mpGrowth: 1,
+    strategies: [],
+  },
+
+  // 궁병계 3차 — 연노병 5-ヌ. 이동 5, 맨해튼 2..4 (원작 최장 원거리)
+  repeaterCrossbow: {
+    id: 'repeaterCrossbow',
+    lineage: 'archer',
+    name: '연노병',
+    tier: 3,
+    category: 'archer',
+    mounted: false,
+    ranged: true,
+    move: 5,
+    minRange: 2,
+    maxRange: 4,
+    moveProfile: 'foot',
+    growth: { atk: 'A', def: 'C', mind: 'B', agi: 'B', morale: 'C' },
+    hpBase: 120, // 110 + 5×2
+    hpGrowth: 5,
+    mpBase: 14, // 12 + 1×2
+    mpGrowth: 1,
+    strategies: [],
+  },
+
+  // 적병계 3차 — 호걸 6-로. 이동 6, 8방
+  mountainHero: {
+    id: 'mountainHero',
+    lineage: 'bandit',
+    name: '호걸',
+    tier: 3,
+    category: 'infantry',
+    mounted: false,
+    ranged: false,
+    move: 6,
+    minRange: 1,
+    maxRange: 1,
+    attackShape: 'chebyshev',
+    moveProfile: 'foot',
+    growth: { atk: 'S', def: 'C', mind: 'B', agi: 'B', morale: 'S' },
+    hpBase: 120, // 110 + 5×2
+    hpGrowth: 5,
+    mpBase: 24, // 22 + 1×2
+    mpGrowth: 1,
+    strategies: [],
+  },
+
+  // 무도가계 3차 — 권성 6-로. 이동 6, 8방
+  fistMaster: {
+    id: 'fistMaster',
+    lineage: 'martialArtist',
+    name: '권성',
+    tier: 3,
+    category: 'infantry',
+    mounted: false,
+    ranged: false,
+    move: 6,
+    minRange: 1,
+    maxRange: 1,
+    attackShape: 'chebyshev',
+    moveProfile: 'foot',
+    growth: { atk: 'A', def: 'C', mind: 'A', agi: 'S', morale: 'B' },
+    hpBase: 106, // 98 + 4×2
+    hpGrowth: 4,
+    mpBase: 24, // 22 + 1×2
+    mpGrowth: 1,
+    strategies: [],
+  },
+
+  // 무희계 3차 — 무녀 6-로. 이동 6, 8방 (무희 회복 패시브도 계열로 계승)
+  shrineMaiden: {
+    id: 'shrineMaiden',
+    lineage: 'dancer',
+    name: '무녀',
+    tier: 3,
+    category: 'support',
+    mounted: false,
+    ranged: false,
+    move: 6,
+    minRange: 1,
+    maxRange: 1,
+    attackShape: 'chebyshev',
+    moveProfile: 'foot',
+    growth: { atk: 'A', def: 'B', mind: 'B', agi: 'S', morale: 'B' },
+    hpBase: 102, // 96 + 3×2
+    hpGrowth: 3,
+    mpBase: 39, // 37 + 1×2
+    mpGrowth: 1,
+    strategies: [],
+  },
+
+  // 포차계 3차 — 벽력차 4-(광역). 이동 4, 맨해튼 3..5, 광역(splash) 승계
+  thunderCart: {
+    id: 'thunderCart',
+    lineage: 'catapult',
+    name: '벽력차',
+    tier: 3,
+    category: 'archer',
+    mounted: false,
+    ranged: true,
+    splash: true, // 포차 광역 — 2차부터 광역, 3차도 유지 (classes.md §4.2)
+    move: 4,
+    minRange: 3,
+    maxRange: 5,
+    moveProfile: 'wheel',
+    growth: { atk: 'S', def: 'B', mind: 'A', agi: 'C', morale: 'A' },
+    hpBase: 106, // 98 + 4×2
+    hpGrowth: 4,
+    mpBase: 14, // 12 + 1×2
+    mpGrowth: 1,
+    strategies: [],
+  },
+
+  // 기마책사계 3차 — 기마군사 7-이. 이동 7, 맨해튼 근접
+  cavalryCommander: {
+    id: 'cavalryCommander',
+    lineage: 'cavalryStrategist',
+    name: '기마군사',
+    tier: 3,
+    category: 'strategist',
+    mounted: true,
+    ranged: false,
+    move: 7,
+    minRange: 1,
+    maxRange: 1,
+    moveProfile: 'horse',
+    growth: { atk: 'C', def: 'S', mind: 'C', agi: 'B', morale: 'B' },
+    hpBase: 106, // 98 + 4×2
+    hpGrowth: 4,
+    mpBase: 48, // 44 + 2×2
+    mpGrowth: 2,
+    strategies: [
+      { strategyId: 'seonpung', learnLevel: 1 },
+      { strategyId: 'dunbyeong', learnLevel: 5 },
+      { strategyId: 'hwajin', learnLevel: 9 },
+    ],
+  },
+
+  // 책사계 3차 — 군사 5-이. 이동 5, 맨해튼 근접 (참모 책략 상속)
+  grandStrategist: {
+    id: 'grandStrategist',
+    lineage: 'strategist',
+    name: '군사',
+    tier: 3,
+    category: 'strategist',
+    mounted: false,
+    ranged: false,
+    move: 5,
+    minRange: 1,
+    maxRange: 1,
+    moveProfile: 'mage',
+    growth: { atk: 'C', def: 'C', mind: 'S', agi: 'B', morale: 'B' },
+    hpBase: 106, // 98 + 4×2
+    hpGrowth: 4,
+    mpBase: 42, // 36 + 3×2
+    mpGrowth: 3,
+    strategies: [
+      { strategyId: 'choyeol', learnLevel: 1 },
+      { strategyId: 'seonpung', learnLevel: 3 },
+      { strategyId: 'dunbyeong', learnLevel: 5 },
+      { strategyId: 'hwajin', learnLevel: 8 },
+      { strategyId: 'pungjin', learnLevel: 10 },
+      { strategyId: 'eophwa', learnLevel: 12 },
+      { strategyId: 'heobo', learnLevel: 14 },
+      { strategyId: 'hwaryong', learnLevel: 15 },
+      { strategyId: 'bongchaek', learnLevel: 16 },
+    ],
+  },
+
+  // 도사계 3차 — 요술사 5-이. 이동 5, 맨해튼 근접 (환술사 책략 상속)
+  sorcerer: {
+    id: 'sorcerer',
+    lineage: 'taoist',
+    name: '요술사',
+    tier: 3,
+    category: 'strategist',
+    mounted: false,
+    ranged: false,
+    move: 5,
+    minRange: 1,
+    maxRange: 1,
+    moveProfile: 'mage',
+    growth: { atk: 'C', def: 'B', mind: 'S', agi: 'A', morale: 'B' },
+    hpBase: 92, // 86 + 3×2
+    hpGrowth: 3,
+    mpBase: 48, // 44 + 2×2
+    mpGrowth: 2,
+    strategies: [
+      { strategyId: 'choyeol', learnLevel: 1 },
+      { strategyId: 'pungjin', learnLevel: 5 },
+      { strategyId: 'eophwa', learnLevel: 9 },
+      { strategyId: 'heobo', learnLevel: 12 },
+      { strategyId: 'hwaryong', learnLevel: 15 },
+      { strategyId: 'dogyeon', learnLevel: 16 },
+    ],
+  },
+
+  // 풍수사계 3차 — 선술사 6-이. 이동 6, 맨해튼 근접 (방술사 책략 상속)
+  hermit: {
+    id: 'hermit',
+    lineage: 'geomancer',
+    name: '선술사',
+    tier: 3,
+    category: 'support',
+    mounted: false,
+    ranged: false,
+    move: 6,
+    minRange: 1,
+    maxRange: 1,
+    moveProfile: 'mage',
+    growth: { atk: 'C', def: 'C', mind: 'A', agi: 'B', morale: 'A' },
+    hpBase: 106, // 98 + 4×2
+    hpGrowth: 4,
+    mpBase: 42, // 36 + 3×2
+    mpGrowth: 3,
+    strategies: [
+      { strategyId: 'sobogeup', learnLevel: 1 },
+      { strategyId: 'goyang', learnLevel: 3 },
+      { strategyId: 'yeonbyeong', learnLevel: 6 },
+      { strategyId: 'pobak', learnLevel: 14 },
+      { strategyId: 'guwondae', learnLevel: 15 },
+      { strategyId: 'dogyeon', learnLevel: 16 },
+    ],
   },
 }

@@ -473,10 +473,21 @@ describe('useItem — 인수(印綬)', () => {
     expect(applyAction(ok, { type: 'useItem', unitId: dun2.id, itemId: 'insu', target: dun2.pos })).not.toBe(ok)
   })
 
-  it('이미 2차 병과면 거부 — 인수를 낭비하지 않는다', () => {
-    const state = insuBattle(30, 'heavyCavalry')
+  it('최상위(3차) 병과면 거부 — 인수를 낭비하지 않는다', () => {
+    const state = insuBattle(50, 'royalGuard') // 3차 — 더 승급할 병과 없음
     const dun = unit(state, 'xiahoudun')
     expect(applyAction(state, { type: 'useItem', unitId: dun.id, itemId: 'insu', target: dun.pos })).toBe(state)
+  })
+
+  it('2차는 Lv30부터 3차로 승급한다 (그 이전엔 거부)', () => {
+    const low = insuBattle(29, 'heavyCavalry')
+    const dun = unit(low, 'xiahoudun')
+    expect(applyAction(low, { type: 'useItem', unitId: dun.id, itemId: 'insu', target: dun.pos })).toBe(low)
+
+    const ok = insuBattle(30, 'heavyCavalry')
+    const dun2 = unit(ok, 'xiahoudun')
+    const after = applyAction(ok, { type: 'useItem', unitId: dun2.id, itemId: 'insu', target: dun2.pos })
+    expect(after).not.toBe(ok)
   })
 
   it('인접한 아군에게도 쓸 수 있다 — 대상만 승급하고 사용자만 행동을 소진한다 (대각선 포함)', () => {
