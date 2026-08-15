@@ -95,6 +95,19 @@ describe('attackableCells (사거리)', () => {
     const cells = attackableCells({ x: 0, y: 0 }, 1, 1, 5, 5)
     expect(cells.length).toBe(2)
   })
+
+  it('8방(체비쇼프 1): 상하좌우 + 대각 8칸 (보병/무도가/무희/적병 — classes.md §4.1)', () => {
+    const cells = attackableCells({ x: 2, y: 2 }, 1, 1, 5, 5, 'chebyshev')
+    expect(cells.length).toBe(8)
+    expect(cells.some((c) => c.x === 1 && c.y === 1)).toBe(true) // 대각 포함
+  })
+
+  it('기본(맨해튼)과 8방(체비쇼프)은 대각 인접 여부만 다르다', () => {
+    const manhattanCells = attackableCells({ x: 2, y: 2 }, 1, 1, 5, 5)
+    const chebCells = attackableCells({ x: 2, y: 2 }, 1, 1, 5, 5, 'chebyshev')
+    expect(manhattanCells).toHaveLength(4)
+    expect(chebCells).toHaveLength(8)
+  })
 })
 
 describe('attackRangeUnion (공격 범위 오버레이)', () => {

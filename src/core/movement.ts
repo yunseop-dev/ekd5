@@ -2,7 +2,7 @@
 // 데이터와 결합하지 않도록 코스트·점유 판정은 콜백으로 주입받는다.
 // 참고: Red Blob Games — Dijkstra movement range (docs/research/tech.md §3)
 
-import type { StrategyArea, Vec2 } from './types'
+import type { AttackShape, StrategyArea, Vec2 } from './types'
 
 export const keyOf = (p: Vec2): string => `${p.x},${p.y}`
 
@@ -102,18 +102,19 @@ export function pathTo(range: MovementRange, dest: Vec2): Vec2[] | null {
   return path
 }
 
-/** 특정 칸에서 공격 가능한 칸 집합 (맨해튼 거리 min~max) */
+/** 특정 칸에서 공격 가능한 칸 집합. shape='chebyshev'(8방)는 거리를 max|Δ|로 잰다 (v1.3, classes.md §4.1). */
 export function attackableCells(
   from: Vec2,
   minRange: number,
   maxRange: number,
   width: number,
   height: number,
+  shape: AttackShape = 'manhattan',
 ): Vec2[] {
   const cells: Vec2[] = []
   for (let dy = -maxRange; dy <= maxRange; dy++) {
     for (let dx = -maxRange; dx <= maxRange; dx++) {
-      const dist = Math.abs(dx) + Math.abs(dy)
+      const dist = shape === 'chebyshev' ? Math.max(Math.abs(dx), Math.abs(dy)) : Math.abs(dx) + Math.abs(dy)
       if (dist < minRange || dist > maxRange) continue
       const p = { x: from.x + dx, y: from.y + dy }
       if (p.x < 0 || p.y < 0 || p.x >= width || p.y >= height) continue
@@ -156,11 +157,12 @@ export function attackRangeUnion(
   maxRange: number,
   width: number,
   height: number,
+  shape: AttackShape = 'manhattan',
 ): Set<string> {
   const union = new Set<string>()
   for (const cell of range.values()) {
     if (!cell.canStop) continue
-    for (const p of attackableCells(cell.pos, minRange, maxRange, width, height)) {
+    for (const p of attackableCells(cell.pos, minRange, maxRange, width, height, shape)) {
       union.add(keyOf(p))
     }
   }

@@ -31,7 +31,7 @@ import {
   strategyDamage,
   strategyHealAmount,
 } from './formulas'
-import { manhattan, strategyAreaCells } from './movement'
+import { chebyshev, manhattan, strategyAreaCells } from './movement'
 import type { BattleAction, BattleState, Faction, StatusId, StrategyArea, UnitState, Vec2 } from './types'
 
 const KILL_BONUS = 40
@@ -273,9 +273,9 @@ export function decideUnit(state: BattleState, unit: UnitState): UnitPlan {
   let best: UnitPlan | null = null
 
   for (const cell of candidateCells) {
-    const { minRange, maxRange } = effectiveAttackRanges(unit)
+    const { minRange, maxRange, shape } = effectiveAttackRanges(unit)
     for (const target of hostiles) {
-      const dist = manhattan(cell, target.pos)
+      const dist = shape === 'chebyshev' ? chebyshev(cell, target.pos) : manhattan(cell, target.pos)
 
       // 물리 공격 (몰우전 — 근접 병과 원거리 부여 포함, v1.3)
       if (dist >= minRange && dist <= maxRange) {
