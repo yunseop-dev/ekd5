@@ -278,13 +278,14 @@ describe('스테이지 3 — 황건 본진 소탕', () => {
     // 장수 기본 레벨(2~3)로는 협곡에서 밀린다 — 최종 스테이지라 로스터 이월을 전제한다
     expect(['victory', 'defeat']).toContain(simulate(startBattle(STAGE_03, 42), 400).result)
 
-    // 두 전투를 거친 로스터(≈Lv6, 초기 장비 유지)면 협곡→성문→성채까지 진행돼 장각을 잡는다.
+    // 두 전투를 거친 로스터(≈Lv7, 초기 장비 유지)면 협곡→성문→성채까지 진행돼 장각을 잡는다.
     // v0.7에서 적 잡병이 방어구까지 갖추면서 맨몸 로스터로는 밀린다 — 실플레이 조건(장비 보유)으로 검증
+    // v1.3-review: 성장등급을 §2로 교정(적 기병 atk S·궁병 사기 S)하면서 적도 강해져 기준을 Lv6→Lv7로 상향
     const roster = STAGE_03.units
       .filter((u) => u.faction === 'player')
       .map((u) => ({
         officerId: u.officerId,
-        level: 6,
+        level: 7,
         exp: 0,
         equipment: toEquipmentMap(OFFICERS[u.officerId].initialEquipment),
         statBonus: {},
@@ -779,9 +780,11 @@ describe('스테이지 13 — 장수 토벌전 (완성 야습)', () => {
     expect(result.pendingRewards).toContainEqual({ itemId: 'flyingDragonRobe', kind: 'equipment' })
   })
 
-  it('전위 전사 갈래(seed 1): 진문에서 쓰러지지만 그래도 승리한다 + 봉황깃옷', () => {
-    // v1.2 R 교정 후 전위는 무력 100·순발 98이 되어 seed 42에서는 살아남는다 — 전사 시드는 1이다
-    const result = simulate(startBattle(STAGE_13, 1, rosterAt(STAGE_13, 17)), 800)
+  it('전위 전사 갈래(seed 3): 진문에서 쓰러지지만 그래도 승리한다 + 봉황깃옷', () => {
+    // v1.2 R 교정 후 전위는 무력 100·순발 98이 되어 seed 42에서는 살아남는다 — 전사 시드는 1이었다.
+    // v1.3-review: 성장등급 §2 교정(보병 mind C→A·순 C→B)으로 전위가 단단해져 seed 1·2에서도 생존 —
+    // 전사 시드를 3으로 갱신 (s13-dianwei-fall + 봉황깃옷 계약 유지)
+    const result = simulate(startBattle(STAGE_13, 3, rosterAt(STAGE_13, 17)), 800)
     expect(result.result).toBe('victory')
     expect(result.units.find((u) => u.officerId === 'dianwei')!.hp).toBe(0)
     expect(result.firedEvents).toContain('s13-dianwei-fall')

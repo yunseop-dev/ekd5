@@ -360,7 +360,9 @@ export function forecastAttack(state: BattleState, attacker: UnitState, defender
 
   // 반격: 직접(근접) 공격에만, 반격측 사거리에 거리 1이 포함될 때, 항상 1회.
   // 혼란은 반격도 못 한다 (행동 완전 불가) — 부동·금책은 반격 정상 (statuses.md §1).
-  const willCounter = !aCls.ranged && dist === 1 && !dCls.ranged && dCls.minRange <= 1 && canAct(defender)
+  // maxRange >= 1 검사로 공격 불가(maxRange 0, 황제 등) 병과는 반격하지 않는다 (v1.3-review).
+  const willCounter =
+    !aCls.ranged && dist === 1 && !dCls.ranged && dCls.minRange <= 1 && dCls.maxRange >= 1 && canAct(defender)
 
   return {
     damage,
