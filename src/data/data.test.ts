@@ -135,6 +135,8 @@ describe('EQUIPMENT — v1.2 신규 20종', () => {
     // 원작 확정: 절영 +1 / 바람바퀴 +2 (thewiki·biglobe 독립 2소스 일치 — kr-blog §R5)
     expect(EQUIPMENT.jueYing.moveBonus).toBe(1)
     expect(EQUIPMENT.windWheel.moveBonus).toBe(2)
+    // 바람바퀴 — 포차계 전용 (원작 확정, kr-blog §R5). 이제 catapult 계열이 추가되어 제약 적용
+    expect(EQUIPMENT.windWheel.classes).toEqual(['catapult'])
     expect(EQUIPMENT.holySword.bonus.mind).toBe(10)
     // 몰우전 — 근접 병과에 원거리 공격 부여 (v1.3에서 엔진 반영 — effectiveAttackRanges)
     expect(EQUIPMENT.moYuJian.rangedAttack).toBe(true)
