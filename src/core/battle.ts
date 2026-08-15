@@ -73,6 +73,8 @@ import {
   EQUIP_GROWTH_TREASURE,
   EQUIP_MAX_LEVEL_NORMAL,
   EQUIP_MAX_LEVEL_TREASURE,
+  MAX_LEVEL,
+  PROMOTION_LEVELS,
 } from './types'
 
 // ---------- 조회 헬퍼 ----------
@@ -391,6 +393,45 @@ function deployedPlayerUnits(stage: StageDef, deployment: string[]): StageUnitDe
   }))
 }
 
+// ---------- 적 레벨 연동 스케일링 (v1.3-scaling, 옵트인) ----------
+
+/** 절사평균 — 원작은 출진 부대수를 4~7/8~11/12~15 구간으로 나눠 상하 1~3명을 제외하고 평균 (campaign-ux.md §40). */
+function trimmedMean(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b)
+  let trim = 0
+  if (sorted.length >= 12) trim = 3
+  else if (sorted.length >= 8) trim = 2
+  else if (sorted.length >= 4) trim = 1
+  const cut = Math.min(trim, Math.floor((sorted.length - 1) / 2))
+  const inner = sorted.slice(cut, sorted.length - cut)
+  return inner.length > 0 ? inner.reduce((a, b) => a + b, 0) / inner.length : 0
+}
+
+/**
+ * 스케일된 적 단위 (레벨 + 적장 클래스업).
+ * delta = 출진 아군 절사평균 − 설계 기준 레벨 → 설계 레벨에 차분만큼 보정, [1, MAX_LEVEL]로 clamp.
+ * 보정 레벨이 승급 문턱(1차→2차 ≥15 / 2차→3차 ≥30) 이상이면 계열 내에서 병과를 올린다 (원작: 적장 클래스업).
+ */
+function scaleEnemyUnit(
+  baseLevel: number,
+  baseClassId: string,
+  scalingRef: number,
+  partyAvg: number,
+): { level: number; classId: string } {
+  const level = Math.max(1, Math.min(MAX_LEVEL, Math.round(baseLevel + (partyAvg - scalingRef))))
+  // 적장 클래스업 — 레벨이 허락하는 최상위 병과까지 계열 내에서 승급
+  let classId = baseClassId
+  while (true) {
+    const cur = CLASSES[classId]
+    if (!cur?.promotesTo) break
+    const need =
+      cur.tier === 1 ? PROMOTION_LEVELS.tier2 : cur.tier === 2 ? PROMOTION_LEVELS.tier3 : Number.POSITIVE_INFINITY
+    if (level >= need) classId = cur.promotesTo
+    else break
+  }
+  return { level, classId }
+}
+
 export function createBattle(
   stage: StageDef,
   seed: number,
@@ -405,13 +446,34 @@ export function createBattle(
       ? [...deployedPlayerUnits(stage, deployment), ...stage.units.filter((u) => u.faction !== 'player')]
       : stage.units
 
+  // ---- v1.3-scaling: 적 레벨 연동 (옵트인 — 스테이지가 기준을 선언하고 로스터가 있을 때만) ----
+  // 자유 전투(로스터 없음)·선언 없는 스테이지는 건드리지 않아 튜닝된 밸런스를 보존한다.
+  const scalingRef = stage.enemyLevelScaling
+  let partyAvg: number | undefined
+  if (roster && scalingRef !== undefined) {
+    const playerLevels = defs
+      .filter((d) => d.faction === 'player')
+      .map((d) => {
+        const e = roster?.find((r) => r.officerId === d.officerId)
+        return e?.level ?? d.level ?? OFFICERS[d.officerId]?.level ?? 0
+      })
+      .filter((l) => l > 0)
+    if (playerLevels.length > 0) partyAvg = trimmedMean(playerLevels)
+  }
+
   const units: UnitState[] = defs.map((def, i) => {
     const officer = OFFICERS[def.officerId]
     // 캠페인 로스터가 있으면 스테이지/장수 기본 레벨을 덮어쓴다 (전투 간 성장 이월)
     const entry = def.faction === 'player' ? roster?.find((r) => r.officerId === def.officerId) : undefined
     // 승급한 아군은 로스터의 병과 오버라이드를 쓴다. 적/우군은 언제나 장수 기본 병과.
-    const classId = entry ? classIdOf(entry) : officer.classId
-    const level = entry?.level ?? def.level ?? officer.level
+    // (적/우군은 아래 v1.3-scaling에서 레벨·병과를 보정할 수 있다)
+    let classId = entry ? classIdOf(entry) : officer.classId
+    let level = entry?.level ?? def.level ?? officer.level
+    if (def.faction !== 'player' && partyAvg !== undefined && scalingRef !== undefined) {
+      const scaled = scaleEnemyUnit(level, classId, scalingRef, partyAvg)
+      level = scaled.level
+      classId = scaled.classId
+    }
     // 아군은 캠페인 로스터 우선, 적/우군·자유 전투는 스테이지 정의(적장 장비 — 원작: 격파 드랍과 연결).
     // 정의 표기(문자열 id)든 인스턴스든 여기서 전부 인스턴스로 정규화된다.
     const equipment = toEquipmentMap(entry?.equipment ?? def.equipment ?? officer.initialEquipment)
