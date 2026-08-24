@@ -41,6 +41,10 @@ export interface TerrainDef {
 
 // ---------- 장수 / 병과 ----------
 
+// 공격범위 모양 — 기본은 맨해튼(거리합, 상하좌우). 체비쇼프(8방)는 보병/무도가/무희/적병의 원작
+// 「ロ」 범위를 위해 v1.3에서 추가 (docs/research/classes.md §4.1). undefined = 'manhattan'.
+export type AttackShape = 'manhattan' | 'chebyshev'
+
 // 장수 5능력치 (원작은 모두 짝수, 부대 초기치 = ÷2)
 export interface OfficerStats {
   str: number // 무력 → 공격력
@@ -96,6 +100,8 @@ export interface UnitClassDef {
   move: number
   minRange: number // 궁병류 = 2 (인접 공격 불가)
   maxRange: number
+  /** 공격범위 모양 — 기본(undefined)은 맨해튼. 'chebyshev' = 8방(보병/무도가/무희/적병 등). */
+  attackShape?: AttackShape
   moveProfile: MoveProfileId
   growth: GrowthGrades
   hpBase: number

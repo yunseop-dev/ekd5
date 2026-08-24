@@ -494,14 +494,14 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
   const attackCells = useMemo(() => {
     const set = new Set<string>()
     if (!selectedUnit) return set
-    const { minRange, maxRange } = effectiveAttackRanges(selectedUnit)
+    const { minRange, maxRange, shape } = effectiveAttackRanges(selectedUnit)
     if (sel?.mode === 'attackTarget') {
-      for (const p of attackableCells(selectedUnit.pos, minRange, maxRange, state.map.width, state.map.height)) {
+      for (const p of attackableCells(selectedUnit.pos, minRange, maxRange, state.map.width, state.map.height, shape)) {
         set.add(keyOf(p))
       }
     } else if (sel?.mode === 'move' && moveRange) {
       // 이동 범위 밖 공격 가능 영역 표시 (정보용)
-      const union = attackRangeUnion(moveRange, minRange, maxRange, state.map.width, state.map.height)
+      const union = attackRangeUnion(moveRange, minRange, maxRange, state.map.width, state.map.height, shape)
       for (const k of union) if (!moveCells.has(k)) set.add(k)
     }
     return set
@@ -831,8 +831,8 @@ export function BattleScreen({ stage, seed, onExit, onRestart, roster, deploymen
     selectedUnit &&
     livingUnits(state).filter((u) => {
       if (!isHostile(selectedUnit, u)) return false
-      const { minRange, maxRange } = effectiveAttackRanges(selectedUnit)
-      const d = manhattan(selectedUnit.pos, u.pos)
+      const { minRange, maxRange, shape } = effectiveAttackRanges(selectedUnit)
+      const d = shape === 'chebyshev' ? chebyshev(selectedUnit.pos, u.pos) : manhattan(selectedUnit.pos, u.pos)
       return d >= minRange && d <= maxRange
     })
 

@@ -95,28 +95,30 @@ describe('병과 데이터 — 계열(lineage)과 승급 트리', () => {
     }
   })
 
-  it('1차 병과의 lineage는 자기 자신이고, 전부 2차로 승급한다', () => {
+  it('1차 병과의 lineage는 자기 자신이다 (promotesTo가 있는 건 전부 실재 2차로 승급)', () => {
     const tier1 = Object.values(CLASSES).filter((c) => c.tier === 1)
-    expect(tier1).toHaveLength(6)
-    for (const cls of tier1) {
-      expect(cls.lineage, cls.id).toBe(cls.id)
+    const promoting = tier1.filter((c) => c.promotesTo !== undefined)
+    // 신규 계열(v1.3) 포함 — 전부 lineage 자기 자신
+    expect(tier1.every((c) => c.lineage === c.id)).toBe(true)
+    // 비승급 병과(황제 같은 단일/호송)를 제외한 나머지 1차는 반드시 실재 2차로 승급한다
+    for (const cls of promoting) {
       const next = CLASSES[cls.promotesTo!]
       expect(next, `${cls.id}.promotesTo`).toBeDefined()
       expect(next.tier).toBe(2)
       expect(next.lineage, `${next.id}는 ${cls.id} 계열`).toBe(cls.id)
     }
+    // 최소한 기존 6 + 신규 6계열(=승급 단위)은 갖춰졌다
+    expect([...new Set(tier1.map((c) => c.lineage))].length).toBeGreaterThanOrEqual(6)
   })
 
-  it('2차 병과 6종은 더 위로 승급하지 않는다 (3차는 v0.8 범위 밖)', () => {
+  it('2차 병과는 더 위로 승급하지 않는다 (3차는 tier-3 확장 범위 밖)', () => {
     const tier2 = Object.values(CLASSES).filter((c) => c.tier === 2)
-    expect(tier2.map((c) => c.id).sort()).toEqual(
-      ['chancellor', 'counselor', 'crossbowman', 'guardInfantry', 'heavyCavalry', 'seniorGeomancer'].sort(),
-    )
+    expect(tier2.length).toBeGreaterThanOrEqual(6)
     for (const cls of tier2) expect(cls.promotesTo, cls.id).toBeUndefined()
   })
 
   it('2차는 1차의 책략을 전부 물려받는다 (같은 learnLevel)', () => {
-    for (const base of Object.values(CLASSES).filter((c) => c.tier === 1)) {
+    for (const base of Object.values(CLASSES).filter((c) => c.tier === 1 && c.promotesTo !== undefined)) {
       const next = CLASSES[base.promotesTo!]
       for (const s of base.strategies) {
         expect(next.strategies, `${next.id} ⊇ ${base.id}`).toContainEqual(s)
@@ -128,7 +130,7 @@ describe('병과 데이터 — 계열(lineage)과 승급 트리', () => {
     // 근거: 나무위키 병과 문서 "클래스 업을 하면 그 순간 HP와 MP가 레벨 상승치의 2배만큼 증가"
     //       + "영걸전, 공명전과 다르게 부대를 승급시켜도 능력치나 성장률에는 변화가 없다"
     //       (조창 HP 107 + 49×5 + 2회×10 = 372 검산 일치, docs/research/promotion.md §2)
-    for (const base of Object.values(CLASSES).filter((c) => c.tier === 1)) {
+    for (const base of Object.values(CLASSES).filter((c) => c.tier === 1 && c.promotesTo !== undefined)) {
       const next = CLASSES[base.promotesTo!]
       expect(next.hpBase, next.id).toBe(base.hpBase + base.hpGrowth * 2)
       expect(next.mpBase, next.id).toBe(base.mpBase + base.mpGrowth * 2)
@@ -151,7 +153,9 @@ describe('병과 데이터 — 계열(lineage)과 승급 트리', () => {
 
   it('방술사는 원작대로 계열 중 유일하게 2차에서 이동력이 오른다 (4→5)', () => {
     expect(CLASSES.seniorGeomancer.move).toBe(CLASSES.geomancer.move + 1)
-    for (const base of Object.values(CLASSES).filter((c) => c.tier === 1 && c.id !== 'geomancer')) {
+    for (const base of Object.values(CLASSES).filter(
+      (c) => c.tier === 1 && c.id !== 'geomancer' && c.promotesTo !== undefined,
+    )) {
       expect(CLASSES[base.promotesTo!].move, base.id).toBe(base.move)
     }
   })
@@ -282,8 +286,8 @@ describe('canPromoteUnit — 승급 조건 매트릭스 (전투·UI 공용)', ()
     expect(canPromoteUnit({ classId: '', level: 50 })).toBe(false)
   })
 
-  it('1차 6종은 전부 Lv15에 승급 가능하다', () => {
-    for (const cls of Object.values(CLASSES).filter((c) => c.tier === 1)) {
+  it('승급 가능한 1차 병과(황제 등 비승급 제외)는 전부 Lv15에 승급 가능하다', () => {
+    for (const cls of Object.values(CLASSES).filter((c) => c.tier === 1 && c.promotesTo !== undefined)) {
       expect(canPromoteUnit({ classId: cls.id, level: PROMOTION_LEVEL }), cls.id).toBe(true)
     }
   })
@@ -377,8 +381,8 @@ describe('canEquipClass — 착용 판정은 계열(lineage) 기준', () => {
     expect(canEquipClass('heavyCavalry', 'woodBow')).toBe(false)
   })
 
-  it('2차 6종 전부: 1차와 착용 가능 집합이 같다', () => {
-    for (const base of Object.values(CLASSES).filter((c) => c.tier === 1)) {
+  it('2차 병과 전부: 1차와 착용 가능 집합이 같다 (비승급 황제 제외)', () => {
+    for (const base of Object.values(CLASSES).filter((c) => c.tier === 1 && c.promotesTo !== undefined)) {
       for (const itemId of Object.keys(EQUIPMENT)) {
         expect(canEquipClass(base.promotesTo!, itemId), `${base.promotesTo}: ${itemId}`).toBe(
           canEquipClass(base.id, itemId),

@@ -40,6 +40,7 @@ import type { MoveContext, MovementRange, Occupancy } from './movement'
 import { chebyshev, keyOf, manhattan, movementRange, strategyAreaCells } from './movement'
 import { nextInt, roll } from './rng'
 import type {
+  AttackShape,
   BattleAction,
   BattleState,
   ConsumableStack,
@@ -225,16 +226,16 @@ export function strategyDamageScaleOf(unit: UnitState): number {
 }
 
 /**
- * 실효 공격 사거리. 몰우전(근접 병과에 원거리 공격 부여, 원작 확정)을 반영한다.
+ * 실효 공격 사거리 + 모양. 몰우전(근접 병과에 원거리 공격 부여, 원작 확정)을 반영한다.
  * 원작 진정치는 "근접 병과가 화살을 쏘는" 것이므로 사거리 2~3을 부여한다 (kr-blog §R5).
- * 원래 원거리 병과는 그대로 둔다.
+ * 8방(로) 병과는 shape='chebyshev'를 함께 돌려준다 (classes.md §4.1).
  */
-export function effectiveAttackRanges(unit: UnitState): { minRange: number; maxRange: number } {
+export function effectiveAttackRanges(unit: UnitState): { minRange: number; maxRange: number; shape: AttackShape } {
   const cls = classOf(unit)
   if (!cls.ranged && equippedItems(unit).some((item) => item.rangedAttack)) {
-    return { minRange: 2, maxRange: 3 }
+    return { minRange: 2, maxRange: 3, shape: 'manhattan' }
   }
-  return { minRange: cls.minRange, maxRange: cls.maxRange }
+  return { minRange: cls.minRange, maxRange: cls.maxRange, shape: cls.attackShape ?? 'manhattan' }
 }
 
 /** 장비(무구성장 포함) + 열매 + 버프 반영된 실효 전투 능력치 (열매 → 장비 가산 → 버프 순서) */
@@ -968,9 +969,9 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
       if (!canAct(attacker)) return prev // 혼란
       if (!isHostile(attacker, defender)) return prev
 
-      const dist = manhattan(attacker.pos, defender.pos)
-      // 몰우전(근접 병과 원거리 부여) 포함 실효 사거리 검증 (v1.3, kr-blog §R5)
-      const { minRange, maxRange } = effectiveAttackRanges(attacker)
+      // 몰우전(근접 병과 원거리 부여) + 8방(체비쇼프) 포함 실효 사거리 검증 (v1.3)
+      const { minRange, maxRange, shape } = effectiveAttackRanges(attacker)
+      const dist = shape === 'chebyshev' ? chebyshev(attacker.pos, defender.pos) : manhattan(attacker.pos, defender.pos)
       if (dist < minRange || dist > maxRange) return prev
 
       // 1타
