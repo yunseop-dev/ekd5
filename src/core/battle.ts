@@ -7,7 +7,7 @@ import { EQUIPMENT } from '../data/equipment'
 import { OFFICERS } from '../data/officers'
 import { STATUSES, statusName } from '../data/statuses'
 import { STRATEGIES } from '../data/strategies'
-import { TERRAIN } from '../data/terrain'
+import { MAP_OBJECTS, objectAt, TERRAIN } from '../data/terrain'
 import type { RosterEntry } from './campaign'
 import {
   canPromoteUnit,
@@ -308,10 +308,16 @@ export function moveContextFor(state: BattleState, unit: UnitState): MoveContext
       // 불길은 진입도 통과도 불가 — 지형 조회보다 먼저 걸러서 적로(flatCost)보다 우선한다 (v1.2).
       // 시작 칸은 movementRange가 costAt에 묻지 않으므로, 불타는 칸에 갇힌 유닛도 탈출할 수 있다.
       if (hazardAt(state, pos)) return null
+      // 목책(오브젝트)은 진입 불가 — 지형보다 우선 (v1.3-objects).
+      const obj = objectAt(state.map, pos)
+      if (obj && MAP_OBJECTS[obj.kind].blocks) return null
       const cost = TERRAIN[state.map.tiles[pos.y][pos.x]].cost[profile]
       return flatCost && cost !== null ? 1 : cost
     },
     occupancyAt: (pos): Occupancy => {
+      // 목책은 유닛이 없어도 점유·정지 불가 셀로 취급한다 (v1.3-objects).
+      const obj = objectAt(state.map, pos)
+      if (obj && MAP_OBJECTS[obj.kind].blocks) return 'block'
       const other = unitAt(state, pos)
       if (!other || other.id === unit.id) return 'free'
       return isHostile(unit, other) ? 'block' : 'pass'

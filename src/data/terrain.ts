@@ -10,7 +10,7 @@
 //   마을은 시설 보정(110)이 아니라 가옥 특유의 기병 불리(90)가 적용된다.
 //   마을의 매턴 회복(healPerTurn 20)은 그대로 유지한다.
 
-import type { TerrainDef, TerrainId } from '../core/types'
+import type { MapObjectDef, MapObjectKind, TerrainDef, TerrainId } from '../core/types'
 
 export const TERRAIN: Record<TerrainId, TerrainDef> = {
   plain: {
@@ -106,4 +106,27 @@ export const TERRAIN: Record<TerrainId, TerrainDef> = {
     cost: { foot: null, horse: null, wheel: null, mage: null },
     effect: { foot: 100, horse: 100, wheel: 100, mage: 100 },
   },
+}
+
+// ---------- 맵 오브젝트 (v1.3-objects) ----------
+// 원작 "스프라이트가 타일 위" (kr-blog §59). 지형 위에 올려지는 오브젝트 메타.
+// fence(목책)만 이동 차단(진입 불가), 나머지는 연출용(비차단). UI는 mark를 타일에 얹어 그린다.
+export interface MapObjectMeta {
+  id: MapObjectKind
+  name: string
+  /** 이동 차단 여부 — 목책은 진입 불가, 천막·깃발·사당은 지나갈 수 있다. */
+  blocks: boolean
+  /** UI에 표시할 1자 표식 (지형 이름 표식처럼). */
+  mark: string
+}
+export const MAP_OBJECTS: Record<MapObjectKind, MapObjectMeta> = {
+  fence: { id: 'fence', name: '목책', blocks: true, mark: '책' },
+  tent: { id: 'tent', name: '천막', blocks: false, mark: '幕' },
+  standard: { id: 'standard', name: '깃발', blocks: false, mark: '旗' },
+  shrine: { id: 'shrine', name: '사당', blocks: false, mark: '祠' },
+}
+
+/** 특정 위치의 오브젝트 — 여러 개면 첫째만 (일반적으로 한 타일에 하나). */
+export function objectAt(map: { objects?: MapObjectDef[] }, pos: { x: number; y: number }): MapObjectDef | undefined {
+  return map.objects?.find((o) => o.pos.x === pos.x && o.pos.y === pos.y)
 }

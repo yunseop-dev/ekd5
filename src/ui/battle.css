@@ -283,6 +283,27 @@
   pointer-events: none;
 }
 
+/* 맵 오브젝트 (v1.3-objects) — 타일 위 오버레이. 목책(fence)은 흐리고, 그 외는 지형 표식처럼 */
+.tile .object {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  line-height: 1;
+  color: #3a2b13;
+  opacity: 0.95;
+  pointer-events: none;
+}
+.tile .object.o-fence {
+  color: #6b4a1e;
+  opacity: 0.9;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.25);
+}
+.tile .object.o-tent { color: #7a5a2e; }
+.tile .object.o-standard { color: #8a1f1f; }
+.tile .object.o-shrine { color: #2f5f2f; }
+
 /* 오버레이 */
 .tile .overlay {
   position: absolute;
@@ -836,6 +857,22 @@
   background: rgba(255, 140, 40, 0.75);
   z-index: 3;
 }
+
+/* 맵 오브젝트 (v1.3-objects) — 유닛 아래 층 표식 */
+.zoom-map-grid .zm-object {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  font-size: 9px;
+  line-height: 1;
+  z-index: 3;
+  pointer-events: none;
+}
+.zoom-map-grid .zm-object.o-fence { color: #6b4a1e; }
+.zoom-map-grid .zm-object.o-tent { color: #7a5a2e; }
+.zoom-map-grid .zm-object.o-standard { color: #8a1f1f; }
+.zoom-map-grid .zm-object.o-shrine { color: #2f5f2f; }
 
 .zoom-map-legend {
   display: flex;

@@ -6,9 +6,11 @@ import {
   forecastAttack,
   knownStrategies,
   livingUnits,
+  movementRangeOf,
   startBattle,
 } from './battle'
 import { strategyHealAmount } from './formulas'
+import { keyOf } from './movement'
 import type { RosterEntry } from './campaign'
 import type { BattleState, StageDef, TerrainId, UnitState } from './types'
 
@@ -578,5 +580,83 @@ describe('적 레벨 연동 스케일링 (옵트인)', () => {
   it('보정 레벨이 승급 문턱(15) 미만이면 병과는 그대로(1차)', () => {
     const state = startBattle(scalingStage(), 1, roster(13)) // delta 3 → 적 8
     expect(unit(state, 'yellowInfantry').classId).toBe('heavyInfantry')
+  })
+})
+
+// 맵 오브젝트 (v1.3-objects) — 목책(fence)은 이동 차단, 천막 등은 비차단 연출
+describe('맵 오브젝트 (오브젝트 레이어)', () => {
+  it('목책(fence) 타일은 이동 불가 — 경로가 끊기고 그 너머로는 진출 못 한다', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 0, y: 0 }, isLeader: true },
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 7, y: 7 } },
+      ],
+    })
+    stage.map.objects = [{ pos: { x: 1, y: 0 }, kind: 'fence' }]
+    const state = startBattle(stage, 1)
+    const caocao = unit(state, 'caocao')
+    const range = movementRangeOf(state, caocao)
+
+    expect(range.has(keyOf({ x: 1, y: 0 }))).toBe(false) // 목책 — 진입 불가
+    // 우회 경로(1,1)는 가능
+    const detour = range.get(keyOf({ x: 1, y: 1 }))
+    expect(detour?.canStop).toBe(true)
+  })
+
+  it('천막(tent)·깃발(standard)·사당(shrine)은 비차단 — 지나고 설 수 있다', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 0, y: 0 }, isLeader: true },
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 7, y: 7 } },
+      ],
+    })
+    stage.map.objects = [
+      { pos: { x: 1, y: 1 }, kind: 'tent' },
+      { pos: { x: 1, y: 2 }, kind: 'standard' },
+      { pos: { x: 1, y: 3 }, kind: 'shrine' },
+    ]
+    const state = startBattle(stage, 1)
+    const caocao = unit(state, 'caocao')
+    const range = movementRangeOf(state, caocao)
+
+    for (const pos of [{ x: 1, y: 1 }, { x: 1, y: 2 }, { x: 1, y: 3 }]) {
+      expect(range.get(keyOf(pos))?.canStop, JSON.stringify(pos)).toBe(true)
+    }
+  })
+
+  it('목책이 놓인 타일에 아군 유닛도 서지 못한다 (occupancy block)', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 0, y: 0 }, isLeader: true },
+        { officerId: 'xiahoudun', faction: 'player', pos: { x: 3, y: 0 } },
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 7, y: 7 } },
+      ],
+      victory: [{ type: 'annihilation' }],
+    })
+    stage.map.objects = [{ pos: { x: 2, y: 0 }, kind: 'fence' }]
+    const state = startBattle(stage, 1)
+    const dun = unit(state, 'xiahoudun')
+    const before = dun.pos
+    // 목책 칸으로 이동 시도 → 거부(경로 없음 = 이동 불가)
+    const next = applyAction(state, { type: 'move', unitId: dun.id, to: { x: 2, y: 0 } })
+    expect(unit(next, 'xiahoudun').pos).toEqual(before)
+  })
+
+  it('목책 벽(fence)이 가로막으면 그 너머로는 진출할 수 없다', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 0, y: 0 }, isLeader: true },
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 7, y: 7 } },
+      ],
+    })
+    // x=2 전체 세로 목책 벽 (8×8 평지)
+    stage.map.objects = Array.from({ length: 8 }, (_, y) => ({ pos: { x: 2, y }, kind: 'fence' }))
+    const state = startBattle(stage, 1)
+    const caocao = unit(state, 'caocao')
+    const range = movementRangeOf(state, caocao)
+
+    expect(range.has(keyOf({ x: 1, y: 0 }))).toBe(true) // 벽 앞까지는 이동 가능
+    expect(range.has(keyOf({ x: 3, y: 0 }))).toBe(false) // 벽 너머 — 절대 진입 불가
+    expect(range.has(keyOf({ x: 7, y: 7 }))).toBe(false)
   })
 })

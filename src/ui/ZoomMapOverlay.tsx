@@ -11,7 +11,7 @@
 import { useEffect } from 'react'
 import { keyOf } from '../core/movement'
 import type { BattleState } from '../core/types'
-import { TERRAIN } from '../data/terrain'
+import { MAP_OBJECTS, objectAt, TERRAIN } from '../data/terrain'
 
 /** 축소 타일 크기 — 출진 미리보기(deploy.css PREVIEW_TILE)와 같은 16px */
 const ZOOM_TILE = 16
@@ -78,6 +78,7 @@ export function ZoomMapOverlay({ state, onClose }: Props) {
               Array.from({ length: width }, (_, x) => {
                 const key = keyOf({ x, y })
                 const terrain = TERRAIN[tiles[y][x]]
+                const obj = objectAt(state.map, { x, y })
                 const unit = unitByCell.get(key)
                 // 지형색은 전투 보드의 `.tile.t-*` 를 그대로 재사용한다 — 색 값을 세 번째로
                 // 적지 않기 위해서다 (크기는 인라인 스타일이 `.tile` 의 44px를 이긴다)
@@ -88,11 +89,12 @@ export function ZoomMapOverlay({ state, onClose }: Props) {
                     style={{ width: ZOOM_TILE, height: ZOOM_TILE }}
                     title={
                       unit
-                        ? `${terrain.name} (${x},${y}) — ${unit.classId}`
-                        : `${terrain.name} (${x},${y})`
+                        ? `${terrain.name}${obj ? ` · ${MAP_OBJECTS[obj.kind].name}` : ''} (${x},${y}) — ${unit.classId}`
+                        : `${terrain.name}${obj ? ` · ${MAP_OBJECTS[obj.kind].name}` : ''} (${x},${y})`
                     }
                   >
                     {hazardCells.has(key) && <span className="zm-hazard" />}
+                    {obj && <span className={`zm-object o-${obj.kind}`}>{MAP_OBJECTS[obj.kind].mark}</span>}
                     {unit && (
                       <span
                         className={[
