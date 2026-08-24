@@ -19,7 +19,7 @@ import type {
   StageDef,
   UnitState,
 } from './types'
-import { EQUIP_MAX_LEVEL_NORMAL, MAX_LEVEL } from './types'
+import { EQUIP_MAX_LEVEL_NORMAL, MAX_LEVEL, PROMOTION_LEVELS } from './types'
 
 /** 로스터 1명 = 전투 사이로 이월되는 성장치 전부 (HP/MP는 레벨에서 재계산) */
 export interface RosterEntry {
@@ -632,13 +632,16 @@ export function classIdOf(entry: Pick<RosterEntry, 'officerId' | 'classId'>): st
 }
 
 /**
- * 승급 가능 판정 — 병과에 상위 병과가 있고 Lv15 이상인가. 인수 보유는 보지 않는다.
+ * 승급 가능 판정 — 병과에 상위 병과가 있고 해당 트리 레벨 문턱(Lv) 이상인가. 인수 보유는 보지 않는다.
+ * 문턱은 트리 레벨별: 1차→2차 = Lv15(PROMOTION_LEVELS.tier2), 2차→3차 = Lv30(PROMOTION_LEVELS.tier3).
+ * (v1.3-tier3: 3차 병과 추가로 레벨 판정을 등급별로 분기 — 황제 등 비승급 병과는 항상 false)
  * 전투 리듀서(useItem 인수 분기)와 UI가 같은 규칙을 쓰도록 부대 단위로 뽑아낸 함수다.
  */
 export function canPromoteUnit(unit: Pick<UnitState, 'classId' | 'level'>): boolean {
-  if (unit.level < PROMOTION_LEVEL) return false
-  const promotesTo = CLASSES[unit.classId]?.promotesTo
-  return promotesTo !== undefined && CLASSES[promotesTo] !== undefined
+  const cls = CLASSES[unit.classId]
+  if (!cls?.promotesTo || !CLASSES[cls.promotesTo]) return false
+  const required = cls.tier === 2 ? PROMOTION_LEVELS.tier3 : PROMOTION_LEVELS.tier2
+  return unit.level >= required
 }
 
 // ---------- 장비 장착 / 상점 (모두 불변, 실패 시 원본 그대로 반환) ----------

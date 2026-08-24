@@ -15,6 +15,7 @@ import { decideUnit, runAiPhase } from './ai'
 import { autoResolveEvents } from './events'
 import { applyAction, effectiveStats, knownStrategies, livingUnits, startBattle, unitAt } from './battle'
 import type { CampaignState, RosterEntry } from './campaign'
+import { PROMOTION_LEVELS } from './types'
 import {
   applyVictory,
   CAMPAIGN_NODES,
@@ -111,10 +112,21 @@ describe('병과 데이터 — 계열(lineage)과 승급 트리', () => {
     expect([...new Set(tier1.map((c) => c.lineage))].length).toBeGreaterThanOrEqual(6)
   })
 
-  it('2차 병과는 더 위로 승급하지 않는다 (3차는 tier-3 확장 범위 밖)', () => {
+  it('2차 병과는 전부 3차로 승급한다 (3차는 v1.3-tier3에서 추가)', () => {
     const tier2 = Object.values(CLASSES).filter((c) => c.tier === 2)
     expect(tier2.length).toBeGreaterThanOrEqual(6)
-    for (const cls of tier2) expect(cls.promotesTo, cls.id).toBeUndefined()
+    for (const cls of tier2) {
+      const next = CLASSES[cls.promotesTo!]
+      expect(next, `${cls.id}.promotesTo`).toBeDefined()
+      expect(next.tier, next.id).toBe(3)
+      expect(next.lineage, next.id).toBe(cls.lineage) // 같은 계열 유지 (장비 규칙 보존)
+    }
+  })
+
+  it('3차 병과에는 더 위로 승급할 병과가 없다 (tier-4 부재)', () => {
+    const tier3 = Object.values(CLASSES).filter((c) => c.tier === 3)
+    expect(tier3.length).toBeGreaterThanOrEqual(6)
+    for (const cls of tier3) expect(cls.promotesTo, cls.id).toBeUndefined()
   })
 
   it('2차는 1차의 책략을 전부 물려받는다 (같은 learnLevel)', () => {
@@ -138,6 +150,40 @@ describe('병과 데이터 — 계열(lineage)과 승급 트리', () => {
       expect(next.mpGrowth, next.id).toBe(base.mpGrowth)
       expect(next.growth, next.id).toEqual(base.growth)
     }
+  })
+
+  it('2차→3차도 같은 승급 공식 — HP/MP +성장치×2, 성장·책략은 2차 계승', () => {
+    for (const base of Object.values(CLASSES).filter((c) => c.tier === 2 && c.promotesTo !== undefined)) {
+      const next = CLASSES[base.promotesTo!]
+      expect(next.hpBase, next.id).toBe(base.hpBase + base.hpGrowth * 2)
+      expect(next.mpBase, next.id).toBe(base.mpBase + base.mpGrowth * 2)
+      expect(next.hpGrowth, next.id).toBe(base.hpGrowth)
+      expect(next.mpGrowth, next.id).toBe(base.mpGrowth)
+      expect(next.growth, next.id).toEqual(base.growth) // 성장등급 불변 계약
+      for (const s of base.strategies) {
+        expect(next.strategies, `${next.id} ⊇ ${base.id}`).toContainEqual(s)
+      }
+    }
+  })
+
+  it('3차 병과 특징 — 이동/사거리/8방이 원작 표(classes.md §1)를 반영한다', () => {
+    // 원거리 사거리 확장: 노병 2..3 → 연노병 2..4(ヌ) / 노기병 2..3 → 연노기병 2..3(ト)
+    expect(CLASSES.repeaterCrossbow.minRange).toBe(2)
+    expect(CLASSES.repeaterCrossbow.maxRange).toBe(4)
+    expect(CLASSES.repeaterRider.minRange).toBe(2)
+    expect(CLASSES.repeaterRider.maxRange).toBe(3)
+    expect(CLASSES.repeaterCrossbow.maxRange).toBeGreaterThan(CLASSES.crossbowman.maxRange)
+    // 8방(체비쇼프) 병과들
+    for (const id of ['overlord', 'royalGuard', 'royalInfantry', 'mountainHero', 'fistMaster', 'shrineMaiden']) {
+      expect(CLASSES[id].attackShape, id).toBe('chebyshev')
+    }
+    // 3차 이동력 상승 (원작 §1)
+    expect(CLASSES.overlord.move).toBe(7)
+    expect(CLASSES.royalGuard.move).toBe(7)
+    expect(CLASSES.repeaterCrossbow.move).toBe(5)
+    expect(CLASSES.hermit.move).toBe(6)
+    // 벽력차 — 포차 광역 승계
+    expect(CLASSES.thunderCart.splash).toBe(true)
   })
 
   it('중기병은 원작대로 수치 무변화 — 이동력도 성장도 경기병 그대로 (보너스 HP/MP뿐)', () => {
@@ -275,8 +321,15 @@ describe('canPromoteUnit — 승급 조건 매트릭스 (전투·UI 공용)', ()
     expect(canPromoteUnit({ classId: 'lightCavalry', level: PROMOTION_LEVEL + 15 })).toBe(true)
   })
 
-  it('이미 2차면 false — 인수를 낭비하지 않는다', () => {
+  it('2차는 Lv15엔 승급 못 하고 Lv30부터 3차로 승급한다', () => {
     for (const cls of Object.values(CLASSES).filter((c) => c.tier === 2)) {
+      expect(canPromoteUnit({ classId: cls.id, level: PROMOTION_LEVELS.tier3 - 1 }), cls.id).toBe(false)
+      expect(canPromoteUnit({ classId: cls.id, level: PROMOTION_LEVELS.tier3 }), cls.id).toBe(true)
+    }
+  })
+
+  it('3차는 더 위로 승급하는 병과가 없다 — Lv50에서도 false (tier-4 부재)', () => {
+    for (const cls of Object.values(CLASSES).filter((c) => c.tier === 3)) {
       expect(canPromoteUnit({ classId: cls.id, level: 50 }), cls.id).toBe(false)
     }
   })
@@ -389,6 +442,19 @@ describe('canEquipClass — 착용 판정은 계열(lineage) 기준', () => {
         )
       }
     }
+  })
+
+  it('3차 병과 전부: 계열 2차와 착용 가능 집합이 같다 (승급해도 무기 유지)', () => {
+    for (const base of Object.values(CLASSES).filter((c) => c.tier === 2 && c.promotesTo !== undefined)) {
+      for (const itemId of Object.keys(EQUIPMENT)) {
+        expect(canEquipClass(base.promotesTo!, itemId), `${base.promotesTo}: ${itemId}`).toBe(
+          canEquipClass(base.id, itemId),
+        )
+      }
+    }
+    // 바람바퀴는 포차계 전용 — 벽력차(3차)도 계열이라 착용 가능
+    expect(canEquipClass('thunderCart', 'windWheel')).toBe(true)
+    expect(canEquipClass('royalGuard', 'windWheel')).toBe(false)
   })
 
   it('미등록 병과/장비는 false', () => {
