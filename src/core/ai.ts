@@ -9,6 +9,7 @@ import {
   canAct,
   canCast,
   classOf,
+  effectiveAttackRanges,
   effectiveStats,
   hasStatus,
   hitRateAgainst,
@@ -260,7 +261,6 @@ export function decideUnit(state: BattleState, unit: UnitState): UnitPlan {
   const hostiles = livingUnits(state).filter((u) => isHostile(unit, u))
   // 회복·강화 후보 (자기 자신 포함). 지원 책략이 없는 병과는 이 목록을 쓰지 않는다.
   const friendlies = livingUnits(state).filter((u) => !isHostile(unit, u))
-  const cls = classOf(unit)
 
   // guard: 이동하지 않음. 현재 위치에서 공격 가능할 때만 행동.
   // 부동(immobile)도 같은 취급 — 제자리에서 공격·책략만 검토한다 (리듀서 canMove 게이트와 같은 결론).
@@ -273,11 +273,12 @@ export function decideUnit(state: BattleState, unit: UnitState): UnitPlan {
   let best: UnitPlan | null = null
 
   for (const cell of candidateCells) {
+    const { minRange, maxRange } = effectiveAttackRanges(unit)
     for (const target of hostiles) {
       const dist = manhattan(cell, target.pos)
 
-      // 물리 공격
-      if (dist >= cls.minRange && dist <= cls.maxRange) {
+      // 물리 공격 (몰우전 — 근접 병과 원거리 부여 포함, v1.3)
+      if (dist >= minRange && dist <= maxRange) {
         const score = scorePhysical(state, unit, cell, target)
         if (!best || score > best.score) {
           best = {

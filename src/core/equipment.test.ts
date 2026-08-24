@@ -125,7 +125,8 @@ describe('EQUIPMENT 데이터', () => {
       expect(item.price === null, item.id).toBe(item.isTreasure === true)
     }
     // 의천검/청강검/적로/맹덕신서/태평요술서 + v0.7 방천화극/적토마 + v1.2 1부 보물 16종
-    expect(Object.values(EQUIPMENT).filter((i) => i.isTreasure).length).toBe(23)
+    // + v1.3 보물 완성 2종(구리기마갑옷·관건 — 원작 쌍을 맞춰 추가, kr-blog §R5)
+    expect(Object.values(EQUIPMENT).filter((i) => i.isTreasure).length).toBe(25)
   })
 
   it('상점 장비 가격이 단계별 설계 구간 안에 있다', () => {

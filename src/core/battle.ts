@@ -197,6 +197,46 @@ function boostedStats(unit: UnitState): OfficerStats {
   }
 }
 
+// ---------- 장비 특수효과 (v1.3 — kr-blog §R5) ----------
+
+/** 장비의 최대 HP 가산 합 (투구 계열: 가죽+15/구리+30, 원작 확정) */
+export function equipMaxHpBonus(unit: UnitState): number {
+  return equippedItems(unit).reduce((sum, item) => sum + (item.maxHpBonus ?? 0), 0)
+}
+
+/** 장비의 최대 MP 가산 합 (복건/관건/칠흑도복: +15/+30/+20, 원작 확정) */
+export function equipMaxMpBonus(unit: UnitState): number {
+  return equippedItems(unit).reduce((sum, item) => sum + (item.maxMpBonus ?? 0), 0)
+}
+
+/** 장비 특수효과를 포함한 실효 최대 HP (호전·레벨업·승급 공용) */
+export function effectiveMaxHp(unit: UnitState): number {
+  return maxHp(classOf(unit), unit.level) + equipMaxHpBonus(unit)
+}
+
+/** 장비 특수효과를 포함한 실효 최대 MP */
+export function effectiveMaxMp(unit: UnitState): number {
+  return maxMp(classOf(unit), unit.level) + equipMaxMpBonus(unit)
+}
+
+/** 백은갑옷 등 — 책략 피해 배율 (1 = 보통, 0.5 = 반감). 곱연산. */
+export function strategyDamageScaleOf(unit: UnitState): number {
+  return equippedItems(unit).reduce((acc, item) => acc * (item.strategyDamageScale ?? 1), 1)
+}
+
+/**
+ * 실효 공격 사거리. 몰우전(근접 병과에 원거리 공격 부여, 원작 확정)을 반영한다.
+ * 원작 진정치는 "근접 병과가 화살을 쏘는" 것이므로 사거리 2~3을 부여한다 (kr-blog §R5).
+ * 원래 원거리 병과는 그대로 둔다.
+ */
+export function effectiveAttackRanges(unit: UnitState): { minRange: number; maxRange: number } {
+  const cls = classOf(unit)
+  if (!cls.ranged && equippedItems(unit).some((item) => item.rangedAttack)) {
+    return { minRange: 2, maxRange: 3 }
+  }
+  return { minRange: cls.minRange, maxRange: cls.maxRange }
+}
+
 /** 장비(무구성장 포함) + 열매 + 버프 반영된 실효 전투 능력치 (열매 → 장비 가산 → 버프 순서) */
 export function effectiveStats(unit: UnitState): CombatStats {
   const base = combatStats(boostedStats(unit), classOf(unit).growth, unit.level)
@@ -370,9 +410,11 @@ export function createBattle(
     const entry = def.faction === 'player' ? roster?.find((r) => r.officerId === def.officerId) : undefined
     // 승급한 아군은 로스터의 병과 오버라이드를 쓴다. 적/우군은 언제나 장수 기본 병과.
     const classId = entry ? classIdOf(entry) : officer.classId
-    const cls = CLASSES[classId]
     const level = entry?.level ?? def.level ?? officer.level
-    return {
+    // 아군은 캠페인 로스터 우선, 적/우군·자유 전투는 스테이지 정의(적장 장비 — 원작: 격파 드랍과 연결).
+    // 정의 표기(문자열 id)든 인스턴스든 여기서 전부 인스턴스로 정규화된다.
+    const equipment = toEquipmentMap(entry?.equipment ?? def.equipment ?? officer.initialEquipment)
+    const unit: UnitState = {
       id: `u${i}_${def.officerId}`,
       officerId: def.officerId,
       classId,
@@ -380,22 +422,26 @@ export function createBattle(
       pos: { ...def.pos },
       level,
       exp: entry?.exp ?? 0,
-      hp: maxHp(cls, level),
-      maxHp: maxHp(cls, level),
-      mp: maxMp(cls, level),
-      maxMp: maxMp(cls, level),
+      hp: 0,
+      maxHp: 0,
+      mp: 0,
+      maxMp: 0,
       moved: false,
       acted: false,
       statuses: [],
       buffs: [],
-      // 아군은 캠페인 로스터 우선, 적/우군·자유 전투는 스테이지 정의(적장 장비 — 원작: 격파 드랍과 연결).
-      // 정의 표기(문자열 id)든 인스턴스든 여기서 전부 인스턴스로 정규화된다.
-      equipment: toEquipmentMap(entry?.equipment ?? def.equipment ?? officer.initialEquipment),
+      equipment,
       statBonus: { ...(entry?.statBonus ?? {}) },
       isLeader: def.isLeader,
       isBoss: def.isBoss,
       behavior: def.behavior,
     }
+    // 장비 특수효과(최대 HP/MP 가산) 포함 실효 최대치 (v1.3 — kr-blog §R5)
+    unit.maxHp = effectiveMaxHp(unit)
+    unit.maxMp = effectiveMaxMp(unit)
+    unit.hp = unit.maxHp
+    unit.mp = unit.maxMp
+    return unit
   })
 
   return {
@@ -591,7 +637,9 @@ function applyHitDamage(
   const aStats = effectiveStats(attacker)
   const dStats = effectiveStats(defender)
 
-  const critRoll = roll(state.rngState, critRate(aStats.morale, dStats.morale))
+  // 황금갑옷 — 회심의 일격 무조건 회피 (원작 확정, kr-blog §R5). 이미 낸 난수는 소모하지 않는다.
+  const critImmune = equippedItems(defender).some((item) => item.critImmune)
+  const critRoll = roll(state.rngState, critImmune ? 0 : critRate(aStats.morale, dStats.morale))
   state.rngState = critRoll.nextState
 
   const bonus = nextInt(state.rngState, 0, 7)
@@ -600,6 +648,15 @@ function applyHitDamage(
   const multipliers = [affinityMultiplier(classOf(attacker), classOf(defender))]
   if (critRoll.value) multipliers.push(CRIT_MULTIPLIER)
   if (damageScale !== 1) multipliers.push(damageScale)
+  // 기마갑옷/가죽·구리 — 원거리(간접) 공격 피해 감소 (원작 확정, kr-blog §R5).
+  // affinity에서 원거리→기병 1.5배가 이미 곱해졌다면 그 위에 곱연산으로 줄어든다.
+  if (classOf(attacker).ranged) {
+    const rangedScale = equippedItems(defender).reduce(
+      (acc, item) => acc * (item.rangedDamageScale ?? 1),
+      1,
+    )
+    if (rangedScale !== 1) multipliers.push(rangedScale)
+  }
 
   const dmg = physicalDamage({
     atk: aStats.atk,
@@ -657,7 +714,14 @@ function resolveStrike(
   const aStats = effectiveStats(attacker)
   const dStats = effectiveStats(defender)
 
-  const hitRoll = roll(state.rngState, hitRateAgainst(aStats.agi, defender, dStats.agi))
+  // 무명장갑(명중+)·방패(회피+) — 명중률 퍼센트포인트 보정 (원작 확정, kr-blog §R5)
+  const hitBonus = equippedItems(attacker).reduce((acc, item) => acc + (item.hitBonus ?? 0), 0)
+  const evadeBonus = equippedItems(defender).reduce((acc, item) => acc + (item.evadeBonus ?? 0), 0)
+
+  const hitRoll = roll(
+    state.rngState,
+    Math.max(30, Math.min(100, hitRateAgainst(aStats.agi, defender, dStats.agi) + hitBonus - evadeBonus)),
+  )
   state.rngState = hitRoll.nextState
   if (!hitRoll.value) {
     log(state, 'miss', `${nameOf(attacker)}의 공격이 빗나갔다!`, { targetId: defender.id, amount: 0 })
@@ -872,7 +936,7 @@ function resolveDuel(
 }
 
 export function applyAction(prev: BattleState, action: BattleAction): BattleState {
-  if (prev.result !== 'ongoing') return prev
+  if (prev.result !== 'ongoing' && !(action.type === 'eventContinue' && prev.pendingEvents.length > 0)) return prev
   // 표시 대기 이벤트가 있으면 eventContinue 외 전 액션을 봉쇄한다 (AI 포함 — v1.1)
   if (prev.pendingEvents.length > 0 && action.type !== 'eventContinue') return prev
   const stage = prev.__stage
@@ -904,9 +968,10 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
       if (!canAct(attacker)) return prev // 혼란
       if (!isHostile(attacker, defender)) return prev
 
-      const aCls = classOf(attacker)
       const dist = manhattan(attacker.pos, defender.pos)
-      if (dist < aCls.minRange || dist > aCls.maxRange) return prev
+      // 몰우전(근접 병과 원거리 부여) 포함 실효 사거리 검증 (v1.3, kr-blog §R5)
+      const { minRange, maxRange } = effectiveAttackRanges(attacker)
+      if (dist < minRange || dist > maxRange) return prev
 
       // 1타
       resolveStrike(state, attacker, defender, occurred)
@@ -918,8 +983,16 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
         const dbl = roll(state.rngState, doubleAttackRate(aStats.agi, dStats.agi))
         state.rngState = dbl.nextState
         if (dbl.value) {
-          log(state, 'double', `${nameOf(attacker)}의 2회 공격!`)
-          resolveStrike(state, attacker, defender, occurred)
+          // 연환갑옷 — 연속공격 2번째 타격만 회피 (원작 확정, kr-blog §R5)
+          if (equippedItems(defender).some((item) => item.secondHitEvade)) {
+            log(state, 'evade', `${nameOf(defender)}이(가) 연환갑옷으로 두 번째 번쩍임을 비껴냈다!`, {
+              targetId: defender.id,
+              amount: 0,
+            })
+          } else {
+            log(state, 'double', `${nameOf(attacker)}의 2회 공격!`)
+            resolveStrike(state, attacker, defender, occurred)
+          }
         }
       }
 
@@ -988,11 +1061,12 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
               const bonus = nextInt(state.rngState, 0, 7)
               state.rngState = bonus.nextState
               const dmg = strategyDamage(cStats.mind, tStats.mind, caster.level, strategy.power, bonus.value)
-              log(state, 'strategy', `${nameOf(caster)}의 ${strategy.name} → ${nameOf(target)}: ${dmg} 데미지`, {
+              const scaled = Math.max(1, Math.trunc(dmg * strategyDamageScaleOf(target)))
+              log(state, 'strategy', `${nameOf(caster)}의 ${strategy.name} → ${nameOf(target)}: ${scaled} 데미지`, {
                 targetId: target.id,
-                amount: -dmg,
+                amount: -scaled,
               })
-              dealDamage(state, target, dmg, occurred)
+              dealDamage(state, target, scaled, occurred)
               grantExp(state, caster, target.level, target.hp === 0)
             }
           }
@@ -1035,11 +1109,12 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
             const bonus = nextInt(state.rngState, 0, 7)
             state.rngState = bonus.nextState
             const dmg = strategyDamage(cStats.mind, tStats.mind, caster.level, strategy.power!, bonus.value)
-            log(state, 'strategy', `${nameOf(caster)}의 ${strategy.name} → ${nameOf(target)}: ${dmg} 데미지`, {
+            const scaled = Math.max(1, Math.trunc(dmg * strategyDamageScaleOf(target)))
+            log(state, 'strategy', `${nameOf(caster)}의 ${strategy.name} → ${nameOf(target)}: ${scaled} 데미지`, {
               targetId: target.id,
-              amount: -dmg,
+              amount: -scaled,
             })
-            dealDamage(state, target, dmg, occurred)
+            dealDamage(state, target, scaled, occurred)
             grantExp(state, caster, target.level, target.hp === 0)
             // 원작 확정: 책략 명중도 무기(부채·보검) exp, 책략 피격도 방어구 exp (equipment.md 증보)
             growEquipment(
@@ -1145,8 +1220,9 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
           const newCls = CLASSES[CLASSES[target.classId].promotesTo!]
           const healed = target.maxHp - target.hp
           target.classId = newCls.id
-          target.maxHp = maxHp(newCls, target.level)
-          target.maxMp = maxMp(newCls, target.level)
+          // 장비 최대 HP/MP 가산 보존 — 병과 성장치는 바뀌어도 장비 보너스는 유지 (v1.3, kr-blog §R5)
+          target.maxHp = effectiveMaxHp(target)
+          target.maxMp = effectiveMaxMp(target)
           // 원작: 인수 사용 = 클래스업 + HP/MP 최대치 회복 (docs/research/promotion.md §4)
           target.hp = target.maxHp
           target.mp = target.maxMp
@@ -1256,6 +1332,14 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
           unit.mp += regained
           log(state, 'mpRegen', `${nameOf(unit)} — 책략치 ${regained} 회복`)
         }
+
+        // 장비 HP 재생 (봉황깃옷 — 원작 확정: 매턴 최대 HP 20%. 청낭서 비중첩·회복 지형 중첩, kr-blog §R5)
+        const hpRegenPct = equippedItems(unit).reduce((acc, item) => acc + (item.hpRegenPercent ?? 0), 0)
+        if (hpRegenPct > 0 && unit.hp < unit.maxHp) {
+          const regained = Math.min(Math.trunc((unit.maxHp * hpRegenPct) / 100), unit.maxHp - unit.hp)
+          unit.hp += regained
+          log(state, 'regen', `${nameOf(unit)} — 깃옷의 기운으로 ${regained} 회복`)
+        }
       }
       break
     }
@@ -1318,6 +1402,9 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
   if (stage) {
     runEvents(state, stage, occurred)
     if (state.pendingEvents.length === 0) checkVictory(state, stage)
+    // v1.3 — 승리 확정 직후 승리 이벤트(victory 트리거) 발화. 원작 "승리 후 전리품/대사" 표현
+    // (kr-blog §R3 — 청주 도복 분기가 여기에 막혀 있었다). 전투당 1회 (firedEvents 가드).
+    if (state.result === 'victory') runEvents(state, stage, [{ type: 'victory' }])
   }
   return state
 }

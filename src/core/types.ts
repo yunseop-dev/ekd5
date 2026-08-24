@@ -122,6 +122,26 @@ export interface EquipmentDef {
   expMultiplier?: number // 획득 경험치 배율 (맹덕신서 1.5)
   mpRegenPerTurn?: number // 매턴 페이즈 시작 시 MP 회복 (태평요술서 = 10, 원작 확정)
   allTerrainCost1?: boolean // 진입 가능 전 지형 소비 이동력 1 (적로, 원작 확정)
+  // ---- v1.3 장비 특수효과 (kr-blog §R5) ----
+  /** 최대 HP 가산 (투구 계열 — 가죽+15/구리+30, 원작 확정) */
+  maxHpBonus?: number
+  /** 최대 MP 가산 (복건/관건/칠흑도복 — +15/+30/+20, 원작 확정) */
+  maxMpBonus?: number
+  /** 매턴 페이즈 시작 시 최대 HP 대비 n% 회복 (봉황깃옷 20%, 원작 확정) */
+  hpRegenPercent?: number
+  /** 회심의 일격을 무조건 회피 (황금갑옷, 원작 확정) */
+  critImmune?: boolean
+  /** 연속공격 2번째 타격만 회피 (연환갑옷, 원작 확정) */
+  secondHitEvade?: boolean
+  /** 책략 피해 배율 (1=보통, 0.5=반감 — 백은갑옷, 원작 확정) */
+  strategyDamageScale?: number
+  /** 원거리(ranged) 공격 피해 배율 (기마갑옷·가죽 0.7/구리 0.5, 원작 확정) */
+  rangedDamageScale?: number
+  /** 물리 명중 보정 (무명장갑 +10 — 퍼센트포인트, 원작 확정) */
+  hitBonus?: number
+  /** 물리 회피 보정 (방패 — 가죽+10/구리+15 — 퍼센트포인트, 원작 확정) */
+  evadeBonus?: number
+  // ----
   /** 착용 가능 병과 id 목록. undefined = 전 병과 (원작 병과 1:1 무기 규칙, equipment.md §5) */
   classes?: string[]
   price: number | null // null = 비매품(보물)
@@ -133,7 +153,7 @@ export interface EquipmentDef {
   pierceBack?: boolean
   /** 여포궁 등 — 명중 시 상태이상 확정 부여 (원작: 보물은 100% 부여, v1.2) */
   onHitStatus?: StatusId
-  /** 몰우전 — 근접 병과에 원거리 공격을 부여 (원작 확정. 엔진 반영은 후속) */
+  /** 몰우전 — 근접 병과에 원거리 공격을 부여 (원작 확정. v1.3 엔진 반영 — effectiveAttackRanges) */
   rangedAttack?: boolean
   description: string
 }
@@ -345,6 +365,8 @@ export type EventTrigger =
   | { type: 'unitDefeated'; officerId: string }
   | { type: 'unitsMeet'; a: string; b: string } // 체비쇼프 거리 1 (인접 8방) — 일기토/설전/조우
   | { type: 'reachArea'; area: Vec2[]; faction: Faction; count?: number } // 지정 칸 위 생존 유닛 ≥ count(기본 1)
+  // v1.3 — 승리 확정 직후 발화 (원작 "승리 후 전리품/대사", kr-blog §R3). 전투당 1회.
+  | { type: 'victory' }
 
 export type EventAction =
   | { type: 'dialogue'; lines: DialogueLine[] }

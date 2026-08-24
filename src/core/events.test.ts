@@ -1159,3 +1159,56 @@ describe('캠페인 — pendingRewards 회수', () => {
     expect(autoResolveEvents(startBattle(stage, 1, campaign.roster)).pendingRewards).toHaveLength(1)
   })
 })
+
+// =====================================================================================
+// v1.3 victory 트리거 — 승리 확정 직후 승리 이벤트 발화 (kr-blog §R3)
+// =====================================================================================
+
+describe('victory 트리거', () => {
+  it('승리 확정 시 victory 트리거 이벤트가 발화한다 (전리품 대사)', () => {
+    const stage = mkStage({
+      units: ADJACENT_PAIR,
+      // 승리 시 대사 + 아이템 지급 (원작 "승리 후 전리품" 표현)
+      events: [
+        ev('win', { type: 'victory' }, [
+          dialogue('적을 모조리 쳤다!'),
+          { type: 'giveItem', itemId: 'leatherShield', kind: 'equipment' },
+        ]),
+      ],
+      victory: [{ type: 'annihilation' }],
+    })
+    const state = startBattle(stage, 1)
+    const won = forceKill(state, 'caocao', 'yellowInfantry') // 유일한 적 격파 → 전멸 승리
+    expect(won.result).toBe('victory')
+    expect(won.firedEvents).toContain('win')
+    // 승리 대사(표시형)를 소비하면 뒤의 giveItem이 pendingRewards에 적재된다
+    const after = autoResolveEvents(won)
+    expect(after.pendingRewards).toEqual([{ itemId: 'leatherShield', kind: 'equipment' }])
+  })
+
+  it('victory 트리거는 전투당 1회만 발화한다 (firedEvents 가드)', () => {
+    const stage = mkStage({
+      units: ADJACENT_PAIR,
+      events: [ev('win', { type: 'victory' }, [dialogue('승리!')])],
+      victory: [{ type: 'annihilation' }],
+    })
+    const state = startBattle(stage, 1)
+    const after = forceKill(state, 'caocao', 'yellowInfantry')
+    expect(after.firedEvents).toEqual(['win'])
+    // 재평가를 더 돌려도 중복 발화되지 않는다 — 이벤트가 재적재되지 않는다
+    expect(after.firedEvents.filter((id) => id === 'win')).toHaveLength(1)
+  })
+
+  it('패배에는 victory 트리거가 발화하지 않는다', () => {
+    const stage = mkStage({
+      units: [{ officerId: 'caocao', faction: 'player', pos: { x: 1, y: 1 }, isLeader: true }],
+      events: [ev('win', { type: 'victory' }, [dialogue('이기면 뜬다')])],
+      victory: [{ type: 'reachPoint', pos: { x: 9, y: 9 } }], // 도달 안 하면 승리 아님
+      defeat: [{ type: 'turnLimit', turns: 1 }],
+    })
+    // 1턴 넘겨 패배 (2턴 시작 시) — victory 트리거는 발화하지 않아야 한다
+    const lost = advanceTurns(startBattle(stage, 1), 2)
+    expect(lost.result).toBe('defeat')
+    expect(lost.firedEvents.filter((id) => id === 'win')).toHaveLength(0)
+  })
+})
