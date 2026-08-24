@@ -672,11 +672,13 @@ export const EQUIPMENT: Record<string, EquipmentDef> = {
     slot: 'accessory',
     bonus: {},
     // **원작 확정 +2, 단 포차계 전용** (thewiki·biglobe 일치). 포차계가 미구현이라 병과 제약은
-    // 계열 추가 시점까지 보류한다 — 지금 classes를 걸면 착용자가 아무도 없어진다 (kr-blog.md §R5)
+    // 계열 추가 시점까지 보류했다 — 이제 catapult 계열이 들어왔으니 제약을 건다 (kr-blog.md §R5).
+    // classes에는 계열 루트 id만 적는다 (canEquipClass가 lineage로 환원) — 중포차도 여전히 쓴다.
     moveBonus: 2,
+    classes: ['catapult'],
     price: null,
     tier: 2,
     isTreasure: true,
-    description: '바람을 타고 도는 바퀴. 발걸음이 한결 가벼워진다.',
+    description: '바람을 타고 도는 바퀴. 포차(砲車)만 다룬다. 발걸음이 한결 가벼워진다.',
   },
 }

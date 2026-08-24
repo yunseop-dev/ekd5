@@ -704,6 +704,45 @@ function applyHitDamage(
   )
 }
 
+/** 포차 광역 피해 배율 — 본타의 절반 (설계값, classes.md §4.2 "대상 인접 광역"). */
+const SPLASH_DAMAGE_SCALE = 0.5
+
+/**
+ * 포차(중포차 2차+) 광역 — 본타가 명중했을 때 대상 인접(8방) 적에게 반감 광역 피해를 나눠준다.
+ * 광역은 반격·2회공격·회심·랜덤가산을 발생시키지 않는 (보너스 콜레터럴) 단순 물리다 (v1.3).
+ */
+function applySplash(state: BattleState, attacker: UnitState, center: UnitState, occurred: OccurredEvent[]): void {
+  const aStats = effectiveStats(attacker)
+  for (const [dx, dy] of [
+    [-1, -1],
+    [0, -1],
+    [1, -1],
+    [-1, 0],
+    [1, 0],
+    [-1, 1],
+    [0, 1],
+    [1, 1],
+  ] as const) {
+    const target = unitAt(state, { x: center.pos.x + dx, y: center.pos.y + dy })
+    if (!target || !isHostile(attacker, target) || target.hp <= 0) continue
+    const dStats = effectiveStats(target)
+    const dmg = physicalDamage({
+      atk: aStats.atk,
+      def: dStats.def,
+      atkTerrainEffect: terrainEffectOf(state, attacker),
+      defTerrainEffect: terrainEffectOf(state, target),
+      attackerLevel: attacker.level,
+      multipliers: [SPLASH_DAMAGE_SCALE],
+      randomBonus: 0,
+    })
+    log(state, 'splash', `${nameOf(attacker)}의 포차 광역! ${nameOf(target)}: ${dmg} 데미지`, {
+      targetId: target.id,
+      amount: -dmg,
+    })
+    dealDamage(state, target, dmg, occurred)
+  }
+}
+
 /** 한 번의 타격 해소 (명중 → 회심 → 데미지 → 장비 특수효과). 명중 여부 반환. damageScale: 반격 시 0.8 */
 function resolveStrike(
   state: BattleState,
@@ -975,7 +1014,8 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
       if (dist < minRange || dist > maxRange) return prev
 
       // 1타
-      resolveStrike(state, attacker, defender, occurred)
+      // primaryHit = 본타 명중 여부 — 포차(중포차+) 광역은 본타가 맞았을 때만 콜레터럴로 터진다
+      const primaryHit = resolveStrike(state, attacker, defender, occurred)
 
       // 2회 공격 판정
       if (defender.hp > 0) {
@@ -1002,6 +1042,11 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
       if (defender.hp > 0 && forecast.willCounter) {
         log(state, 'counter', `${nameOf(defender)}의 반격!`)
         resolveStrike(state, defender, attacker, occurred, COUNTER_DAMAGE_SCALE)
+      }
+
+      // 포차 광역 — 중포차(2차) 이상: 본타가 명중했을 때 대상 인접(8방) 적에게 반감 콜레터럴 (classes.md §4.2)
+      if (primaryHit && classOf(attacker).splash) {
+        applySplash(state, attacker, defender, occurred)
       }
 
       attacker.acted = true

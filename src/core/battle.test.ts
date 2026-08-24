@@ -428,3 +428,56 @@ describe('증원', () => {
     expect(state.units.some((u) => u.officerId === 'yellowCavalry')).toBe(true)
   })
 })
+
+// 포차 광역 (v1.3) — 중포차(2차)는 본타 명중 시 대상 인접(8방) 적에 반감 광역. 경포차(1차)는 광역 없음 (classes.md §4.2)
+describe('포차 광역 (포차계 전용)', () => {
+  // 중포차(2차) 광역 테스트 — 대상(3,0)과 대각 인접 적(2,1)을 두고 본타 공격 시 인접 적도 피해
+  it('중포차가 명중하면 대상 인접(8방) 적에도 반감 광역 피해가 들어간다', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 0, y: 0 }, isLeader: true },
+        { officerId: 'xiahoudun', faction: 'player', pos: { x: 0, y: 1 } }, // (3,0)과 거리 4 — 포차 사거리(3~5) 내
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 3, y: 0 } },
+        { officerId: 'yellowArcher', faction: 'enemy', pos: { x: 2, y: 1 } }, // 대상(3,0) 대각 인접
+        { officerId: 'yellowCavalry', faction: 'enemy', pos: { x: 6, y: 6 } }, // 멀리 — 무관계
+      ],
+    })
+    let state = startBattle(stage, 1)
+    const shooter = unit(state, 'xiahoudun')
+    shooter.classId = 'heavyCatapult' // 중포차(2차) — 광역
+    const target = unit(state, 'yellowInfantry')
+    const side = unit(state, 'yellowArcher') // 인접 적
+    const targetHp = target.hp
+    const sideHp = side.hp
+
+    const next = applyAction(state, { type: 'attack', unitId: shooter.id, targetId: target.id })
+    expect(unit(next, 'yellowInfantry').hp).toBeLessThan(targetHp) // 본타
+    expect(unit(next, 'yellowArcher').hp).toBeLessThan(sideHp) // 광역 콜레터럴
+    expect(unit(next, 'xiahoudun').acted).toBe(true)
+    // 광역 로그 존재
+    expect(next.log.some((e) => e.type === 'splash')).toBe(true)
+  })
+
+  it('경포차(1차)는 광역이 없다 — 대상만 맞고 인접 적은 무사하다', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 0, y: 0 }, isLeader: true },
+        { officerId: 'xiahoudun', faction: 'player', pos: { x: 0, y: 1 } }, // (3,0)과 거리 4 — 포차 사거리(3~5) 내
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 3, y: 0 } },
+        { officerId: 'yellowArcher', faction: 'enemy', pos: { x: 2, y: 1 } },
+      ],
+    })
+    let state = startBattle(stage, 1)
+    const shooter = unit(state, 'xiahoudun')
+    shooter.classId = 'catapult' // 경포차(1차) — 광역 없음
+    const target = unit(state, 'yellowInfantry')
+    const side = unit(state, 'yellowArcher')
+    const targetHp = target.hp
+    const sideHp = side.hp
+
+    const next = applyAction(state, { type: 'attack', unitId: shooter.id, targetId: target.id })
+    expect(unit(next, 'yellowInfantry').hp).toBeLessThan(targetHp) // 본타는 맞음
+    expect(unit(next, 'yellowArcher').hp).toBe(sideHp) // 인접 적은 피해 없음
+    expect(next.log.some((e) => e.type === 'splash')).toBe(false)
+  })
+})

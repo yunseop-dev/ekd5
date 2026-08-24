@@ -366,6 +366,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     category: 'archer',
     mounted: false,
     ranged: true,
+    splash: true, // 2차부터 포차 광역 — 대상 인접(8방) 적 반감 피해 (classes.md §4.2)
     move: 3, // 원작 포차 3→3(2차 무변화)→4(3차 +1)
     minRange: 3,
     maxRange: 5,

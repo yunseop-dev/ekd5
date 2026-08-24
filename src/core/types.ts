@@ -102,6 +102,8 @@ export interface UnitClassDef {
   maxRange: number
   /** 공격범위 모양 — 기본(undefined)은 맨해튼. 'chebyshev' = 8방(보병/무도가/무희/적병 등). */
   attackShape?: AttackShape
+  /** 포차 광역 — 본타가 명중하면 대상 인접(8방) 적에게 반감 광역 피해. 2차 중포차부터 (classes.md §4.2). */
+  splash?: boolean
   moveProfile: MoveProfileId
   growth: GrowthGrades
   hpBase: number
