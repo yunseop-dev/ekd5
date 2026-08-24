@@ -433,6 +433,10 @@ export interface StageDef {
   reinforcements: ReinforcementDef[]
   weather: Weather
   bonusExp?: number // 2차 승리조건 달성 시 생존 전원 보너스 (시리즈 전통 +50)
+  /** 적 레벨 연동 스케일링 (v1.3-scaling, 옵트인) — 로스터가 있는 캠페인 전투에서만.
+   *  값 = 이 스테이지의 **설계 기준 레벨**. 출진 아군 절사평균과의 차분만큼 적 단위 레벨을 보정하고,
+   *  보정 레벨이 승급 문턱(≥15·≥30) 이상이면 적장 병과도 클래스업. 선언하지 않으면 불변(밸런스 보존). */
+  enemyLevelScaling?: number
   // 전리품 — 원작 3분류 중 "특정 적 격파 시"(bossKill)와 "승리 후 지급"(victory)만 구현.
   // 시설 점령 즉시 지급은 v0.5 범위 밖 (docs/research/campaign-ux.md 1부 §3).
   loot?: {

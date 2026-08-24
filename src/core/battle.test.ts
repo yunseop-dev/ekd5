@@ -9,6 +9,7 @@ import {
   startBattle,
 } from './battle'
 import { strategyHealAmount } from './formulas'
+import type { RosterEntry } from './campaign'
 import type { BattleState, StageDef, TerrainId, UnitState } from './types'
 
 // 8×8 평지 맵 + 필요 유닛만 배치한 테스트 스테이지
@@ -538,5 +539,44 @@ describe('무희 상태회복 패시브', () => {
 
     expect(unit(next, 'guojia').statuses).toEqual([{ id: 'poison' }]) // 해제되지 않는다
     expect(next.log.some((e) => e.type === 'danceCure')).toBe(false)
+  })
+})
+
+// 적 레벨 연동 스케일링 (v1.3-scaling, 옵트인) — 아군 절사평균−기준 차분만큼 적 보정 + 적장 클래스업
+describe('적 레벨 연동 스케일링 (옵트인)', () => {
+  const scalingStage = (): StageDef =>
+    mkStage({
+      enemyLevelScaling: 10, // 설계 기준 레벨 10
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 0, y: 0 }, isLeader: true },
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 5, y: 0 }, level: 5 },
+      ],
+    })
+  const roster = (lv: number): RosterEntry[] => [
+    { officerId: 'caocao', level: lv, exp: 0, equipment: {}, statBonus: {} },
+  ]
+
+  it('로스터가 없으면(자유 전투) 스테이지가 선언해도 적 레벨 불변 — 튜닝 보존', () => {
+    const free = startBattle(scalingStage(), 1)
+    expect(unit(free, 'yellowInfantry').level).toBe(5)
+  })
+
+  it('로스터가 있으면 아군 절사평균−기준 차분만큼 적 레벨만 보정, 아군은 로스터 그대로', () => {
+    const state = startBattle(scalingStage(), 1, roster(13)) // partyAvg 13, delta +3
+    expect(unit(state, 'yellowInfantry').level).toBe(8) // 5 + 3
+    expect(unit(state, 'caocao').level).toBe(13)
+  })
+
+  it('적장 클래스업 — 보정 레벨 ≥15면 2차, ≥30이면 3차 병과로 승급한다', () => {
+    const s25 = startBattle(scalingStage(), 1, roster(30)) // delta 20 → 적 25 → 2차
+    expect(unit(s25, 'yellowInfantry').classId).toBe('guardInfantry')
+
+    const s33 = startBattle(scalingStage(), 1, roster(38)) // delta 28 → 적 33 → 3차
+    expect(unit(s33, 'yellowInfantry').classId).toBe('royalInfantry')
+  })
+
+  it('보정 레벨이 승급 문턱(15) 미만이면 병과는 그대로(1차)', () => {
+    const state = startBattle(scalingStage(), 1, roster(13)) // delta 3 → 적 8
+    expect(unit(state, 'yellowInfantry').classId).toBe('heavyInfantry')
   })
 })
