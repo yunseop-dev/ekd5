@@ -112,6 +112,8 @@ export function attackableCells(
   shape: AttackShape = 'manhattan',
 ): Vec2[] {
   const cells: Vec2[] = []
+  // 공격 불가 병과(황제 등 maxRange 0)는 자기 칸조차 공격 대상으로 삼지 않는다 (v1.3-review)
+  if (maxRange < 1) return cells
   for (let dy = -maxRange; dy <= maxRange; dy++) {
     for (let dx = -maxRange; dx <= maxRange; dx++) {
       const dist = shape === 'chebyshev' ? Math.max(Math.abs(dx), Math.abs(dy)) : Math.abs(dx) + Math.abs(dy)

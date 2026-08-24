@@ -10,7 +10,7 @@ import {
   startBattle,
 } from './battle'
 import { strategyHealAmount } from './formulas'
-import { keyOf } from './movement'
+import { attackableCells, keyOf } from './movement'
 import type { RosterEntry } from './campaign'
 import type { BattleState, StageDef, TerrainId, UnitState } from './types'
 
@@ -658,5 +658,30 @@ describe('맵 오브젝트 (오브젝트 레이어)', () => {
     expect(range.has(keyOf({ x: 1, y: 0 }))).toBe(true) // 벽 앞까지는 이동 가능
     expect(range.has(keyOf({ x: 3, y: 0 }))).toBe(false) // 벽 너머 — 절대 진입 불가
     expect(range.has(keyOf({ x: 7, y: 7 }))).toBe(false)
+  })
+})
+
+// 황제(공격 불가, maxRange 0) — 반격 불가 + 공격 범위 없음 (v1.3-review)
+describe('황제(공격 불가) 반격/공격 범위', () => {
+  it('공격 불가 병과(maxRange 0)는 인접 공격을 받아도 반격하지 않는다', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 0, y: 0 }, isLeader: true },
+        { officerId: 'xiahoudun', faction: 'player', pos: { x: 1, y: 0 } }, // 황제로 사용
+        { officerId: 'yellowInfantry', faction: 'enemy', pos: { x: 2, y: 0 } },
+      ],
+    })
+    const state = startBattle(stage, 1)
+    const emperor = unit(state, 'xiahoudun')
+    emperor.classId = 'emperor' // maxRange 0
+    const foe = unit(state, 'yellowInfantry')
+
+    // 황제가 공격당할 때 반격 판정이 false여야 한다
+    const fc = forecastAttack(state, foe, emperor)
+    expect(fc.willCounter).toBe(false)
+  })
+
+  it('공격 불가 병과의 attackableCells는 빈 배열이다 (자기 칸도 아님)', () => {
+    expect(attackableCells({ x: 3, y: 3 }, 0, 0, 8, 8)).toEqual([])
   })
 })

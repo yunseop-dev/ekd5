@@ -21,7 +21,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 1,
     maxRange: 1,
     moveProfile: 'foot',
-    growth: { atk: 'A', def: 'A', mind: 'A', agi: 'B', morale: 'S' },
+    growth: { atk: 'A', def: 'A', mind: 'A', agi: 'A', morale: 'A' },
     hpBase: 120,
     hpGrowth: 7,
     mpBase: 20,
@@ -44,7 +44,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 1,
     maxRange: 1,
     moveProfile: 'horse',
-    growth: { atk: 'A', def: 'B', mind: 'C', agi: 'A', morale: 'B' },
+    growth: { atk: 'S', def: 'A', mind: 'B', agi: 'B', morale: 'B' },
     hpBase: 110,
     hpGrowth: 6,
     mpBase: 10,
@@ -64,7 +64,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 1,
     maxRange: 1,
     moveProfile: 'foot',
-    growth: { atk: 'B', def: 'S', mind: 'C', agi: 'C', morale: 'B' },
+    growth: { atk: 'B', def: 'S', mind: 'A', agi: 'B', morale: 'B' },
     hpBase: 130,
     hpGrowth: 7,
     mpBase: 10,
@@ -84,7 +84,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 2,
     maxRange: 2,
     moveProfile: 'foot',
-    growth: { atk: 'A', def: 'C', mind: 'B', agi: 'B', morale: 'C' },
+    growth: { atk: 'A', def: 'B', mind: 'B', agi: 'B', morale: 'S' },
     hpBase: 100,
     hpGrowth: 5,
     mpBase: 10,
@@ -104,7 +104,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 1,
     maxRange: 1,
     moveProfile: 'mage',
-    growth: { atk: 'C', def: 'C', mind: 'S', agi: 'B', morale: 'B' },
+    growth: { atk: 'B', def: 'B', mind: 'S', agi: 'B', morale: 'B' },
     hpBase: 90,
     hpGrowth: 4,
     mpBase: 30,
@@ -132,7 +132,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 1,
     maxRange: 1,
     moveProfile: 'mage',
-    growth: { atk: 'C', def: 'C', mind: 'A', agi: 'B', morale: 'A' },
+    growth: { atk: 'C', def: 'C', mind: 'S', agi: 'A', morale: 'A' },
     hpBase: 90,
     hpGrowth: 4,
     mpBase: 30,
@@ -166,7 +166,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 1,
     maxRange: 1,
     moveProfile: 'foot',
-    growth: { atk: 'A', def: 'A', mind: 'A', agi: 'B', morale: 'S' },
+    growth: { atk: 'A', def: 'A', mind: 'A', agi: 'A', morale: 'A' },
     hpBase: 134, // 120 + 7×2
     hpGrowth: 7,
     mpBase: 24, // 20 + 2×2
@@ -189,7 +189,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 1,
     maxRange: 1,
     moveProfile: 'horse',
-    growth: { atk: 'A', def: 'B', mind: 'C', agi: 'A', morale: 'B' },
+    growth: { atk: 'S', def: 'A', mind: 'B', agi: 'B', morale: 'B' },
     hpBase: 122, // 110 + 6×2
     hpGrowth: 6,
     mpBase: 12, // 10 + 1×2
@@ -209,7 +209,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 1,
     maxRange: 1,
     moveProfile: 'foot',
-    growth: { atk: 'B', def: 'S', mind: 'C', agi: 'C', morale: 'B' },
+    growth: { atk: 'B', def: 'S', mind: 'A', agi: 'B', morale: 'B' },
     hpBase: 144, // 130 + 7×2
     hpGrowth: 7,
     mpBase: 12, // 10 + 1×2
@@ -229,7 +229,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 2,
     maxRange: 3, // 원작: 원거리 계열은 승급마다 사거리 확장 (궁병 ニ → 노병 ト)
     moveProfile: 'foot',
-    growth: { atk: 'A', def: 'C', mind: 'B', agi: 'B', morale: 'C' },
+    growth: { atk: 'A', def: 'B', mind: 'B', agi: 'B', morale: 'S' },
     hpBase: 110, // 100 + 5×2
     hpGrowth: 5,
     mpBase: 12, // 10 + 1×2
@@ -249,7 +249,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 1,
     maxRange: 1,
     moveProfile: 'mage',
-    growth: { atk: 'C', def: 'C', mind: 'S', agi: 'B', morale: 'B' },
+    growth: { atk: 'B', def: 'B', mind: 'S', agi: 'B', morale: 'B' },
     hpBase: 98, // 90 + 4×2
     hpGrowth: 4,
     mpBase: 36, // 30 + 3×2
@@ -279,7 +279,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 1,
     maxRange: 1,
     moveProfile: 'mage',
-    growth: { atk: 'C', def: 'C', mind: 'A', agi: 'B', morale: 'A' },
+    growth: { atk: 'C', def: 'C', mind: 'S', agi: 'A', morale: 'A' },
     hpBase: 98, // 90 + 4×2
     hpGrowth: 4,
     mpBase: 36, // 30 + 3×2
@@ -533,7 +533,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 1,
     maxRange: 1,
     moveProfile: 'horse',
-    growth: { atk: 'C', def: 'S', mind: 'C', agi: 'B', morale: 'B' },
+    growth: { atk: 'C', def: 'C', mind: 'S', agi: 'B', morale: 'B' },
     hpBase: 90,
     hpGrowth: 4,
     mpBase: 40,
@@ -557,7 +557,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 1,
     maxRange: 1,
     moveProfile: 'horse',
-    growth: { atk: 'C', def: 'S', mind: 'C', agi: 'B', morale: 'B' },
+    growth: { atk: 'C', def: 'C', mind: 'S', agi: 'B', morale: 'B' },
     hpBase: 98, // 90 + 4×2
     hpGrowth: 4,
     mpBase: 44, // 40 + 2×2
@@ -625,6 +625,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
   },
 
   // 황제 — 비무장 호송 유닛. 공격 불가(범위 0·1), 승급 없음 (classes.md §3)
+  // HP/MP·성장등급은 원작 표(classes.md §2)에 황제가 없어 [설계값] — 사기 S만 kr-blog §R2 확정.
   emperor: {
     id: 'emperor',
     lineage: 'emperor',
@@ -667,7 +668,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     maxRange: 1,
     attackShape: 'chebyshev',
     moveProfile: 'foot',
-    growth: { atk: 'A', def: 'A', mind: 'A', agi: 'B', morale: 'S' },
+    growth: { atk: 'A', def: 'A', mind: 'A', agi: 'A', morale: 'A' },
     hpBase: 148, // 134 + 7×2
     hpGrowth: 7,
     mpBase: 28, // 24 + 2×2
@@ -692,7 +693,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     maxRange: 1,
     attackShape: 'chebyshev',
     moveProfile: 'horse',
-    growth: { atk: 'A', def: 'B', mind: 'C', agi: 'A', morale: 'B' },
+    growth: { atk: 'S', def: 'A', mind: 'B', agi: 'B', morale: 'B' },
     hpBase: 134, // 122 + 6×2
     hpGrowth: 6,
     mpBase: 14, // 12 + 1×2
@@ -735,7 +736,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     maxRange: 1,
     attackShape: 'chebyshev',
     moveProfile: 'foot',
-    growth: { atk: 'B', def: 'S', mind: 'C', agi: 'C', morale: 'B' },
+    growth: { atk: 'B', def: 'S', mind: 'A', agi: 'B', morale: 'B' },
     hpBase: 158, // 144 + 7×2
     hpGrowth: 7,
     mpBase: 14, // 12 + 1×2
@@ -756,7 +757,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 2,
     maxRange: 4,
     moveProfile: 'foot',
-    growth: { atk: 'A', def: 'C', mind: 'B', agi: 'B', morale: 'C' },
+    growth: { atk: 'A', def: 'B', mind: 'B', agi: 'B', morale: 'S' },
     hpBase: 120, // 110 + 5×2
     hpGrowth: 5,
     mpBase: 14, // 12 + 1×2
@@ -865,7 +866,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 1,
     maxRange: 1,
     moveProfile: 'horse',
-    growth: { atk: 'C', def: 'S', mind: 'C', agi: 'B', morale: 'B' },
+    growth: { atk: 'C', def: 'C', mind: 'S', agi: 'B', morale: 'B' },
     hpBase: 106, // 98 + 4×2
     hpGrowth: 4,
     mpBase: 48, // 44 + 2×2
@@ -890,7 +891,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 1,
     maxRange: 1,
     moveProfile: 'mage',
-    growth: { atk: 'C', def: 'C', mind: 'S', agi: 'B', morale: 'B' },
+    growth: { atk: 'B', def: 'B', mind: 'S', agi: 'B', morale: 'B' },
     hpBase: 106, // 98 + 4×2
     hpGrowth: 4,
     mpBase: 42, // 36 + 3×2
@@ -949,7 +950,7 @@ export const CLASSES: Record<string, UnitClassDef> = {
     minRange: 1,
     maxRange: 1,
     moveProfile: 'mage',
-    growth: { atk: 'C', def: 'C', mind: 'A', agi: 'B', morale: 'A' },
+    growth: { atk: 'C', def: 'C', mind: 'S', agi: 'A', morale: 'A' },
     hpBase: 106, // 98 + 4×2
     hpGrowth: 4,
     mpBase: 42, // 36 + 3×2
