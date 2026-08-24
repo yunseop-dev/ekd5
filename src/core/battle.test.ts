@@ -481,3 +481,62 @@ describe('포차 광역 (포차계 전용)', () => {
     expect(next.log.some((e) => e.type === 'splash')).toBe(false)
   })
 })
+
+// 무희 상태회복 패시브 (v1.3) — 무희가 자기 페이즈 시작 시 인접(8방) 상태이상 아군을 해제한다 (classes.md §3)
+// 결정적 검증: poisoned 아군의 statBonus.luck을 극단적인 음수로 두면 자연해제(사기%)가 0으로 억제되어
+// 오직 무희의 춤만이 상태이상을 걷어낼 수 있다. 인접 대상은 회복되고, 먼 대상은 남는다.
+describe('무희 상태회복 패시브', () => {
+  it('무희가 자기 페이즈 시작 시 인접(8방) 상태이상 아군을 해제하고, 먼 아군은 남긴다', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 0, y: 0 }, isLeader: true },
+        { officerId: 'xiahoudun', faction: 'player', pos: { x: 2, y: 1 } }, // 무희로 사용할 아군
+        { officerId: 'guojia', faction: 'player', pos: { x: 3, y: 1 } }, // 무희와 인접 — 독
+        { officerId: 'xiahouyuan', faction: 'player', pos: { x: 6, y: 6 } }, // 먼 곳 — 독 (대조)
+        { officerId: 'yellowCavalry', faction: 'enemy', pos: { x: 7, y: 6 } }, // 턴 진행 유지용(어닐레이션 방지)
+      ],
+    })
+    let state = startBattle(stage, 1)
+    const dancer = unit(state, 'xiahoudun')
+    dancer.classId = 'dancer' // 무희
+    const near = unit(state, 'guojia')
+    const far = unit(state, 'xiahouyuan')
+    // 자연해제(사기%) 차단 — 오직 무희만 회복 가능한 상태로 만든다
+    near.statuses = [{ id: 'poison' }]
+    far.statuses = [{ id: 'seal' }]
+    near.statBonus = { luck: -1000 }
+    far.statBonus = { luck: -1000 }
+
+    // 플레이어 페이즈 시작을 재진입시킨다: player → enemy → (턴2) player
+    let next = applyAction(state, { type: 'endPhase' })
+    next = applyAction(next, { type: 'endPhase' })
+
+    // 인접 아군은 무희의 춤으로 회복, 먼 아군(대조)은 그대로
+    expect(unit(next, 'guojia').statuses).toEqual([])
+    expect(unit(next, 'xiahouyuan').statuses).toEqual([{ id: 'seal' }])
+    expect(next.log.some((e) => e.type === 'danceCure')).toBe(true)
+  })
+
+  it('무희가 아닌 병과는 페이즈 시작 시 인접 아군 상태이상을 해제하지 않는다', () => {
+    const stage = mkStage({
+      units: [
+        { officerId: 'caocao', faction: 'player', pos: { x: 0, y: 0 }, isLeader: true },
+        { officerId: 'xiahoudun', faction: 'player', pos: { x: 2, y: 1 } }, // 무희 아님
+        { officerId: 'guojia', faction: 'player', pos: { x: 3, y: 1 } }, // 인접 — 독
+        { officerId: 'yellowCavalry', faction: 'enemy', pos: { x: 7, y: 6 } }, // 턴 진행 유지용(어닐레이션 방지)
+      ],
+    })
+    let state = startBattle(stage, 1)
+    const nonDancer = unit(state, 'xiahoudun')
+    nonDancer.classId = 'strategist' // 무희 아님
+    const near = unit(state, 'guojia')
+    near.statuses = [{ id: 'poison' }]
+    near.statBonus = { luck: -1000 }
+
+    let next = applyAction(state, { type: 'endPhase' })
+    next = applyAction(next, { type: 'endPhase' })
+
+    expect(unit(next, 'guojia').statuses).toEqual([{ id: 'poison' }]) // 해제되지 않는다
+    expect(next.log.some((e) => e.type === 'danceCure')).toBe(false)
+  })
+})

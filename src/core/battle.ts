@@ -743,6 +743,38 @@ function applySplash(state: BattleState, attacker: UnitState, center: UnitState,
   }
 }
 
+// 인접 8방 (체비쇼프 1) — 포차 광역·무희 회복 등 공용
+const NEIGHBOR8: ReadonlyArray<readonly [number, number]> = [
+  [-1, -1],
+  [0, -1],
+  [1, -1],
+  [-1, 0],
+  [1, 0],
+  [-1, 1],
+  [0, 1],
+  [1, 1],
+]
+
+/**
+ * 무희 상태회복 패시브 (classes.md §3) — 무희(무희/무희(舞姬), 계열 dancer) 는 **자기 페이즈 시작 시**
+ * 인접(8방)한 상태이상 아군의 상태이상을 모두 춤으로 회복시킨다. HP 회복이 아니라 상태이상 해제다.
+ */
+function applyDancerRecovery(state: BattleState): void {
+  const dancers = livingUnits(state, state.phase).filter((u) => classOf(u).lineage === 'dancer')
+  for (const dancer of dancers) {
+    for (const [dx, dy] of NEIGHBOR8) {
+      const ally = unitAt(state, { x: dancer.pos.x + dx, y: dancer.pos.y + dy })
+      if (!ally || ally.id === dancer.id || isHostile(dancer, ally)) continue
+      if (ally.statuses.length === 0) continue
+      const cured = ally.statuses.map((s) => statusName(s.id))
+      ally.statuses = []
+      log(state, 'danceCure', `${nameOf(dancer)}의 춤 — ${nameOf(ally)}의 ${cured.join('·')} 상태가 회복되었다!`, {
+        targetId: ally.id,
+      })
+    }
+  }
+}
+
 /** 한 번의 타격 해소 (명중 → 회심 → 데미지 → 장비 특수효과). 명중 여부 반환. damageScale: 반격 시 0.8 */
 function resolveStrike(
   state: BattleState,
@@ -1387,6 +1419,9 @@ export function applyAction(prev: BattleState, action: BattleAction): BattleStat
           log(state, 'regen', `${nameOf(unit)} — 깃옷의 기운으로 ${regained} 회복`)
         }
       }
+
+      // 무희 상태회복 패시브 — 무희(무희 계열)가 자기 페이즈 시작 시 인접(8방) 상태이상 아군을 춤으로 회복 (classes.md §3)
+      applyDancerRecovery(state)
       break
     }
 
